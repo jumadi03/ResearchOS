@@ -7,7 +7,7 @@ from app.architecture.governance import (
 )
 
 
-def main() -> None:
+def test_contract() -> None:
     registry = ValidatorRegistry()
 
     print("Registry :", registry)
@@ -27,5 +27,3 @@ def main() -> None:
     print("PASS")
 
 
-if __name__ == "__main__":
-    main()

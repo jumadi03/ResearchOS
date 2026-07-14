@@ -6,7 +6,7 @@ from app.kernel.contracts import Capability
 from app.kernel.contracts import Transformer
 
 
-def main() -> None:
+def test_contract() -> None:
     print("Capability :", Capability)
     print("Transformer:", Transformer)
 
@@ -14,5 +14,3 @@ def main() -> None:
     print("PASS")
 
 
-if __name__ == "__main__":
-    main()

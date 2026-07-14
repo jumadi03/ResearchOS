@@ -12,7 +12,7 @@ from app.architecture import (
 )
 
 
-def main() -> None:
+def test_contract() -> None:
 
     #
     # Arrange
@@ -70,5 +70,3 @@ def main() -> None:
     )
 
 
-if __name__ == "__main__":
-    main()

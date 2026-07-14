@@ -5,7 +5,7 @@ Manual test for Law Registry.
 from app.architecture.governance import LawRegistry
 
 
-def main() -> None:
+def test_contract() -> None:
     registry = LawRegistry()
 
     print("Registry :", registry)
@@ -17,5 +17,3 @@ def main() -> None:
     print("PASS")
 
 
-if __name__ == "__main__":
-    main()

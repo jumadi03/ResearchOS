@@ -2,4 +2,5 @@ from app.architecture.transformers import (
     ArchitectureTransformer,
 )
 
-print(ArchitectureTransformer)
+def test_architecture_transformer_is_importable() -> None:
+    assert ArchitectureTransformer is not None

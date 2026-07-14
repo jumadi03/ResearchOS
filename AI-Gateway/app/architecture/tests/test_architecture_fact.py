@@ -7,21 +7,24 @@ from app.architecture.models.architecture_fact import (
 )
 
 
-artifact = ArchitectureArtifact(
-    artifact_id="ART-0001",
-    name="ScientificTheory",
-    artifact_type="DomainModel",
-    module=(
-        "app.modeling.models."
-        "scientific_theory"
-    ),
-)
+def test_architecture_fact_contract() -> None:
+    artifact = ArchitectureArtifact(
+        artifact_id="ART-0001",
+        name="ScientificTheory",
+        artifact_type="DomainModel",
+        module=(
+            "app.modeling.models."
+            "scientific_theory"
+        ),
+        source="class ScientificTheory: ...",
+    )
 
-fact = ArchitectureFact(
-    fact_id="FACT-0001",
-    artifact=artifact,
-    fact_name="Frozen",
-    fact_value="True",
-)
+    fact = ArchitectureFact(
+        fact_id="FACT-0001",
+        artifact=artifact,
+        fact_name="Frozen",
+        fact_value="True",
+    )
 
-print(fact)
+    assert fact.artifact is artifact
+    assert fact.fact_name == "Frozen"

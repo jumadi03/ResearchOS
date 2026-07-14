@@ -1,0 +1,25 @@
+[project]
+name = "researchos-ai-gateway"
+version = "0.3.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi==0.139.0",
+    "pydantic==2.13.4",
+    "python-dotenv==1.2.2",
+    "requests==2.34.2",
+    "sse-starlette==3.4.5",
+    "uvicorn==0.50.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["app"]
+python_files = ["test_*.py"]
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+]

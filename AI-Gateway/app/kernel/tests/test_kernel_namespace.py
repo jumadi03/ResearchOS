@@ -8,7 +8,7 @@ from app.kernel.contracts import Transformer
 from app.kernel.execution import ExecutionContext
 
 
-def main() -> None:
+def test_contract() -> None:
     print("Kernel Namespace :", app.kernel.__name__)
     print("Capability       :", Capability)
     print("Transformer      :", Transformer)
@@ -18,5 +18,3 @@ def main() -> None:
     print("PASS")
 
 
-if __name__ == "__main__":
-    main()

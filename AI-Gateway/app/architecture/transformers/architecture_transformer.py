@@ -14,7 +14,7 @@ Contains no implementation.
 
 from typing import Protocol
 
-from app.kernel.transformers.transformer import (
+from app.kernel.contracts.transformer import (
     Transformer,
 )
 

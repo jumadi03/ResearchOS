@@ -44,7 +44,7 @@ class ArchitectureViolation:
     #
     # Related architecture law.
     #
-    law: ArchitectureFact
+    law: ArchitectureLaw
 
     #
     # Violated architecture fact.

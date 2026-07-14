@@ -22,21 +22,31 @@ law = ArchitectureLaw(
 )
 
 
-fact = ArchitectureFact(
-    fact_id="FACT-0001",
-    artifact_name="ScientificTheory",
-    artifact_type="DomainModel",
-    fact_name="Frozen",
-    fact_value="False",
+from app.architecture.models.architecture_artifact import (
+    ArchitectureArtifact,
 )
 
 
-violation = ArchitectureViolation(
-    violation_id="VIO-0001",
-    law=law,
-    fact=fact,
-    message="Domain Model must be immutable.",
-)
+def test_architecture_violation_contract() -> None:
+    artifact = ArchitectureArtifact(
+        artifact_id="ART-0001",
+        name="ScientificTheory",
+        artifact_type="DomainModel",
+        module="app.modeling.models.scientific_theory",
+        source="class ScientificTheory: ...",
+    )
+    fact = ArchitectureFact(
+        fact_id="FACT-0001",
+        artifact=artifact,
+        fact_name="Frozen",
+        fact_value="False",
+    )
+    violation = ArchitectureViolation(
+        violation_id="VIO-0001",
+        law=law,
+        fact=fact,
+        message="Domain Model must be immutable.",
+    )
 
-
-print(violation)
+    assert violation.law is law
+    assert violation.fact is fact
