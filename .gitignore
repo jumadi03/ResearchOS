@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+deploy/stack.env
+deploy/local-access.env
+deploy/monitoring/prometheus.token
 
 # Python bytecode and caches
 __pycache__/

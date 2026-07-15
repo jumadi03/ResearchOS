@@ -1,0 +1,94 @@
+"""Repeatable DATA-002G reviewed-evidence graph acceptance check."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+import os
+
+from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
+from app.knowledge.repositories.postgres import PostgresScientificDataRepository
+from canonical_evidence import manifest
+from canonical_repository import discovery_run
+from representation_repository import result
+
+
+def timestamp(value: datetime) -> str:
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def main() -> None:
+    repository = PostgresScientificDataRepository(os.environ["DATABASE_URL"])
+    record = discovery_run().records[0]
+    source_representation = result(
+        b"%PDF-1.7\nResearchOS representation v2\n", "2026-07-15T13:05:00Z"
+    )
+    extraction = manifest(source_representation.content_hash)
+    graph = ScientificKnowledgeGraphBuilder().build(extraction)
+    now = datetime.now(timezone.utc)
+    method_review = repository.review_evidence(
+        "healthcheck-method", decision="accepted", reviewer="graph-reviewer@researchos.local",
+        rationale=f"Accepted for graph healthcheck {timestamp(now)}.", occurred_at=timestamp(now),
+    )
+    limitation_review = repository.review_evidence(
+        "healthcheck-limitation", decision="accepted", reviewer="graph-reviewer@researchos.local",
+        rationale=f"Accepted for graph healthcheck {timestamp(now)}.",
+        occurred_at=timestamp(now + timedelta(seconds=1)),
+    )
+    first = repository.persist_graph(graph, occurred_at=extraction.created_at)
+    assert repository.persist_graph(graph, occurred_at=extraction.created_at) == first
+    assert len(first) == len(graph.edges) == 2
+
+    review_ids = (method_review.provenance_id, limitation_review.provenance_id)
+    with repository._connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT count(DISTINCT n.node_id)
+                FROM knowledge_nodes n
+                JOIN canonical_objects c ON c.object_id=n.object_id
+                WHERE c.stable_key IN (
+                    'doi:10.0000/researchos.repository-healthcheck',
+                    'evidence:healthcheck-method', 'evidence:healthcheck-limitation'
+                )
+            """)
+            assert cursor.fetchone()[0] == 3
+            cursor.execute("""
+                SELECT count(*), count(DISTINCT e.provenance_id),
+                       bool_and(e.review_status='accepted'),
+                       bool_and(p.human_reviewer='graph-reviewer@researchos.local')
+                FROM knowledge_edges e
+                JOIN provenance_events p ON p.provenance_id=e.provenance_id
+                WHERE p.event_payload->>'evidence_review_provenance_id' IN (%s,%s)
+            """, review_ids)
+            assert cursor.fetchone() == (2, 2, True, True)
+
+    repository.review_evidence(
+        "healthcheck-limitation", decision="rejected",
+        reviewer="graph-reviewer@researchos.local",
+        rationale=f"Revoked after graph healthcheck {timestamp(now)}.",
+        occurred_at=timestamp(now + timedelta(seconds=2)),
+    )
+    try:
+        repository.persist_graph(graph, occurred_at=extraction.created_at)
+    except ValueError as exc:
+        assert "not accepted" in str(exc)
+    else:
+        raise AssertionError("Graph persistence accepted rejected evidence")
+    with repository._connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT p.event_payload->>'evidence_object_id', e.review_status
+                FROM knowledge_edges e
+                JOIN provenance_events p ON p.provenance_id=e.provenance_id
+                WHERE p.event_payload->>'evidence_review_provenance_id' IN (%s,%s)
+                ORDER BY 1
+            """, review_ids)
+            states = dict(cursor.fetchall())
+    assert states == {
+        "healthcheck-limitation": "rejected",
+        "healthcheck-method": "accepted",
+    }, states
+    print("canonical graph healthcheck: passed")
+
+
+if __name__ == "__main__":
+    main()
