@@ -26,12 +26,14 @@ from app.knowledge.service import KnowledgeDiscoveryService
 from app.settings import (
     KNOWLEDGE_API_PRINCIPALS, KNOWLEDGE_OUTPUT_ROOT,
     KNOWLEDGE_PROVIDER_MAX_ATTEMPTS, KNOWLEDGE_PROVIDER_TIMEOUT,
-    DATABASE_URL, KNOWLEDGE_DOCUMENT_MAX_BYTES, SEMANTIC_SCHOLAR_API_KEY,
+    DATABASE_URL, DATABASE_SCHEMA_VERSION, KNOWLEDGE_DOCUMENT_MAX_BYTES,
+    SEMANTIC_SCHOLAR_API_KEY,
     MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_DOCUMENT_BUCKET,
 )
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.repositories.minio import MinioScientificObjectStore
+from app.infrastructure.database import require_schema_version
 from app.observability import (
     AuditTrail,
     CorrelationMiddleware,
@@ -61,6 +63,7 @@ def create_app() -> FastAPI:
     )
     app.state.knowledge_authenticator = KnowledgeAuthenticator(KNOWLEDGE_API_PRINCIPALS)
     if DATABASE_URL:
+        require_schema_version(DATABASE_URL, DATABASE_SCHEMA_VERSION)
         from app.product.sessions import WorkspaceSessionManager
         from app.product.intelligence import IntelligenceLedger
 

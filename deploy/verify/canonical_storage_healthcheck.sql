@@ -41,3 +41,11 @@ WHERE schemaname='public' AND tablename IN (
     'knowledge_nodes','knowledge_edges','research_artifacts',
     'artifact_lifecycle_events','publication_representations'
 );
+
+DO $$
+BEGIN
+    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 15 THEN
+        RAISE EXCEPTION 'database schema version does not match application';
+    END IF;
+END;
+$$;

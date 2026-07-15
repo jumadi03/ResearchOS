@@ -37,6 +37,23 @@ format dump plus compressed MinIO and knowledge-volume snapshots at startup and
 every 24 hours. It verifies every archive and retains 14 days by default.
 Configure intervals in `stack.env`.
 
+## Database migrations
+
+PostgreSQL schema changes are applied by the one-shot `migrate` service before
+the API, worker, or backup service starts. Every migration is recorded in
+`schema_migrations` with its version, filename, and SHA-256 checksum. A changed
+checksum or incomplete legacy baseline stops deployment instead of guessing.
+
+For an existing volume, apply and verify pending migrations with:
+
+```powershell
+docker compose --env-file stack.env -f compose.yaml run --rm migrate
+```
+
+The command is idempotent. The API also checks `DATABASE_SCHEMA_VERSION` during
+startup and refuses to run against an older or newer schema. Never edit a
+migration that has already been applied; add a new numbered migration instead.
+
 ## Background jobs
 
 Workers claim jobs using `FOR UPDATE SKIP LOCKED`. Supported job types are
