@@ -1,0 +1,27 @@
+groups:
+  - name: researchos-worker
+    rules:
+      - alert: ResearchOSWorkerMissing
+        expr: up{job="researchos-worker"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: ResearchOS worker metrics endpoint is unavailable
+      - alert: ResearchOSWorkerHeartbeatStale
+        expr: time() - researchos_worker_heartbeat_unixtime > 30
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: ResearchOS worker has lost its database heartbeat
+      - alert: ResearchOSDeadLetterJobs
+        expr: researchos_worker_queue_jobs{status="dead_letter"} > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: ResearchOS has jobs in the dead-letter queue
+      - alert: ResearchOSWorkerQueueBacklog
+        expr: researchos_worker_queue_jobs{status="pending"} > 100
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: ResearchOS worker queue backlog is elevated

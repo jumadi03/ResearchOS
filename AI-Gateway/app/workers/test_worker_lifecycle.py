@@ -114,6 +114,9 @@ def test_worker_records_heartbeat_and_removes_stale_workers(monkeypatch):
         def execute(self, statement, parameters=None):
             statements.append((statement, parameters))
 
+        def fetchall(self):
+            return []
+
     class Transaction:
         def __enter__(self):
             return self
@@ -130,3 +133,4 @@ def test_worker_records_heartbeat_and_removes_stale_workers(monkeypatch):
     assert "INSERT INTO worker_heartbeats" in statements[0][0]
     assert statements[0][1] == (worker.WORKER_ID,)
     assert "DELETE FROM worker_heartbeats" in statements[1][0]
+    assert "FROM background_jobs GROUP BY status" in statements[2][0]

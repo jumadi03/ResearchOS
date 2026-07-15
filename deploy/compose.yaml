@@ -80,7 +80,9 @@ services:
       JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-660}
       JOB_RETRY_BASE_SECONDS: ${JOB_RETRY_BASE_SECONDS:-5}
       JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-600}
+      WORKER_METRICS_PORT: 9102
     volumes: ["knowledge_data:/data/knowledge"]
+    expose: ["9102"]
     depends_on:
       migrate: {condition: service_completed_successfully}
       minio: {condition: service_healthy}
@@ -100,7 +102,8 @@ services:
     ports: ["127.0.0.1:9090:9090"]
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus.token:/etc/prometheus/researchos.token:ro
+      - ./monitoring/worker-alerts.yml:/etc/prometheus/worker-alerts.yml:ro
+      - ./monitoring/prometheus.token:/etc/prometheus/prometheus.token:ro
       - prometheus_data:/prometheus
 
   grafana:

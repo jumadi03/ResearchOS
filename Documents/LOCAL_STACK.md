@@ -186,6 +186,15 @@ never restore over the active `researchos` database. The latest verified result
 and staging-retirement decisions are documented in
 `STORAGE_COMPLIANCE_REPORT.md`.
 
+## Worker monitoring
+
+The worker exposes Prometheus metrics only on the internal Compose network at
+`worker:9102/metrics`. Metrics cover database heartbeat time, queue depth by
+status, job outcomes by type, and job duration count/sum. Prometheus loads four
+alerts from `deploy/monitoring/worker-alerts.yml`: unavailable metrics, stale
+database heartbeat, dead-letter jobs, and sustained pending queue backlog. Use
+the Prometheus **Status > Targets** and **Alerts** pages to inspect current state.
+
 ## Security
 
 Local secrets are stored in ignored `deploy/stack.env`. Services bind only to

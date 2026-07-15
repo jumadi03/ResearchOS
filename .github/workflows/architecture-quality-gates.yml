@@ -94,6 +94,14 @@ jobs:
           --env-file stack.env.example
           -f compose.yaml
           config --quiet
+      - name: Validate Prometheus configuration and alert rules
+        working-directory: deploy
+        run: >-
+          docker run --rm
+          --entrypoint promtool
+          --volume "$PWD/monitoring:/etc/prometheus:ro"
+          prom/prometheus:v3.8.1
+          check config /etc/prometheus/prometheus.yml
       - name: Build API and worker image
         working-directory: AI-Gateway
         run: docker build --tag researchos-ci .

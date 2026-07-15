@@ -8,8 +8,10 @@ from queue import Empty
 import signal
 import socket
 from threading import Thread
-from time import sleep
+from time import perf_counter, sleep
 from uuid import uuid4
+
+from app.workers.metrics import WorkerMetrics
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 KNOWLEDGE_ROOT = Path(os.getenv("KNOWLEDGE_OUTPUT_ROOT", "/data/knowledge"))
@@ -18,8 +20,10 @@ JOB_MAX_ATTEMPTS = int(os.getenv("JOB_MAX_ATTEMPTS", "3"))
 JOB_LEASE_SECONDS = int(os.getenv("JOB_LEASE_SECONDS", "660"))
 JOB_RETRY_BASE_SECONDS = int(os.getenv("JOB_RETRY_BASE_SECONDS", "5"))
 JOB_TIMEOUT_SECONDS = int(os.getenv("JOB_TIMEOUT_SECONDS", "600"))
+WORKER_METRICS_PORT = int(os.getenv("WORKER_METRICS_PORT", "9102"))
 WORKER_ID = os.getenv("WORKER_ID", f"{socket.gethostname()}:{uuid4()}")
 _stop_requested = False
+metrics = WorkerMetrics()
 
 
 def record_heartbeat(connection) -> None:
@@ -35,6 +39,10 @@ def record_heartbeat(connection) -> None:
         cursor.execute(
             "DELETE FROM worker_heartbeats WHERE last_seen_at < now() - interval '7 days'"
         )
+        cursor.execute(
+            "SELECT status, count(*) FROM background_jobs GROUP BY status"
+        )
+        metrics.set_queue({status: count for status, count in cursor.fetchall()})
 
 
 def heartbeat_loop(database_url: str) -> None:
@@ -45,6 +53,7 @@ def heartbeat_loop(database_url: str) -> None:
         try:
             with psycopg.connect(database_url, autocommit=True) as connection:
                 record_heartbeat(connection)
+                metrics.heartbeat()
         except psycopg.Error:
             pass
         for _ in range(5):
@@ -143,7 +152,7 @@ def mark_failed(connection, job_id, error: Exception):
         )
         row = cursor.fetchone()
         if row is None:
-            return
+            return "missing"
         attempts = row[0]
         status, delay = failure_disposition(attempts)
         terminal = status == "dead_letter"
@@ -158,6 +167,7 @@ def mark_failed(connection, job_id, error: Exception):
             status, terminal, terminal, delay or 0, str(error)[:4000],
             job_id, WORKER_ID,
         ))
+        return status
 
 
 def execute(connection, job_type, payload):
@@ -260,8 +270,11 @@ def main():
         raise RuntimeError("DATABASE_URL is required for the background worker")
     if JOB_LEASE_SECONDS <= JOB_TIMEOUT_SECONDS:
         raise RuntimeError("JOB_LEASE_SECONDS must be greater than JOB_TIMEOUT_SECONDS")
+    if WORKER_METRICS_PORT <= 0:
+        raise RuntimeError("WORKER_METRICS_PORT must be positive")
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
+    metrics.serve(WORKER_METRICS_PORT)
     Thread(
         target=heartbeat_loop,
         args=(DATABASE_URL,),
@@ -277,11 +290,18 @@ def main():
                         sleep(2)
                         continue
                     job_id, job_type, payload = job
+                    started = perf_counter()
                     try:
                         execute_with_timeout(DATABASE_URL, job_type, payload)
                         mark_complete(connection, job_id)
+                        metrics.observe_job(
+                            job_type, "complete", perf_counter() - started
+                        )
                     except Exception as exc:
-                        mark_failed(connection, job_id, exc)
+                        outcome = mark_failed(connection, job_id, exc)
+                        metrics.observe_job(
+                            job_type, outcome, perf_counter() - started
+                        )
         except psycopg.Error:
             if not _stop_requested:
                 sleep(5)
