@@ -50,6 +50,7 @@ app/
     discovery/     # scientific object dan evidence discovery
     infrastructure/
     kernel/        # kontrak lintas domain
+    knowledge/     # literature discovery dan scientific knowledge
     modeling/      # scientific modeling
     router/
     runtime/
@@ -67,6 +68,66 @@ memiliki violation.
 
 Spesifikasi terminologi, trust boundary, status, dan reproducibility gate ada
 di [`Documents/ARCHITECTURE_GOVERNANCE.md`](../Documents/ARCHITECTURE_GOVERNANCE.md).
+
+Visi, batas domain, provenance rules, dan roadmap bertahap untuk Scientific
+Knowledge Subsystem ada di
+[`Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md`](../Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md).
+
+SK-001A menyediakan endpoint terautentikasi `POST /knowledge/discovery/runs`
+untuk menjalankan pencarian OpenAlex, Crossref, dan Semantic Scholar. Endpoint
+bersifat fail-closed dan memerlukan Bearer token dengan role `discoverer` dari
+`KNOWLEDGE_API_PRINCIPALS`. Contoh konfigurasi tersedia di `.env.example`.
+
+Setiap run menyimpan raw provider pages, hash provenance, cache response, dan
+snapshot kanonis di `KNOWLEDGE_OUTPUT_ROOT`. Klien tidak dapat menentukan path
+penyimpanan. `SEMANTIC_SCHOLAR_API_KEY` bersifat opsional, tetapi disarankan
+untuk quota provider yang lebih stabil.
+
+SK-001B metadata collection tersedia melalui
+`POST /knowledge/discovery/runs/{run_id}/metadata`. Hasilnya tidak mengubah
+snapshot discovery: observasi provider, citation edges, konflik metadata, dan
+correction/retraction signals disimpan sebagai snapshot metadata berversi.
+
+SK-001C document acquisition tersedia melalui
+`POST /knowledge/discovery/runs/{run_id}/documents`. Acquisition memerlukan
+provenance yang cocok dengan discovery run, status akses `open`, lisensi yang
+dinyatakan, dan URL HTTPS. Konten PDF valid disimpan secara content-addressed;
+hak akses yang restricted atau unknown hanya menghasilkan metadata-only
+registry entry dan tidak memicu download.
+
+SK-001D evidence extraction tersedia melalui
+`POST /knowledge/documents/{document_id}/extractions`. Hanya blob PDF yang
+lolos verifikasi registry dapat diproses. Setiap objek hasil extraction
+memiliki koordinat sumber, quote hash, confidence, parser version, dan status
+`provisional`; parser tidak dapat memberikan status accepted secara otomatis.
+
+SK-001E Scientific Knowledge Graph tersedia melalui
+`POST /knowledge/extractions/{extraction_id}/graph`. Graph bersifat
+deterministik dan content-addressed. Semua relationship tetap berupa assertion
+ber-provenance; pembentukan graph tidak mengubah hasil extraction menjadi fakta
+tervalidasi.
+
+SK-001F Theory Builder tersedia melalui `POST /knowledge/theories` untuk
+synthesis dari satu atau beberapa verified graph. Review manusia dicatat lewat
+`POST /knowledge/theories/{bundle_id}/reviews`; keputusan membutuhkan rationale
+dan identity reviewer selalu berasal dari principal terautentikasi.
+
+SK-001G Research Gap Detection tersedia melalui
+`POST /knowledge/theories/{bundle_id}/gaps`. Setiap gap menyimpan taxonomy,
+severity, rule pemicu, theory/evidence references, dan explanation. Hypothesis
+proposal selalu advisory dan tidak dipromosikan menjadi teori atau evidence.
+
+SK-001H Validation Engine tersedia melalui
+`POST /knowledge/theories/{bundle_id}/validations`. Confidence score adalah
+hasil assessment method berversi, bukan probabilitas teori benar. Laporan
+merekam replication, contradiction, risk of bias, staleness, evidence IDs,
+alasan status, dan reviewer terautentikasi dengan semantics fail-safe.
+
+SK-001I Publication Engine tersedia melalui
+`POST /knowledge/theories/{bundle_id}/publications`. Output kanonis adalah
+Markdown evidence-linked beserta manifest reproducibility. Citation verifier
+dan validation status menjadi release gate; systematic-review support hanya
+dapat diterbitkan dari validation `PASS`. Paket yang sudah dirilis immutable.
 
 Architecture Graph MVP tersedia melalui `ArchitectureGraphBuilder`. Builder
 memindai source Python dan menghasilkan snapshot JSON deterministik berisi
@@ -131,3 +192,9 @@ schema/ARC/persistence, pemeriksaan konsistensi dependency, kompilasi source,
 dan audit vulnerability. Branch protection sebaiknya mewajibkan ketiga check
 `Regression and coverage`, `Schema, ARC, and persistence gates`, serta
 `Dependency security` sebelum merge.
+
+Panduan stack lokal PostgreSQL/pgvector, MinIO, API, worker, monitoring, dan
+backup tersedia di [`Documents/LOCAL_STACK.md`](../Documents/LOCAL_STACK.md).
+Arsitektur canonical identity, representation, provenance, graph, semantic
+index, artifact lifecycle, dan publication storage tersedia di
+[`Documents/SCIENTIFIC_DATA_STORAGE.md`](../Documents/SCIENTIFIC_DATA_STORAGE.md).
