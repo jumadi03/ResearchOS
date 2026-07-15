@@ -82,6 +82,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Prepare isolated CI configuration
+        working-directory: deploy
+        run: |
+          cp stack.env.example stack.env
+          printf 'ci-auditor-token\n' > monitoring/prometheus.token
       - name: Validate Compose configuration
         working-directory: deploy
         run: >-
