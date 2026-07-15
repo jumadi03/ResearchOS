@@ -1,22 +1,43 @@
+"""Structured logging with request correlation context."""
+
+from contextvars import ContextVar
+from datetime import datetime, timezone
+import json
 import logging
-import os
+from pathlib import Path
 
-os.makedirs("logs", exist_ok=True)
 
-logger = logging.getLogger("ResearchOS")
-logger.setLevel(logging.INFO)
+correlation_id_context: ContextVar[str] = ContextVar(
+    "correlation_id", default="unscoped"
+)
 
-if not logger.handlers:
 
-    file_handler = logging.FileHandler(
-        "logs/researchos.log",
-        encoding="utf-8"
-    )
+class JSONFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "event": getattr(record, "event", record.getMessage()),
+            "correlation_id": correlation_id_context.get(),
+            **getattr(record, "fields", {}),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(message)s"
-    )
 
-    file_handler.setFormatter(formatter)
+def configure_logging(log_directory: Path | None = None) -> logging.Logger:
+    logger = logging.getLogger("ResearchOS")
+    logger.setLevel(logging.INFO)
+    if logger.handlers:
+        return logger
+    directory = log_directory or Path("logs")
+    directory.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(directory / "researchos.jsonl", encoding="utf-8")
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
+    return logger
 
-    logger.addHandler(file_handler)
+
+logger = configure_logging()

@@ -1,0 +1,188 @@
+"""Generate a verified Architecture Review & Compliance package."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from hashlib import sha256
+
+from ..models import (
+    ARCManifest,
+    ARCPackage,
+    ArchitectureGraph,
+    ArchitectureLawBundle,
+    ReviewSession,
+    ReviewStatus,
+    ValidationReport,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ARCGenerator:
+    """Create ARC artifacts only after all integrity gates pass."""
+
+    def generate(
+        self,
+        *,
+        graph: ArchitectureGraph,
+        law_bundle: ArchitectureLawBundle,
+        compliance_report: ValidationReport,
+        review: ReviewSession,
+        generated_at: str,
+        generated_by: str = "system",
+    ) -> ARCPackage:
+        datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        self._validate_inputs(graph, law_bundle, compliance_report, review)
+
+        artifacts = {
+            "architecture-graph.json": graph.to_json(),
+            "laws.json": law_bundle.to_json(),
+            "compliance-report.json": compliance_report.to_json(),
+            "review.json": review.to_json(),
+            "report.md": self._render_markdown(
+                graph, law_bundle, compliance_report, review, generated_at,
+                generated_by,
+            ),
+        }
+        checksums = {
+            name: sha256(content.encode("utf-8")).hexdigest()
+            for name, content in sorted(artifacts.items())
+        }
+        manifest = ARCManifest(
+            arc_id="",
+            project_name=graph.project_name,
+            generated_at=generated_at,
+            graph_id=graph.graph_id,
+            graph_hash=graph.content_hash,
+            source_revision=graph.source_revision,
+            law_bundle_id=law_bundle.bundle_id,
+            law_bundle_hash=law_bundle.content_hash,
+            compliance_hash=compliance_report.calculate_content_hash(),
+            review_id=review.review_id,
+            review_hash=review.calculate_content_hash(),
+            generated_by=generated_by,
+            artifact_checksums=checksums,
+        ).finalized()
+        package = ARCPackage(manifest=manifest, artifacts=artifacts)
+        if not package.verify():
+            raise ValueError("Generated ARC package failed its integrity check")
+        return package
+
+    @staticmethod
+    def _validate_inputs(
+        graph: ArchitectureGraph,
+        bundle: ArchitectureLawBundle,
+        report: ValidationReport,
+        review: ReviewSession,
+    ) -> None:
+        if review.status is not ReviewStatus.APPROVED:
+            raise ValueError("ARC generation requires an approved review")
+        if not graph.content_hash or graph.calculate_content_hash() != graph.content_hash:
+            raise ValueError("Architecture Graph integrity check failed")
+        if not bundle.content_hash or bundle.calculate_content_hash() != bundle.content_hash:
+            raise ValueError("Architecture Law Bundle integrity check failed")
+        metadata = report.metadata or {}
+        if metadata.get("graph_id") != graph.graph_id:
+            raise ValueError("Compliance report graph_id does not match the graph")
+        if metadata.get("graph_hash") != graph.content_hash:
+            raise ValueError("Compliance report graph_hash does not match the graph")
+        if review.graph_id != graph.graph_id or review.graph_hash != graph.content_hash:
+            raise ValueError("Review graph provenance does not match the graph")
+
+        violations = {
+            violation.violation_id: violation
+            for result in report.validation_results
+            for violation in result.violations
+        }
+        if {finding.finding_id for finding in review.findings} != set(violations):
+            raise ValueError("Review findings do not match compliance violations")
+        bundle_laws = {(law.law_id, law.version) for law in bundle.laws}
+        referenced_laws = {
+            (violation.law.law_id, violation.law.version)
+            for violation in violations.values()
+        }
+        if not referenced_laws.issubset(bundle_laws):
+            raise ValueError("Compliance report references a law outside the bundle")
+
+    @staticmethod
+    def _escape(value: object) -> str:
+        return str(value).replace("|", "\\|").replace("\n", " ")
+
+    def _render_markdown(
+        self,
+        graph: ArchitectureGraph,
+        bundle: ArchitectureLawBundle,
+        report: ValidationReport,
+        review: ReviewSession,
+        generated_at: str,
+        generated_by: str,
+    ) -> str:
+        lines = [
+            "# Architecture Review & Compliance Report",
+            "",
+            f"- Project: `{self._escape(graph.project_name)}`",
+            f"- Source revision: `{self._escape(graph.source_revision or 'unspecified')}`",
+            f"- Generated at: `{generated_at}`",
+            f"- Generated by: `{self._escape(generated_by)}`",
+            f"- Graph: `{graph.graph_id}`",
+            f"- Graph hash: `{graph.content_hash}`",
+            f"- Law bundle: `{bundle.bundle_id}`",
+            f"- Compliance status: **{report.status}**",
+            f"- Review status: **{review.status.value}**",
+            "",
+            "## Summary",
+            "",
+            f"- Architecture nodes: {len(graph.nodes)}",
+            f"- Architecture edges: {len(graph.edges)}",
+            f"- Applicable law bundle entries: {len(bundle.laws)}",
+            f"- Validation results: {len(report.validation_results)}",
+            f"- Findings: {len(review.findings)}",
+            "",
+            "## Validation results",
+            "",
+            "| Validator | Status | Findings |",
+            "|---|---:|---:|",
+        ]
+        lines.extend(
+            f"| {self._escape(result.validation_id)} | {result.status.value} | "
+            f"{len(result.violations)} |"
+            for result in report.validation_results
+        )
+        lines.extend(["", "## Findings and decisions", ""])
+        if not review.findings:
+            lines.append("No architecture violations were reported.")
+        else:
+            lines.extend(
+                [
+                    "| Finding | Law | Message | Decision | Reviewer | Expiry |",
+                    "|---|---|---|---|---|---|",
+                ]
+            )
+            for finding in review.findings:
+                decision = review.current_decision(finding.finding_id)
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        self._escape(value)
+                        for value in (
+                            finding.finding_id,
+                            finding.violation.law.law_id,
+                            finding.violation.message,
+                            decision.decision_type.value if decision else "UNDECIDED",
+                            decision.reviewer if decision else "",
+                            decision.expires_at if decision else "",
+                        )
+                    )
+                    + " |"
+                )
+        lines.extend(
+            [
+                "",
+                "## Integrity",
+                "",
+                "This report is part of a content-addressed ARC package. Refer to "
+                "`manifest.json` and `checksums.json` for artifact verification.",
+                "",
+            ]
+        )
+        return "\n".join(lines)

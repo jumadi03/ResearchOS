@@ -4,12 +4,13 @@ ResearchOS Architecture Compliance Engine.
 Coordinates architecture validators.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .validator_registry import ValidatorRegistry
 
 from ..models import (
     ArchitectureValidationResult,
+    ArchitectureGraph,
     ValidationReport,
 )
 
@@ -39,6 +40,9 @@ class ComplianceEngine:
 
     def validate(
         self,
+        graph: ArchitectureGraph | None = None,
+        *,
+        as_of: str | None = None,
     ) -> ValidationReport:
         """
         Execute every registered validator.
@@ -51,10 +55,18 @@ class ComplianceEngine:
         ] = []
 
         for validator in self.registry.get_all():
+            active_validator = validator
+            if graph is not None or as_of is not None:
+                active_validator = replace(validator, graph=graph, as_of=as_of)
             results.append(
-                validator.validate()
+                active_validator.validate()
             )
 
         return ValidationReport(
             validation_results=tuple(results),
+            metadata={
+                "graph_id": graph.graph_id if graph else None,
+                "graph_hash": graph.content_hash if graph else None,
+                "as_of": as_of,
+            },
         )

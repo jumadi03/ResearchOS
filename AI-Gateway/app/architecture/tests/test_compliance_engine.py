@@ -11,6 +11,7 @@ from app.architecture.governance import (
     NamespaceValidator,
     ValidatorRegistry,
 )
+from app.architecture.models import ValidationStatus
 
 
 def test_contract() -> None:
@@ -64,6 +65,13 @@ def test_contract() -> None:
 
     assert len(results) == 2
 
+    # Foundation validators are deliberately inconclusive. An empty list of
+    # violations must not be interpreted as a compliant architecture.
+    assert report.status == "INCOMPLETE"
+    assert report.is_compliant is False
+    assert results[0].status is ValidationStatus.NOT_IMPLEMENTED
+    assert results[1].status is ValidationStatus.NOT_RUN
+
     assert (
         results[0].validation_id
         == "NAMESPACE-FOUNDATION"
@@ -71,7 +79,7 @@ def test_contract() -> None:
 
     assert (
         results[1].validation_id
-        == "DEPENDENCY-FOUNDATION"
+        == "DEPENDENCY"
     )
 
     print()

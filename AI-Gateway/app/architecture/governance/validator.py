@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from .law_resolution import LawResolution
 
 from ..models import (
+    ArchitectureGraph,
     ArchitectureValidationResult,
+    ValidationStatus,
 )
 
 
@@ -27,6 +29,8 @@ class Validator:
     """
 
     resolution: LawResolution
+    graph: ArchitectureGraph | None = None
+    as_of: str | None = None
 
     def validate(self) -> ArchitectureValidationResult:
         """
@@ -38,6 +42,7 @@ class Validator:
         return ArchitectureValidationResult(
             validation_id="VALIDATION-FOUNDATION",
             artifact_name="UNKNOWN",
+            status=ValidationStatus.NOT_IMPLEMENTED,
             violations=(),
             metadata={
                 "foundation": True,

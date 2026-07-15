@@ -61,3 +61,13 @@ class ArchitectureViolation:
     #
     metadata: dict[str, Any] = field(
         default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, item: dict[str, Any]) -> "ArchitectureViolation":
+        return cls(
+            violation_id=item["violation_id"],
+            law=ArchitectureLaw.from_dict(item["law"]),
+            fact=ArchitectureFact.from_dict(item["fact"]),
+            message=item["message"],
+            metadata=item.get("metadata", {}),
+        )

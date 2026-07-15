@@ -13,6 +13,9 @@ from .namespace_validator import NamespaceValidator
 from .public_api_validator import PublicAPIValidator
 from .validator import Validator
 from .validator_registry import ValidatorRegistry
+from .review_engine import ReviewEngine
+from .arc_generator import ARCGenerator
+from .arc_publisher import ARCPublisher
 
 __all__ = [
     "LawRegistry",
@@ -23,4 +26,7 @@ __all__ = [
     "DependencyValidator",
     "PublicAPIValidator",
     "ComplianceEngine",
+    "ReviewEngine",
+    "ARCGenerator",
+    "ARCPublisher",
 ]

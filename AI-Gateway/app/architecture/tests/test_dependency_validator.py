@@ -40,10 +40,11 @@ def test_contract() -> None:
     #
     # Contract Test
     #
-    assert result.validation_id == "DEPENDENCY-FOUNDATION"
+    assert result.validation_id == "DEPENDENCY"
     assert result.artifact_name == "DependencyValidator"
     assert result.violations == ()
-    assert result.metadata["resolved_laws"] == 0
+    assert result.status.value == "NOT_RUN"
+    assert result.metadata["reason"] == "ARCHITECTURE_GRAPH_REQUIRED"
 
     print()
     print("CONTRACT TEST : PASS")

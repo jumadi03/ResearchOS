@@ -18,6 +18,7 @@ from .models import (
 from .scanner import ArchitectureScanner
 from .parser import ArchitectureParser
 from .symbol_extractor import SymbolExtractor
+from .graph_builder import ArchitectureGraphBuilder
 from .import_extractor import ImportExtractor
 from .class_extractor import ClassExtractor
 from .visitor import ArchitectureVisitor
@@ -35,6 +36,7 @@ __all__ = [
     "ArchitectureScanner",
     "ArchitectureParser",
     "SymbolExtractor",
+    "ArchitectureGraphBuilder",
     "ImportExtractor",
     "ClassExtractor",
     "ArchitectureVisitor",

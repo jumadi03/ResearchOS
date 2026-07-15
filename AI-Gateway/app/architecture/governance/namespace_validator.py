@@ -13,6 +13,7 @@ from app.architecture.governance.validator import (
 from app.architecture.models.architecture_validation_result import (
     ArchitectureValidationResult,
 )
+from app.architecture.models.validation_status import ValidationStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +43,7 @@ class NamespaceValidator(Validator):
         return ArchitectureValidationResult(
             validation_id="NAMESPACE-FOUNDATION",
             artifact_name="NamespaceValidator",
+            status=ValidationStatus.NOT_IMPLEMENTED,
             violations=(),
             metadata={
                 "resolved_laws": len(laws),
