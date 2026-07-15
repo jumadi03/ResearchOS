@@ -19,7 +19,7 @@ defaults:
 
 jobs:
   regression:
-    name: Regression and coverage
+    name: Full regression and architecture coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -45,6 +45,52 @@ jobs:
           --cov-report=xml
           --cov-fail-under=90
           -q
+
+  knowledge-product:
+    name: Knowledge and product regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: AI-Gateway/pyproject.toml
+      - name: Install project
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Run knowledge and product regression
+        run: >-
+          python -m pytest
+          app/knowledge/tests
+          --cov=app.knowledge
+          --cov=app.router.knowledge
+          --cov=app.router.session
+          --cov=app.router.workspace
+          --cov-report=term-missing
+          --cov-report=xml:knowledge-coverage.xml
+          --cov-fail-under=75
+          -q
+
+  deployment-contracts:
+    name: Container and deployment contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate Compose configuration
+        working-directory: deploy
+        run: >-
+          docker compose
+          --env-file stack.env.example
+          -f compose.yaml
+          config --quiet
+      - name: Build API and worker image
+        run: docker build --tag researchos-ci .
 
   governance-contracts:
     name: Schema, ARC, and persistence gates
