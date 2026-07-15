@@ -15,11 +15,11 @@ from app.knowledge.extraction.models import (
 )
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
-from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
 from app.knowledge.repositories.read_models import ObjectPage, ObjectSummary, ProjectSummary
+from app.knowledge.repositories.postgres_semantic import PostgresSemanticRepositoryMixin
 
 
-class PostgresScientificDataRepository:
+class _PostgresRepositoryCore:
     _LIFECYCLE_TRANSITIONS = {
         "planned": "draft", "draft": "review", "review": "validated",
         "validated": "ratified", "ratified": "published",
@@ -1216,3 +1216,10 @@ class PostgresScientificDataRepository:
         return {"project_id": project_id, "nodes": list(nodes.values()), "edges": edges,
                 "available_relationship_types": available_types,
                 "truncated": len(edges) == limit}
+
+
+class PostgresScientificDataRepository(
+    PostgresSemanticRepositoryMixin,
+    _PostgresRepositoryCore,
+):
+    """Compatibility façade composed from bounded PostgreSQL repositories."""
