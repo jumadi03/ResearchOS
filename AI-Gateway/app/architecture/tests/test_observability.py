@@ -60,6 +60,26 @@ def test_readiness_fails_closed_without_authentication_config(tmp_path: Path) ->
     assert unavailable.json()["checks"]["authentication_configured"] is False
 
 
+def test_readiness_includes_runtime_dependencies(tmp_path: Path) -> None:
+    client = _operations_client(tmp_path)
+
+    class RuntimeChecker:
+        def checks(self):
+            return {
+                "database": True,
+                "schema_version": True,
+                "worker": False,
+                "object_storage": True,
+            }
+
+    client.app.state.runtime_readiness_checker = RuntimeChecker()
+    result = client.get("/ready")
+
+    assert result.status_code == 503
+    assert result.json()["status"] == "not_ready"
+    assert result.json()["checks"]["worker"] is False
+
+
 def test_metrics_require_auditor_and_expose_request_measurements(
     tmp_path: Path,
 ) -> None:

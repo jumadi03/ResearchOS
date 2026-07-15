@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from app.workers import main as worker
 
 
@@ -99,3 +101,32 @@ def test_isolated_job_failure_is_propagated(monkeypatch):
         assert str(exc) == "parser failed"
     else:
         raise AssertionError("Child failure must be propagated")
+def test_worker_records_heartbeat_and_removes_stale_workers(monkeypatch):
+    statements = []
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def execute(self, statement, parameters=None):
+            statements.append((statement, parameters))
+
+    class Transaction:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+    connection = SimpleNamespace(
+        transaction=lambda: Transaction(), cursor=lambda: Cursor()
+    )
+
+    worker.record_heartbeat(connection)
+
+    assert "INSERT INTO worker_heartbeats" in statements[0][0]
+    assert statements[0][1] == (worker.WORKER_ID,)
+    assert "DELETE FROM worker_heartbeats" in statements[1][0]

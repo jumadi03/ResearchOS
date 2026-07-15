@@ -29,11 +29,13 @@ from app.settings import (
     DATABASE_URL, DATABASE_SCHEMA_VERSION, KNOWLEDGE_DOCUMENT_MAX_BYTES,
     SEMANTIC_SCHOLAR_API_KEY,
     MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_DOCUMENT_BUCKET,
+    READINESS_WORKER_MAX_AGE_SECONDS,
 )
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.repositories.minio import MinioScientificObjectStore
 from app.infrastructure.database import require_schema_version
+from app.infrastructure.readiness import RuntimeReadinessChecker
 from app.observability import (
     AuditTrail,
     CorrelationMiddleware,
@@ -77,6 +79,13 @@ def create_app() -> FastAPI:
         "timeout": KNOWLEDGE_PROVIDER_TIMEOUT,
         "max_attempts": KNOWLEDGE_PROVIDER_MAX_ATTEMPTS,
     }
+    object_store = (
+        MinioScientificObjectStore(
+            endpoint=MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY,
+            secret_key=MINIO_SECRET_KEY, bucket=MINIO_DOCUMENT_BUCKET,
+        )
+        if MINIO_ENDPOINT and MINIO_ACCESS_KEY and MINIO_SECRET_KEY else None
+    )
     app.state.knowledge_service = KnowledgeDiscoveryService(
         (
             OpenAlexProvider(**provider_options),
@@ -88,13 +97,13 @@ def create_app() -> FastAPI:
         data_repository=(
             PostgresScientificDataRepository(DATABASE_URL) if DATABASE_URL else None
         ),
-        object_store=(
-            MinioScientificObjectStore(
-                endpoint=MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY,
-                secret_key=MINIO_SECRET_KEY, bucket=MINIO_DOCUMENT_BUCKET,
-            )
-            if MINIO_ENDPOINT and MINIO_ACCESS_KEY and MINIO_SECRET_KEY else None
-        ),
+        object_store=object_store,
+    )
+    app.state.runtime_readiness_checker = RuntimeReadinessChecker(
+        database_url=DATABASE_URL,
+        expected_schema_version=DATABASE_SCHEMA_VERSION,
+        object_store=object_store,
+        worker_max_age_seconds=READINESS_WORKER_MAX_AGE_SECONDS,
     )
     app.state.metrics_registry = MetricsRegistry()
     app.state.audit_trail = AuditTrail(

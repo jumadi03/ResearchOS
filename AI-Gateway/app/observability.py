@@ -178,6 +178,9 @@ def ready(request: Request, response: Response) -> dict[str, Any]:
             request.app.state.architecture_authenticator.principals_by_token
         ),
     }
+    runtime_checker = getattr(request.app.state, "runtime_readiness_checker", None)
+    if runtime_checker is not None:
+        checks.update(runtime_checker.checks())
     is_ready = all(checks.values())
     response.status_code = 200 if is_ready else 503
     return {"status": "ready" if is_ready else "not_ready", "checks": checks}

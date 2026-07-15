@@ -7,6 +7,7 @@ from pathlib import Path
 from queue import Empty
 import signal
 import socket
+from threading import Thread
 from time import sleep
 from uuid import uuid4
 
@@ -19,6 +20,37 @@ JOB_RETRY_BASE_SECONDS = int(os.getenv("JOB_RETRY_BASE_SECONDS", "5"))
 JOB_TIMEOUT_SECONDS = int(os.getenv("JOB_TIMEOUT_SECONDS", "600"))
 WORKER_ID = os.getenv("WORKER_ID", f"{socket.gethostname()}:{uuid4()}")
 _stop_requested = False
+
+
+def record_heartbeat(connection) -> None:
+    with connection.transaction(), connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO worker_heartbeats(worker_id, last_seen_at)
+            VALUES (%s, now())
+            ON CONFLICT(worker_id) DO UPDATE SET last_seen_at=excluded.last_seen_at
+            """,
+            (WORKER_ID,),
+        )
+        cursor.execute(
+            "DELETE FROM worker_heartbeats WHERE last_seen_at < now() - interval '7 days'"
+        )
+
+
+def heartbeat_loop(database_url: str) -> None:
+    """Publish liveness independently while the worker executes long-running jobs."""
+    import psycopg
+
+    while not _stop_requested:
+        try:
+            with psycopg.connect(database_url, autocommit=True) as connection:
+                record_heartbeat(connection)
+        except psycopg.Error:
+            pass
+        for _ in range(5):
+            if _stop_requested:
+                return
+            sleep(1)
 
 
 def request_stop(_signum=None, _frame=None):
@@ -230,6 +262,12 @@ def main():
         raise RuntimeError("JOB_LEASE_SECONDS must be greater than JOB_TIMEOUT_SECONDS")
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
+    Thread(
+        target=heartbeat_loop,
+        args=(DATABASE_URL,),
+        name="researchos-worker-heartbeat",
+        daemon=True,
+    ).start()
     while not _stop_requested:
         try:
             with psycopg.connect(DATABASE_URL, autocommit=True) as connection:

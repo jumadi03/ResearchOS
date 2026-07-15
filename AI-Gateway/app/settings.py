@@ -66,7 +66,10 @@ KNOWLEDGE_PROVIDER_TIMEOUT = float(os.getenv("KNOWLEDGE_PROVIDER_TIMEOUT", "20")
 KNOWLEDGE_PROVIDER_MAX_ATTEMPTS = int(os.getenv("KNOWLEDGE_PROVIDER_MAX_ATTEMPTS", "3"))
 KNOWLEDGE_DOCUMENT_MAX_BYTES = int(os.getenv("KNOWLEDGE_DOCUMENT_MAX_BYTES", "25000000"))
 DATABASE_URL = os.getenv("DATABASE_URL")
-DATABASE_SCHEMA_VERSION = int(os.getenv("DATABASE_SCHEMA_VERSION", "15"))
+DATABASE_SCHEMA_VERSION = int(os.getenv("DATABASE_SCHEMA_VERSION", "16"))
+READINESS_WORKER_MAX_AGE_SECONDS = int(
+    os.getenv("READINESS_WORKER_MAX_AGE_SECONDS", "15")
+)
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY") or os.getenv("MINIO_ROOT_USER")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY") or os.getenv("MINIO_ROOT_PASSWORD")
@@ -80,6 +83,8 @@ def validate_runtime_configuration() -> None:
         raise RuntimeError("Knowledge provider timeout and attempts must be positive")
     if KNOWLEDGE_DOCUMENT_MAX_BYTES <= 0:
         raise RuntimeError("KNOWLEDGE_DOCUMENT_MAX_BYTES must be positive")
+    if READINESS_WORKER_MAX_AGE_SECONDS <= 0:
+        raise RuntimeError("READINESS_WORKER_MAX_AGE_SECONDS must be positive")
     minio_values = (MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY)
     if any(minio_values) and not all(minio_values):
         raise RuntimeError(
