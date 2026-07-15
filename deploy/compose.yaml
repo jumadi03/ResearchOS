@@ -62,8 +62,9 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       KNOWLEDGE_OUTPUT_ROOT: /data/knowledge
       JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-3}
-      JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-300}
+      JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-660}
       JOB_RETRY_BASE_SECONDS: ${JOB_RETRY_BASE_SECONDS:-5}
+      JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-600}
     volumes: ["knowledge_data:/data/knowledge"]
     depends_on:
       postgres: {condition: service_healthy}

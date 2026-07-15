@@ -20,3 +20,82 @@ def test_stop_request_is_graceful(monkeypatch):
     monkeypatch.setattr(worker, "_stop_requested", False)
     worker.request_stop()
     assert worker._stop_requested is True
+
+
+class _Queue:
+    def __init__(self, result=None):
+        self.result = result
+
+    def empty(self):
+        return self.result is None
+
+    def get(self, timeout=None):
+        assert timeout == 1
+        if self.result is None:
+            from queue import Empty
+            raise Empty
+        return self.result
+
+
+class _Process:
+    exitcode = 0
+
+    def __init__(self, alive=False):
+        self.alive = alive
+        self.terminated = False
+
+    def start(self):
+        return None
+
+    def join(self, _timeout=None):
+        return None
+
+    def is_alive(self):
+        return self.alive and not self.terminated
+
+    def terminate(self):
+        self.terminated = True
+
+    def kill(self):
+        self.terminated = True
+
+
+class _Context:
+    def __init__(self, process, result=None):
+        self.process = process
+        self.queue = _Queue(result)
+
+    def Queue(self, maxsize):
+        assert maxsize == 1
+        return self.queue
+
+    def Process(self, **_kwargs):
+        return self.process
+
+
+def test_job_timeout_terminates_isolated_process(monkeypatch):
+    process = _Process(alive=True)
+    monkeypatch.setattr(
+        worker.multiprocessing, "get_context",
+        lambda _method: _Context(process),
+    )
+    try:
+        worker.execute_with_timeout("postgresql://test", "parse_document", {})
+    except TimeoutError:
+        pass
+    else:
+        raise AssertionError("Timed-out job must raise TimeoutError")
+    assert process.terminated is True
+
+
+def test_isolated_job_failure_is_propagated(monkeypatch):
+    monkeypatch.setattr(
+        worker.multiprocessing, "get_context",
+        lambda _method: _Context(_Process(), ("failed", "parser failed")),
+    )
+    try:
+        worker.execute_with_timeout("postgresql://test", "parse_document", {})
+    except RuntimeError as exc:
+        assert str(exc) == "parser failed"
+    else:
+        raise AssertionError("Child failure must be propagated")

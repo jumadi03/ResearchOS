@@ -46,6 +46,10 @@ Claims carry a bounded lease so interrupted `running` jobs return to the queue.
 Failures use exponential backoff and move to `dead_letter` after
 `JOB_MAX_ATTEMPTS`; worker shutdown waits for the active job boundary. Configure
 the attempt limit, lease duration, and retry base through `stack.env`.
+Each job runs in an isolated child process with a hard timeout configured by
+`JOB_TIMEOUT_SECONDS`; timed-out processes are terminated before retry handling.
+The configured lease must be longer than the hard timeout so another worker
+cannot reclaim a job while its isolated process is still active.
 The current HNSW embedding index uses 1536 dimensions; workers reject vectors
 with a different shape instead of silently storing incompatible embeddings.
 Every embedding job must also provide a canonical object UUID and source

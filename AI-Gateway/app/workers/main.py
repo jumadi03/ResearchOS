@@ -1,8 +1,10 @@
 """PostgreSQL-backed worker for parsing, normalization, and vector indexing."""
 
 import json
+import multiprocessing
 import os
 from pathlib import Path
+from queue import Empty
 import signal
 import socket
 from time import sleep
@@ -12,8 +14,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 KNOWLEDGE_ROOT = Path(os.getenv("KNOWLEDGE_OUTPUT_ROOT", "/data/knowledge"))
 EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
 JOB_MAX_ATTEMPTS = int(os.getenv("JOB_MAX_ATTEMPTS", "3"))
-JOB_LEASE_SECONDS = int(os.getenv("JOB_LEASE_SECONDS", "300"))
+JOB_LEASE_SECONDS = int(os.getenv("JOB_LEASE_SECONDS", "660"))
 JOB_RETRY_BASE_SECONDS = int(os.getenv("JOB_RETRY_BASE_SECONDS", "5"))
+JOB_TIMEOUT_SECONDS = int(os.getenv("JOB_TIMEOUT_SECONDS", "600"))
 WORKER_ID = os.getenv("WORKER_ID", f"{socket.gethostname()}:{uuid4()}")
 _stop_requested = False
 
@@ -177,11 +180,54 @@ def execute(connection, job_type, payload):
         raise ValueError(f"Unsupported job type: {job_type}")
 
 
+def _execute_isolated(database_url: str, job_type: str, payload: dict, result_queue):
+    """Run one job with a connection owned exclusively by the child process."""
+    try:
+        import psycopg
+
+        with psycopg.connect(database_url, autocommit=True) as connection:
+            execute(connection, job_type, payload)
+        result_queue.put(("complete", None))
+    except BaseException as exc:
+        result_queue.put(("failed", f"{type(exc).__name__}: {exc}"))
+
+
+def execute_with_timeout(database_url: str, job_type: str, payload: dict) -> None:
+    context = multiprocessing.get_context("spawn")
+    result_queue = context.Queue(maxsize=1)
+    process = context.Process(
+        target=_execute_isolated,
+        args=(database_url, job_type, payload, result_queue),
+        name=f"researchos-job-{job_type}",
+    )
+    process.start()
+    process.join(JOB_TIMEOUT_SECONDS)
+    if process.is_alive():
+        process.terminate()
+        process.join(10)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        raise TimeoutError(
+            f"Job {job_type} exceeded {JOB_TIMEOUT_SECONDS} seconds"
+        )
+    try:
+        status, error = result_queue.get(timeout=1)
+    except Empty:
+        raise RuntimeError(
+            f"Job process exited without a result (exit code {process.exitcode})"
+        )
+    if status != "complete":
+        raise RuntimeError(error or f"Job {job_type} failed")
+
+
 def main():
     import psycopg
 
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is required for the background worker")
+    if JOB_LEASE_SECONDS <= JOB_TIMEOUT_SECONDS:
+        raise RuntimeError("JOB_LEASE_SECONDS must be greater than JOB_TIMEOUT_SECONDS")
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
     while not _stop_requested:
@@ -194,7 +240,7 @@ def main():
                         continue
                     job_id, job_type, payload = job
                     try:
-                        execute(connection, job_type, payload)
+                        execute_with_timeout(DATABASE_URL, job_type, payload)
                         mark_complete(connection, job_id)
                     except Exception as exc:
                         mark_failed(connection, job_id, exc)
