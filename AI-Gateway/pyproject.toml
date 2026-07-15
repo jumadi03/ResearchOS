@@ -6,6 +6,9 @@ dependencies = [
     "fastapi==0.139.0",
     "pydantic==2.13.4",
     "python-dotenv==1.2.2",
+    "pypdf==6.13.3",
+    "psycopg[binary]==3.2.10",
+    "boto3==1.40.20",
     "requests==2.34.2",
     "reportlab==4.4.9",
     "sse-starlette==3.4.5",
@@ -18,7 +21,6 @@ dev = [
     "pytest-cov==7.1.0",
     "httpx==0.28.1",
     "pytest-asyncio==1.4.0",
-    "pypdf==6.13.3",
     "pip-audit==2.10.0",
 ]
 
