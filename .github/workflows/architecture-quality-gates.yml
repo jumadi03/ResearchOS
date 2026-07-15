@@ -92,6 +92,57 @@ jobs:
       - name: Build API and worker image
         run: docker build --tag researchos-ci .
 
+  storage-integration:
+    name: PostgreSQL and MinIO integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepare isolated CI configuration
+        working-directory: deploy
+        run: |
+          cp stack.env.example stack.env
+          printf 'ci-auditor-token\n' > monitoring/prometheus.token
+      - name: Start canonical storage stack
+        working-directory: deploy
+        run: >-
+          docker compose
+          --env-file stack.env
+          -f compose.yaml
+          up --build --detach --wait
+          postgres minio api
+      - name: Verify canonical schema and append-only provenance
+        working-directory: deploy
+        run: >-
+          docker compose
+          --env-file stack.env
+          -f compose.yaml
+          exec -T postgres
+          psql -v ON_ERROR_STOP=1
+          -U researchos -d researchos
+          -f /dev/stdin
+          < verify/canonical_storage_healthcheck.sql
+      - name: Verify canonical repository idempotency
+        working-directory: deploy
+        run: |
+          docker compose --env-file stack.env -f compose.yaml cp verify/canonical_repository.py api:/tmp/canonical_repository.py
+          docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/canonical_repository.py
+      - name: Verify PostgreSQL and MinIO representation integrity
+        working-directory: deploy
+        run: |
+          docker compose --env-file stack.env -f compose.yaml cp verify/representation_repository.py api:/tmp/representation_repository.py
+          docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/representation_repository.py
+      - name: Show service logs after failure
+        if: failure()
+        working-directory: deploy
+        run: docker compose --env-file stack.env -f compose.yaml logs --no-color
+      - name: Stop isolated CI stack
+        if: always()
+        working-directory: deploy
+        run: docker compose --env-file stack.env -f compose.yaml down --volumes
+
   governance-contracts:
     name: Schema, ARC, and persistence gates
     runs-on: ubuntu-latest
