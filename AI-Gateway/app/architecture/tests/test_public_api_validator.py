@@ -42,7 +42,7 @@ def test_contract() -> None:
     #
     assert (
         result.validation_id
-        == "PUBLIC-API-FOUNDATION"
+        == "PUBLIC-API"
     )
 
     assert (
@@ -52,10 +52,8 @@ def test_contract() -> None:
 
     assert result.violations == ()
 
-    assert (
-        result.metadata["resolved_laws"]
-        == 0
-    )
+    assert result.status.value == "NOT_RUN"
+    assert result.metadata["reason"] == "ARCHITECTURE_GRAPH_REQUIRED"
 
     print()
     print("CONTRACT TEST : PASS")

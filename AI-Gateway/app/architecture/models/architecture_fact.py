@@ -59,3 +59,13 @@ class ArchitectureFact:
     metadata: dict[str, Any] = field(
         default_factory=dict
     )
+
+    @classmethod
+    def from_dict(cls, item: dict[str, Any]) -> "ArchitectureFact":
+        return cls(
+            fact_id=item["fact_id"],
+            artifact=ArchitectureArtifact.from_dict(item["artifact"]),
+            fact_name=item["fact_name"],
+            fact_value=item["fact_value"],
+            metadata=item.get("metadata", {}),
+        )

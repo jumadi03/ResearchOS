@@ -1,0 +1,6 @@
+.test-tmp/
+coverage.xml
+logs/
+output/
+__pycache__/
+*.py[cod]

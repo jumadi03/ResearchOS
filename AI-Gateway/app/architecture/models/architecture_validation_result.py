@@ -18,6 +18,7 @@ from typing import Any
 from app.architecture.models.architecture_violation import (
     ArchitectureViolation,
 )
+from app.architecture.models.validation_status import ValidationStatus
 
 
 @dataclass(
@@ -56,3 +57,9 @@ class ArchitectureValidationResult:
     metadata: dict[str, Any] = field(
         default_factory=dict
     )
+
+    #
+    # Explicit execution outcome. Kept after the pre-existing fields to retain
+    # compatibility with callers that construct results positionally.
+    #
+    status: ValidationStatus = ValidationStatus.NOT_RUN

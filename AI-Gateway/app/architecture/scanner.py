@@ -88,8 +88,13 @@ class ArchitectureScanner:
         Build one ArchitectureArtifact.
         """
 
+        try:
+            relative_path = path.relative_to(self.root)
+        except ValueError:
+            relative_path = path
+
         module = (
-            str(path.with_suffix(""))
+            str(relative_path.with_suffix(""))
             .replace("\\", ".")
             .replace("/", ".")
         )
@@ -105,7 +110,7 @@ class ArchitectureScanner:
             module=module,
             source=source,
             metadata={
-                "path": str(path),
+                "path": relative_path.as_posix(),
                 "size": path.stat().st_size,
                 "encoding": "utf-8",
             },

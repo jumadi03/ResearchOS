@@ -55,3 +55,7 @@ class ArchitectureArtifact:
     metadata: dict[str, Any] = field(
         default_factory=dict
     )
+
+    @classmethod
+    def from_dict(cls, item: dict[str, Any]) -> "ArchitectureArtifact":
+        return cls(**item)
