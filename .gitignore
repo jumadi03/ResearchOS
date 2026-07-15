@@ -37,6 +37,7 @@ dist/
 *.log
 *.tmp
 *.temp
+AI-Gateway/tmp/
 
 # IDE and editor settings
 .idea/
