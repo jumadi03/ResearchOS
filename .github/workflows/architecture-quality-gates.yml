@@ -95,7 +95,11 @@ jobs:
           -f compose.yaml
           config --quiet
       - name: Build API and worker image
+        working-directory: AI-Gateway
         run: docker build --tag researchos-ci .
+      - name: Build backup image
+        working-directory: deploy/backup
+        run: docker build --tag researchos-backup-ci .
 
   storage-integration:
     name: PostgreSQL and MinIO integration

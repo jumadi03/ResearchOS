@@ -33,9 +33,12 @@ monitoring history, and backups is explicitly intended.
 
 Docker-managed volumes store PostgreSQL, MinIO, ResearchOS knowledge artifacts,
 Prometheus, Grafana, and backups. The backup process creates a PostgreSQL custom
-format dump plus compressed MinIO and knowledge-volume snapshots at startup and
-every 24 hours. It verifies every archive and retains 14 days by default.
-Configure intervals in `stack.env`.
+format dump plus compressed MinIO and knowledge snapshots at startup and every
+24 hours. MinIO objects are copied through the S3 API; the backup is accepted
+only when recursive object metadata before and after the copy matches. The
+MinIO archive includes a JSONL restoration manifest containing object metadata.
+Every artifact has a verified SHA-256 sidecar, and files are published atomically after verification.
+Backups are retained for 14 days by default. Configure intervals in `stack.env`.
 
 ## Database migrations
 

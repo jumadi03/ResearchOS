@@ -115,7 +115,7 @@ services:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
 
   backup:
-    image: postgres:17-bookworm
+    build: {context: ./backup}
     restart: unless-stopped
     env_file: ["stack.env"]
     environment:
@@ -123,16 +123,18 @@ services:
       PGDATABASE: ${POSTGRES_DB:-researchos}
       PGUSER: ${POSTGRES_USER:-researchos}
       PGPASSWORD: ${POSTGRES_PASSWORD}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-researchos}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOCUMENT_BUCKET: ${MINIO_DOCUMENT_BUCKET:-researchos-documents}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
     volumes:
-      - ./backup/backup.sh:/usr/local/bin/backup.sh:ro
       - backup_data:/backups
-      - minio_data:/source/minio:ro
       - knowledge_data:/source/knowledge:ro
-    command: ["bash", "/usr/local/bin/backup.sh"]
     depends_on:
       migrate: {condition: service_completed_successfully}
+      minio: {condition: service_healthy}
 
 volumes:
   postgres_data:
