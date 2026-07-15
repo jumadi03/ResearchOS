@@ -543,6 +543,17 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "cookie HttpOnly" in response.text
 
 
+def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:
+    application = client(tmp_path, None).app
+    paths = [
+        (route.path, tuple(sorted(route.methods or ())))
+        for route in application.routes
+        if getattr(route, "path", "").startswith("/knowledge")
+    ]
+
+    assert len(paths) == len(set(paths))
+
+
 def test_work_queue_is_readable_and_exposes_role_capabilities(tmp_path: Path) -> None:
     reviewer = client(tmp_path, "review", repository=RecordingRepository()).get(
         "/knowledge/projects/researchos-default/work-queue"
