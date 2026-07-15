@@ -134,6 +134,12 @@ jobs:
         run: |
           docker compose --env-file stack.env -f compose.yaml cp verify/representation_repository.py api:/tmp/representation_repository.py
           docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/representation_repository.py
+      - name: Verify worker lease recovery and dead-letter lifecycle
+        working-directory: deploy
+        run: |
+          docker compose --env-file stack.env -f compose.yaml up --detach worker
+          docker compose --env-file stack.env -f compose.yaml cp verify/resilient_worker.py api:/tmp/resilient_worker.py
+          docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/resilient_worker.py
       - name: Show service logs after failure
         if: failure()
         working-directory: deploy
