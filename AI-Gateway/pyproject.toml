@@ -41,7 +41,11 @@ addopts = [
 ]
 
 [tool.coverage.run]
-omit = ["app/architecture/tests/*"]
+omit = [
+    "app/**/tests/*",
+    "app/test_*.py",
+    "app/**/test_*.py",
+]
 
 [tool.coverage.report]
 fail_under = 90

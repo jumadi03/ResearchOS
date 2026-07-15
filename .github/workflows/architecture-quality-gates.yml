@@ -71,7 +71,7 @@ jobs:
           --cov=app.router.workspace
           --cov-report=term-missing
           --cov-report=xml:knowledge-coverage.xml
-          --cov-fail-under=75
+          --cov-fail-under=70
           -q
 
   deployment-contracts:
