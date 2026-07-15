@@ -537,6 +537,7 @@ def test_product_object_actions_are_permission_aware(tmp_path: Path) -> None:
 
 def test_object_workspace_is_available_without_embedding_credentials(tmp_path: Path) -> None:
     response = client(tmp_path, None).get("/workspace")
+    assert response.headers["cache-control"] == "no-store"
     assert response.status_code == 200
     assert "ResearchOS Workspace" in response.text
     assert "cookie HttpOnly" in response.text

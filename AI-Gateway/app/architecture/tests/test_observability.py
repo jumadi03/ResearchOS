@@ -12,6 +12,7 @@ from app.observability import (
     AuditTrail,
     CorrelationMiddleware,
     MetricsRegistry,
+    SecurityHeadersMiddleware,
     router,
 )
 
@@ -32,6 +33,7 @@ def _operations_client(tmp_path: Path, *, configured: bool = True) -> TestClient
     app.state.metrics_registry = MetricsRegistry()
     app.state.audit_trail = AuditTrail(output / "audit" / "events.jsonl")
     app.add_middleware(CorrelationMiddleware, metrics=app.state.metrics_registry)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(router)
     return TestClient(app)
 
@@ -46,6 +48,26 @@ def test_health_and_correlation_id_propagation(tmp_path: Path) -> None:
     assert invalid.status_code == 200
     assert invalid.headers["x-correlation-id"] != "bad value"
     assert len(invalid.headers["x-correlation-id"]) == 32
+
+
+def test_browser_security_headers_are_restrictive(tmp_path: Path) -> None:
+    client = _operations_client(tmp_path)
+    response = client.get("/health")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["cross-origin-opener-policy"] == "same-origin"
+    policy = response.headers["content-security-policy"]
+    assert "default-src 'self'" in policy
+    assert "script-src 'self'" in policy
+    assert "style-src 'self'" in policy
+    assert "frame-ancestors 'none'" in policy
+    assert "'unsafe-inline'" not in policy
+
+    docs = client.get("/docs")
+    assert "content-security-policy" not in docs.headers
+    assert docs.headers["x-frame-options"] == "DENY"
 
 
 def test_readiness_fails_closed_without_authentication_config(tmp_path: Path) -> None:

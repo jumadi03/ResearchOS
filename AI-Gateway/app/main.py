@@ -40,6 +40,7 @@ from app.observability import (
     AuditTrail,
     CorrelationMiddleware,
     MetricsRegistry,
+    SecurityHeadersMiddleware,
     router as operations_router,
 )
 
@@ -113,6 +114,7 @@ def create_app() -> FastAPI:
         CorrelationMiddleware,
         metrics=app.state.metrics_registry,
     )
+    app.add_middleware(SecurityHeadersMiddleware)
 
 
     @app.get("/")

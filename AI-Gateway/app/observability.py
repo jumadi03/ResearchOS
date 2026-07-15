@@ -151,6 +151,36 @@ class CorrelationMiddleware(BaseHTTPMiddleware):
             correlation_id_context.reset(token)
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Apply a restrictive browser security baseline to every response."""
+
+    _content_security_policy = "; ".join((
+        "default-src 'self'",
+        "base-uri 'self'",
+        "connect-src 'self'",
+        "font-src 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+        "img-src 'self' data:",
+        "object-src 'none'",
+        "script-src 'self'",
+        "style-src 'self'",
+    ))
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if not request.url.path.startswith(("/docs", "/redoc")):
+            response.headers["Content-Security-Policy"] = self._content_security_policy
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), geolocation=(), microphone=()"
+        )
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        return response
+
+
 router = APIRouter(tags=["operations"])
 bearer = HTTPBearer(auto_error=False)
 

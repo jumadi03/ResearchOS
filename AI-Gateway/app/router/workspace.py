@@ -12,4 +12,4 @@ INDEX = Path(__file__).resolve().parents[1] / "product" / "static" / "index.html
 
 @router.get("/workspace", include_in_schema=False)
 def workspace() -> FileResponse:
-    return FileResponse(INDEX)
+    return FileResponse(INDEX, headers={"Cache-Control": "no-store"})
