@@ -61,6 +61,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
       MINIO_ENDPOINT: http://minio:9000
       KNOWLEDGE_OUTPUT_ROOT: /data/knowledge
+      JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-3}
+      JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-300}
+      JOB_RETRY_BASE_SECONDS: ${JOB_RETRY_BASE_SECONDS:-5}
     volumes: ["knowledge_data:/data/knowledge"]
     depends_on:
       postgres: {condition: service_healthy}

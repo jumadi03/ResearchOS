@@ -3,14 +3,35 @@
 import json
 import os
 from pathlib import Path
+import signal
+import socket
 from time import sleep
+from uuid import uuid4
 
-import psycopg
-
-
-DATABASE_URL = os.environ["DATABASE_URL"]
+DATABASE_URL = os.getenv("DATABASE_URL")
 KNOWLEDGE_ROOT = Path(os.getenv("KNOWLEDGE_OUTPUT_ROOT", "/data/knowledge"))
 EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+JOB_MAX_ATTEMPTS = int(os.getenv("JOB_MAX_ATTEMPTS", "3"))
+JOB_LEASE_SECONDS = int(os.getenv("JOB_LEASE_SECONDS", "300"))
+JOB_RETRY_BASE_SECONDS = int(os.getenv("JOB_RETRY_BASE_SECONDS", "5"))
+WORKER_ID = os.getenv("WORKER_ID", f"{socket.gethostname()}:{uuid4()}")
+_stop_requested = False
+
+
+def request_stop(_signum=None, _frame=None):
+    global _stop_requested
+    _stop_requested = True
+
+
+def retry_delay(attempts: int) -> int:
+    """Return bounded exponential backoff for the next retry."""
+    return min(JOB_RETRY_BASE_SECONDS * (2 ** max(attempts - 1, 0)), 3600)
+
+
+def failure_disposition(attempts: int) -> tuple[str, int | None]:
+    if attempts >= JOB_MAX_ATTEMPTS:
+        return "dead_letter", None
+    return "pending", retry_delay(attempts)
 
 
 def validate_semantic_source(cursor, payload):
@@ -48,17 +69,60 @@ def validate_semantic_source(cursor, payload):
 def claim(connection):
     with connection.transaction(), connection.cursor() as cursor:
         cursor.execute("""
+            UPDATE background_jobs SET status='pending', locked_by=NULL,
+                lease_expires_at=NULL, available_at=now(),
+                error=COALESCE(error, 'worker lease expired')
+            WHERE status='running' AND lease_expires_at < now()
+        """)
+        cursor.execute("""
             SELECT job_id, job_type, payload FROM background_jobs
-            WHERE status = 'pending' ORDER BY created_at
+            WHERE status='pending' AND available_at <= now()
+            ORDER BY available_at, created_at
             FOR UPDATE SKIP LOCKED LIMIT 1
         """)
         row = cursor.fetchone()
         if row:
             cursor.execute("""
                 UPDATE background_jobs SET status='running', attempts=attempts+1,
-                started_at=now() WHERE job_id=%s
-            """, (row[0],))
+                started_at=now(), completed_at=NULL, locked_by=%s,
+                lease_expires_at=now() + (%s * interval '1 second')
+                WHERE job_id=%s
+            """, (WORKER_ID, JOB_LEASE_SECONDS, row[0]))
         return row
+
+
+def mark_complete(connection, job_id):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE background_jobs SET status='complete', completed_at=now(),
+                error=NULL, locked_by=NULL, lease_expires_at=NULL
+            WHERE job_id=%s AND status='running' AND locked_by=%s
+        """, (job_id, WORKER_ID))
+
+
+def mark_failed(connection, job_id, error: Exception):
+    with connection.transaction(), connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT attempts FROM background_jobs WHERE job_id=%s FOR UPDATE",
+            (job_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return
+        attempts = row[0]
+        status, delay = failure_disposition(attempts)
+        terminal = status == "dead_letter"
+        cursor.execute("""
+            UPDATE background_jobs SET status=%s,
+                completed_at=CASE WHEN %s THEN now() ELSE NULL END,
+                available_at=CASE WHEN %s THEN available_at
+                    ELSE now() + (%s * interval '1 second') END,
+                error=%s, locked_by=NULL, lease_expires_at=NULL
+            WHERE job_id=%s AND locked_by=%s
+        """, (
+            status, terminal, terminal, delay or 0, str(error)[:4000],
+            job_id, WORKER_ID,
+        ))
 
 
 def execute(connection, job_type, payload):
@@ -114,10 +178,16 @@ def execute(connection, job_type, payload):
 
 
 def main():
-    while True:
+    import psycopg
+
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is required for the background worker")
+    signal.signal(signal.SIGINT, request_stop)
+    signal.signal(signal.SIGTERM, request_stop)
+    while not _stop_requested:
         try:
             with psycopg.connect(DATABASE_URL, autocommit=True) as connection:
-                while True:
+                while not _stop_requested:
                     job = claim(connection)
                     if not job:
                         sleep(2)
@@ -125,13 +195,12 @@ def main():
                     job_id, job_type, payload = job
                     try:
                         execute(connection, job_type, payload)
-                        with connection.cursor() as cursor:
-                            cursor.execute("UPDATE background_jobs SET status='complete', completed_at=now(), error=NULL WHERE job_id=%s", (job_id,))
+                        mark_complete(connection, job_id)
                     except Exception as exc:
-                        with connection.cursor() as cursor:
-                            cursor.execute("UPDATE background_jobs SET status='failed', completed_at=now(), error=%s WHERE job_id=%s", (str(exc), job_id))
+                        mark_failed(connection, job_id, exc)
         except psycopg.Error:
-            sleep(5)
+            if not _stop_requested:
+                sleep(5)
 
 
 if __name__ == "__main__":

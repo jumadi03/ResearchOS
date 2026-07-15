@@ -203,7 +203,12 @@ class PostgresReadModelRepositoryMixin:
                 "pending_reviews": len(reviews),
                 "pending_transitions": len(transitions),
                 "index_jobs": len(jobs),
-                "failed_jobs": sum(job["status"] == "failed" for job in jobs),
+                "failed_jobs": sum(
+                    job["status"] in {"failed", "dead_letter"} for job in jobs
+                ),
+                "dead_letter_jobs": sum(
+                    job["status"] == "dead_letter" for job in jobs
+                ),
             },
         }
 
@@ -270,5 +275,4 @@ class PostgresReadModelRepositoryMixin:
         return {"project_id": project_id, "nodes": list(nodes.values()), "edges": edges,
                 "available_relationship_types": available_types,
                 "truncated": len(edges) == limit}
-
 

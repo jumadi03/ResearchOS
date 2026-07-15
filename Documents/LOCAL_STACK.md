@@ -42,6 +42,10 @@ Configure intervals in `stack.env`.
 Workers claim jobs using `FOR UPDATE SKIP LOCKED`. Supported job types are
 `normalize_metadata`, `index_embedding`, and `parse_document`. Job status,
 attempts, errors, and timestamps remain inspectable in `background_jobs`.
+Claims carry a bounded lease so interrupted `running` jobs return to the queue.
+Failures use exponential backoff and move to `dead_letter` after
+`JOB_MAX_ATTEMPTS`; worker shutdown waits for the active job boundary. Configure
+the attempt limit, lease duration, and retry base through `stack.env`.
 The current HNSW embedding index uses 1536 dimensions; workers reject vectors
 with a different shape instead of silently storing incompatible embeddings.
 Every embedding job must also provide a canonical object UUID and source
