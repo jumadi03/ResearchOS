@@ -28,7 +28,7 @@ from app.knowledge.validation.persistence import ValidationReportStore
 from app.knowledge.publication.engine import PublicationEngine
 from app.knowledge.publication.models import PublicationKind
 from app.knowledge.publication.persistence import PublicationStore
-from app.knowledge.authentication import KnowledgeRole
+from app.knowledge.repository_service import KnowledgeRepositoryService
 
 
 class KnowledgeDiscoveryService:
@@ -46,6 +46,7 @@ class KnowledgeDiscoveryService:
         self.metadata_collector = MetadataCollector()
         self._runs: dict[str, DiscoveryRun] = {}
         self.data_repository = data_repository
+        self.repository_service = KnowledgeRepositoryService(data_repository)
         self.object_store = object_store
         self.document_acquirer = document_acquirer or DocumentAcquirer()
         self.document_registry = DocumentRegistry(output_root / "documents")
@@ -145,9 +146,7 @@ class KnowledgeDiscoveryService:
         self, evidence_object_id: str, *, decision: str, reviewer: str,
         rationale: str, occurred_at: str,
     ):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for evidence review")
-        return self.data_repository.review_evidence(
+        return self.repository_service.review_evidence(
             evidence_object_id, decision=decision, reviewer=reviewer,
             rationale=rationale, occurred_at=occurred_at,
         )
@@ -253,9 +252,7 @@ class KnowledgeDiscoveryService:
         self, artifact_id: str, *, to_status: str, actor_id: str,
         rationale: str, occurred_at: str,
     ):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for artifact lifecycle")
-        return self.data_repository.transition_artifact(
+        return self.repository_service.transition_artifact(
             artifact_id, to_status=to_status, actor_id=actor_id,
             rationale=rationale, occurred_at=occurred_at,
         )
@@ -264,9 +261,7 @@ class KnowledgeDiscoveryService:
         self, *, object_type: str, object_id: str, model: str,
         embedding: tuple[float, ...], metadata: dict,
     ):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for semantic indexing")
-        return self.data_repository.enqueue_semantic_index(
+        return self.repository_service.enqueue_semantic_index(
             object_type=object_type, object_id=object_id, model=model,
             embedding=embedding, metadata=metadata,
         )
@@ -275,80 +270,37 @@ class KnowledgeDiscoveryService:
         self, *, model: str, query_embedding: tuple[float, ...], limit: int,
         object_types: tuple[str, ...],
     ):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for semantic retrieval")
-        return self.data_repository.semantic_search(
+        return self.repository_service.semantic_search(
             model=model, query_embedding=query_embedding, limit=limit,
             object_types=object_types,
         )
 
     def list_projects(self):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for product reads")
-        return self.data_repository.list_projects()
+        return self.repository_service.list_projects()
 
     def list_objects(
         self, project_id: str, *, limit: int = 50, cursor: str | None = None,
         query: str | None = None, object_types: tuple[str, ...] = (),
     ):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for product reads")
-        return self.data_repository.list_objects(
+        return self.repository_service.list_objects(
             project_id, limit=limit, cursor=cursor, query=query,
             object_types=object_types,
         )
 
     def get_object_read_model(self, object_ref: str, project_id: str, principal):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for product reads")
-        result = self.data_repository.get_object_read_model(object_ref, project_id)
-        actions = []
-        evidence = result.get("evidence")
-        artifact = result.get("artifact")
-        if evidence and evidence.get("review_status") == "pending" and principal.has_role(KnowledgeRole.REVIEWER):
-            actions.extend((
-                {"action": "evidence:accept", "method": "POST", "href": f"/knowledge/evidence/{result['identity']['object_id']}/reviews"},
-                {"action": "evidence:reject", "method": "POST", "href": f"/knowledge/evidence/{result['identity']['object_id']}/reviews"},
-            ))
-        if evidence and evidence.get("review_status") == "accepted" and principal.has_role(KnowledgeRole.INDEXER):
-            actions.append({"action": "semantic:index", "method": "POST", "href": "/knowledge/semantic-index/jobs"})
-        if artifact:
-            transitions = {"draft": "validated", "validated": "ratified", "ratified": "published"}
-            next_status = transitions.get(artifact.get("status"))
-            if next_status and principal.has_role(KnowledgeRole.REVIEWER):
-                actions.append({
-                    "action": "artifact:transition", "method": "POST",
-                    "href": f"/knowledge/artifacts/{result['identity']['object_id']}/transitions",
-                    "to_status": next_status,
-                })
-            if artifact.get("status") in {"validated", "ratified", "published"} and principal.has_role(KnowledgeRole.INDEXER):
-                actions.append({"action": "semantic:index", "method": "POST", "href": "/knowledge/semantic-index/jobs"})
-        result["permissions"] = {
-            "can_read": True,
-            "roles": sorted(role.value for role in principal.roles),
-            "available_actions": actions,
-        }
-        return result
+        return self.repository_service.get_object_read_model(
+            object_ref, project_id, principal
+        )
 
     def get_work_queue(self, project_id: str, principal):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for workflow reads")
-        queue = self.data_repository.get_work_queue(project_id)
-        queue["permissions"] = {
-            "can_review": principal.has_role(KnowledgeRole.REVIEWER),
-            "can_index": principal.has_role(KnowledgeRole.INDEXER),
-            "roles": sorted(role.value for role in principal.roles),
-        }
-        return queue
+        return self.repository_service.get_work_queue(project_id, principal)
 
     def get_project_graph(
         self, project_id: str, *, limit: int = 100,
         relationship_types: tuple[str, ...] = (), review_status: str | None = None,
         min_confidence: float = 0.0,
     ):
-        if self.data_repository is None:
-            raise RuntimeError("Canonical repository is required for graph reads")
-        return self.data_repository.get_project_graph(
+        return self.repository_service.get_project_graph(
             project_id, limit=limit, relationship_types=relationship_types,
             review_status=review_status, min_confidence=min_confidence,
         )
