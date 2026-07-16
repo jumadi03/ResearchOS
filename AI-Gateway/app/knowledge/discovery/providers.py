@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from time import sleep
 from typing import Any, Callable, Protocol
+from urllib.parse import quote
 
 import requests
 
@@ -47,11 +49,14 @@ class HttpProvider:
         self.backoff_seconds = backoff_seconds
         self._sleeper = sleeper
 
-    def _get(self, params: dict[str, Any], headers: dict[str, str] | None = None) -> requests.Response:
+    def _get(
+        self, params: dict[str, Any], headers: dict[str, str] | None = None,
+        *, url: str | None = None,
+    ) -> requests.Response:
         for attempt in range(1, self.max_attempts + 1):
             try:
                 response = self._transport(
-                    self.base_url, params=params, headers=headers or {}, timeout=self.timeout
+                    url or self.base_url, params=params, headers=headers or {}, timeout=self.timeout
                 )
                 response.raise_for_status()
                 return response
@@ -106,6 +111,13 @@ class CrossrefProvider(HttpProvider):
     base_url = "https://api.crossref.org/works"
 
     def search(self, plan: SearchPlan) -> tuple[ProviderPage, ...]:
+        doi = plan.query.strip()
+        doi = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", doi, flags=re.IGNORECASE)
+        if re.fullmatch(r"10\.\d{4,9}/\S+", doi, flags=re.IGNORECASE):
+            response = self._get({}, url=f"{self.base_url}/{quote(doi, safe='')}")
+            record = response.json().get("message") or {}
+            return (ProviderPage((record,) if record else (), response.url),)
+
         page_size = min(plan.limit_per_provider, 1000)
         params: dict[str, Any] = {"query.bibliographic": plan.query, "rows": page_size, "cursor": "*"}
         filters = []

@@ -18,6 +18,10 @@ follows Semantic Versioning.
 
 - Compare PostgreSQL artifact metadata by canonical JSON value so nested tuple
   metadata remains idempotent after JSON storage normalization.
+- Normalize structured Crossref license records before PostgreSQL persistence
+  and derive open-access state only from explicit provider or license signals.
+- Resolve exact DOI queries through Crossref's work endpoint instead of relying
+  on ranked bibliographic search results.
 
 ## [0.4.0] - 2026-07-16
 

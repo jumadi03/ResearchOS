@@ -5,7 +5,9 @@ from app.knowledge.discovery.cache import CachedProvider
 from app.knowledge.discovery.persistence import (
     DiscoverySnapshotStore, RawPageStore, serialize_run,
 )
-from app.knowledge.discovery.providers import OpenAlexProvider, ProviderError, ProviderPage
+from app.knowledge.discovery.providers import (
+    CrossrefProvider, OpenAlexProvider, ProviderError, ProviderPage,
+)
 from app.knowledge.models import MatchKind, ScientificQuestion, SearchPlan
 
 
@@ -130,6 +132,29 @@ def test_openalex_follows_cursor_and_respects_total_limit() -> None:
 
     assert [page.records[0]["id"] for page in pages] == ["1", "2"]
     assert calls[1]["cursor"] == "next"
+
+
+def test_crossref_resolves_exact_doi_without_ranked_search() -> None:
+    calls = []
+
+    def transport(url, **kwargs):
+        calls.append((url, kwargs["params"]))
+        return FakeResponse(
+            {"message": {"DOI": "10.1371/journal.pone.0319334", "title": ["Exact"]}},
+            url=url,
+        )
+
+    pages = CrossrefProvider(transport=transport).search(
+        SearchPlan(
+            "p", "https://doi.org/10.1371/journal.pone.0319334", ("crossref",),
+            limit_per_provider=10, year_from=2025, year_to=2025,
+        )
+    )
+
+    assert pages[0].records[0]["DOI"] == "10.1371/journal.pone.0319334"
+    assert calls == [
+        ("https://api.crossref.org/works/10.1371%2Fjournal.pone.0319334", {})
+    ]
 
 
 def test_http_provider_retries_rate_limit_using_retry_after() -> None:

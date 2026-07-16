@@ -16,6 +16,29 @@ from app.knowledge.repositories.postgres_evidence import PostgresEvidenceReposit
 from app.knowledge.repositories.postgres_artifacts import PostgresArtifactRepositoryMixin
 
 
+def normalized_source_license(raw: dict) -> str | None:
+    value = raw.get("license")
+    if isinstance(value, str):
+        return value.strip() or None
+    items = value if isinstance(value, list) else [value]
+    for item in items:
+        if isinstance(item, dict):
+            candidate = item.get("URL") or item.get("url")
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+    return None
+
+
+def source_access_status(raw: dict, license_value: str | None) -> str:
+    if isinstance(raw.get("open_access"), dict) and raw["open_access"].get("is_oa") is True:
+        return "open"
+    if raw.get("openAccessPdf"):
+        return "open"
+    if license_value and "creativecommons.org/" in license_value.lower():
+        return "open"
+    return "unknown"
+
+
 class _PostgresRepositoryCore:
     _LIFECYCLE_TRANSITIONS = {
         "planned": "draft", "draft": "review", "review": "validated",
@@ -104,6 +127,7 @@ class _PostgresRepositoryCore:
         raw = source.raw
         url = raw.get("URL") or raw.get("url") or raw.get("id")
         source_type = str(raw.get("type") or raw.get("publicationTypes") or "scholarly_work")
+        license_value = normalized_source_license(raw)
         cursor.execute("""
             INSERT INTO scientific_sources(
                 provider,source_type,external_id,doi,url,title,authors,
@@ -115,8 +139,8 @@ class _PostgresRepositoryCore:
         """, (
             source.provider, source_type, source.source_id, record.doi, url,
             record.title, json.dumps(record.authors), record.year,
-            source.retrieved_at, raw.get("license"),
-            "open" if (raw.get("open_access") or {}).get("is_oa") else "unknown",
+            source.retrieved_at, license_value,
+            source_access_status(raw, license_value),
             source.response_hash,
         ))
         return cursor.fetchone()[0]
