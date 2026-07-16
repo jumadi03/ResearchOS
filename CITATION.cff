@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use ResearchOS in academic work, please cite this software."
+title: ResearchOS
+type: software
+authors:
+  - family-names: Jumadi
+    alias: jumadi03
+repository-code: "https://github.com/jumadi03/ResearchOS"
+url: "https://github.com/jumadi03/ResearchOS"
+version: 0.3.0
+date-released: 2026-07-16
+license: Apache-2.0
+keywords:
+  - research software
+  - scientific knowledge
+  - provenance
+  - reproducibility
+  - architecture governance
