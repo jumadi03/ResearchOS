@@ -9,7 +9,8 @@ from app.knowledge.authentication import KnowledgeRole
 from app.knowledge.models import ScientificQuestion, SearchPlan
 from app.models.knowledge import (
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
-    ArtifactTransitionRequest, EvidenceReviewRequest, PublicationRequest,
+    ArtifactTransitionRequest, EvidenceReviewRequest, PublicationPreviewRequest,
+    PublicationRequest,
     SemanticIndexRequest, SemanticSearchRequest, TheoryBuildRequest,
     TheoryAlignmentDecisionRequest, TheoryAlignmentRequest, TheoryReviewRequest,
     TheoryValidationRequest,
@@ -385,3 +386,76 @@ def publish(bundle_id: str, req: PublicationRequest, request: Request, credentia
     result["location"] = location.name
     result["integrity_verified"] = package.verify()
     return result
+
+
+@router.get("/theories/{bundle_id}/publication-readiness")
+def publication_readiness(
+    bundle_id: str, request: Request, kind: str = "literature_review",
+    validation_report_id: str | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        return request.app.state.knowledge_service.publication_readiness(
+            bundle_id, kind=kind, validation_report_id=validation_report_id,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/theories/{bundle_id}/publication-preview")
+def preview_publication(
+    bundle_id: str, req: PublicationPreviewRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        result = request.app.state.knowledge_service.preview_publication(
+            bundle_id, kind=req.kind,
+            validation_report_id=req.validation_report_id,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        **result,
+        "citation_verification": asdict(result["citation_verification"]),
+    }
+
+
+@router.get("/theories/{bundle_id}/publication-history")
+def publication_history(
+    bundle_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        packages = request.app.state.knowledge_service.publication_history(bundle_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"bundle_id": bundle_id, "items": [
+        {"manifest": asdict(item.manifest), "package_content_hash": item.content_hash}
+        for item in packages
+    ]}
+
+
+@router.get("/theories/{bundle_id}/publications/{publication_id}")
+def publication_package(
+    bundle_id: str, publication_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        package = request.app.state.knowledge_service.publication_package(
+            bundle_id, publication_id,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "manifest": asdict(package.manifest), "markdown": package.markdown,
+        "package_content_hash": package.content_hash,
+        "integrity_verified": package.verify(),
+    }

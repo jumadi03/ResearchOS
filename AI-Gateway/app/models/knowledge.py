@@ -116,5 +116,17 @@ class TheoryValidationRequest(BaseModel):
 class PublicationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     validation_report_id: str = Field(min_length=1)
-    kind: str
+    kind: Literal[
+        "literature_review", "scoping_review", "systematic_review_support",
+        "research_proposal", "evidence_brief",
+    ]
     generated_at: str = Field(min_length=1)
+
+
+class PublicationPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    validation_report_id: str | None = Field(default=None, min_length=1)
+    kind: Literal[
+        "literature_review", "scoping_review", "systematic_review_support",
+        "research_proposal", "evidence_brief",
+    ]

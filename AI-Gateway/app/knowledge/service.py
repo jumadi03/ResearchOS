@@ -91,6 +91,18 @@ class KnowledgeDiscoveryService:
     def publish(self, bundle_id, **options):
         return self.theory_pipeline.publish(bundle_id, **options)
 
+    def publication_readiness(self, bundle_id, **options):
+        return self.theory_pipeline.publication_readiness(bundle_id, **options)
+
+    def preview_publication(self, bundle_id, **options):
+        return self.theory_pipeline.preview_publication(bundle_id, **options)
+
+    def publication_history(self, bundle_id):
+        return self.theory_pipeline.publication_history(bundle_id)
+
+    def publication_package(self, bundle_id, publication_id):
+        return self.theory_pipeline.publication_package(bundle_id, publication_id)
+
     def transition_artifact(
         self, artifact_id: str, *, to_status: str, actor_id: str,
         rationale: str, occurred_at: str,

@@ -301,6 +301,15 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
     assert gaps.status_code == 201
     proposal = theories.json()["proposals"][0]
+    review = api.post(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/reviews",
+        json={
+            "theory_id": proposal["theory_id"], "decision": "accepted",
+            "rationale": "Evidence and provenance reviewed",
+            "occurred_at": "2026-07-15T23:55:00Z",
+        }, headers={"Authorization": "Bearer review"},
+    )
+    assert review.status_code == 200
     validation = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/validations",
         json={
@@ -578,6 +587,35 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     )
     assert validation_history.status_code == 200
     assert validation_history.json()["items"][0]["active_for_current_bundle"] is True
+    assert api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/publication-readiness"
+    ).status_code == 403
+    readiness = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/publication-readiness?kind=literature_review",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert readiness.status_code == 200
+    assert readiness.json()["ready"] is True
+    assert all(item["passed"] for item in readiness.json()["checks"])
+    systematic = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/publication-readiness?kind=systematic_review_support",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert systematic.status_code == 200
+    assert systematic.json()["ready"] is False
+    assert next(
+        item for item in systematic.json()["checks"]
+        if item["key"] == "validation_policy"
+    )["passed"] is False
+    preview = api.post(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/publication-preview",
+        json={"kind": "evidence_brief", "validation_report_id": validation.json()["report_id"]},
+        headers={"Authorization": "Bearer review"},
+    )
+    assert preview.status_code == 200
+    assert preview.json()["ready"] is True
+    assert preview.json()["citation_verification"]["verified"] is True
+    assert "# Evidence Brief" in preview.json()["markdown"]
     publication = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/publications",
         json={"validation_report_id": validation.json()["report_id"], "kind": "literature_review", "generated_at": "2026-07-15T00:00:00Z"},
@@ -586,6 +624,19 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     assert publication.status_code == 201
     assert publication.json()["integrity_verified"] is True
     assert publication.json()["generated_by"] == "reviewer@example"
+    history = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/publication-history",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert history.status_code == 200
+    assert history.json()["items"][0]["manifest"]["publication_id"] == publication.json()["publication_id"]
+    package = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/publications/{publication.json()['publication_id']}",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert package.status_code == 200
+    assert package.json()["integrity_verified"] is True
+    assert package.json()["package_content_hash"] == publication.json()["package_content_hash"]
     request["source_response_hash"] = "invented"
     assert api.post(f"/knowledge/discovery/runs/{discovered['run_id']}/documents", json=request).status_code == 422
 
@@ -650,6 +701,9 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "Decision History" in response.text
     assert 'id="revalidationDialog"' in response.text
     assert 'id="validationHistory"' in response.text
+    assert 'id="readinessChecks"' in response.text
+    assert 'id="publicationPreview"' in response.text
+    assert 'id="publicationHistory"' in response.text
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:

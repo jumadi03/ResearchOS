@@ -143,6 +143,27 @@ opened from the decision ledger, `triggered_by_decision_id` links the immutable
 report to its initiating alignment or `keep_separate` event. Publication fails
 closed if the selected report hash does not match current bundle content.
 
+### Publication readiness and immutable release
+
+`GET /knowledge/theories/{bundle_id}/publication-readiness` evaluates the same
+server-side checklist used by final publication. It verifies input integrity,
+exact validation currency, completion of theory review, at least one accepted
+theory, absence of unresolved competition between accepted theories, complete
+evidence provenance, and the validation policy for the requested publication
+kind.
+
+All publication kinds reject `fail` and `stale` validation. Systematic-review
+support requires `pass`; literature reviews, scoping reviews, research
+proposals, and evidence briefs may explicitly carry `incomplete` validation and
+its limitations. Only accepted theories are rendered into the synthesis.
+
+`POST /knowledge/theories/{bundle_id}/publication-preview` renders canonical
+Markdown and verifies citations without releasing an artifact. Final publish
+uses the identical readiness function and creates an immutable package.
+Integrity-verified packages are restored after restart and listed at
+`GET /knowledge/theories/{bundle_id}/publication-history` with their theory and
+validation hashes.
+
 The [end-to-end pilot](END_TO_END_PILOT.md) intentionally produced
 `incomplete`: one open-access paper was traceable and reviewable, but one source
 was insufficient for a stronger conclusion.

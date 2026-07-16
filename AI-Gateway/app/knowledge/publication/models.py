@@ -11,6 +11,7 @@ class PublicationKind(StrEnum):
     SCOPING_REVIEW = "scoping_review"
     SYSTEMATIC_REVIEW_SUPPORT = "systematic_review_support"
     RESEARCH_PROPOSAL = "research_proposal"
+    EVIDENCE_BRIEF = "evidence_brief"
 
 
 @dataclass(frozen=True, slots=True)

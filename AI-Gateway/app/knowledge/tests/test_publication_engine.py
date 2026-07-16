@@ -4,14 +4,16 @@ from dataclasses import replace
 from app.knowledge.publication.engine import PublicationEngine
 from app.knowledge.publication.models import PublicationKind
 from app.knowledge.publication.persistence import PublicationStore
-from app.knowledge.theory.models import EvidenceStance, TheoryBundle, TheoryEvidence, TheoryProposal
+from app.knowledge.theory.models import (
+    EvidenceStance, TheoryBundle, TheoryEvidence, TheoryProposal, TheoryReviewState,
+)
 from app.knowledge.validation.engine import ValidationEngine
 from app.knowledge.validation.models import RiskOfBias
 
 
 def inputs(graphs=2):
     evidence = tuple(TheoryEvidence(f"e{i}", f"g{i}", f"o{i}", EvidenceStance.SUPPORTS, 0.8, f"q{i}") for i in range(graphs))
-    bundle = TheoryBundle("bundle", tuple(f"g{i}" for i in range(graphs)), "time", (TheoryProposal("t1", "Governance improves performance", evidence, len(evidence), 0),), ()).finalized()
+    bundle = TheoryBundle("bundle", tuple(f"g{i}" for i in range(graphs)), "time", (TheoryProposal("t1", "Governance improves performance", evidence, len(evidence), 0, TheoryReviewState.ACCEPTED),), ()).finalized()
     report = ValidationEngine().validate(bundle, assessed_at="2026-07-15T00:00:00Z", search_completed_at="2026-07-01T00:00:00Z", max_age_days=180, bias_by_theory={"t1": RiskOfBias.LOW}, reviewer="reviewer")
     return bundle, report
 
@@ -26,6 +28,7 @@ def test_publication_is_evidence_linked_reproducible_and_immutable(tmp_path: Pat
     location = store.save(package)
     assert store.save(package) == location
     assert (location / "publication.md").exists() and (location / "manifest.json").exists()
+    assert store.load_all() == (package,)
 
 
 def test_systematic_review_gate_rejects_non_pass_validation() -> None:
@@ -49,3 +52,15 @@ def test_publication_rejects_validation_for_stale_bundle_content() -> None:
 def test_citation_verifier_detects_unresolved_reference() -> None:
     result = PublicationEngine.verify_citations("Claim [evidence:missing]", ("known",))
     assert not result.verified and result.unresolved_citations == ("missing",)
+
+
+def test_publication_readiness_is_transparent_and_preview_is_non_mutating() -> None:
+    bundle, report = inputs()
+    engine = PublicationEngine()
+    readiness = engine.readiness(bundle, report, PublicationKind.EVIDENCE_BRIEF)
+    assert readiness["ready"] is True
+    assert all(item["passed"] for item in readiness["checks"])
+    preview = engine.preview(bundle, report, PublicationKind.EVIDENCE_BRIEF)
+    assert preview["ready"] is True
+    assert preview["citation_verification"].verified
+    assert "# Evidence Brief" in preview["markdown"]

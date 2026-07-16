@@ -41,6 +41,9 @@ follows Semantic Versioning.
 - Bind validation reports to exact theory-bundle content, retain inactive
   history, link revalidation to reviewer decisions, expose transparent gate
   results, and reject publication with stale validation.
+- Add a fail-closed Publication Readiness workspace with policy checklists,
+  non-mutating Markdown preview, evidence briefs, reviewer confirmation, and
+  restart-safe immutable package history.
 
 ## [0.4.0] - 2026-07-16
 

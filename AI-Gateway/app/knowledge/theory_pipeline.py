@@ -39,6 +39,10 @@ class KnowledgeTheoryPipeline:
         self.validation_reports = {
             item.report_id: item for item in self.validation_store.load_all()
         }
+        self.publication_packages = {
+            item.manifest.publication_id: item
+            for item in self.publication_store.load_all()
+        }
 
     def build_theories(self, graph_ids: tuple[str, ...], *, generated_by: str):
         missing = [item for item in graph_ids if item not in self.graphs]
@@ -285,7 +289,60 @@ class KnowledgeTheoryPipeline:
                 file_size=len(markdown), representation_type="markdown",
                 edition_type="canonical", published_at=generated_at,
             )
-        return package, self.publication_store.save(package)
+        location = self.publication_store.save(package)
+        self.publication_packages[package.manifest.publication_id] = package
+        return package, location
+
+    def publication_readiness(
+        self, bundle_id, *, kind, validation_report_id=None,
+    ):
+        bundle = self._bundle(bundle_id)
+        report = self._publication_report(bundle, validation_report_id)
+        return self.publication_engine.readiness(
+            bundle, report, PublicationKind(kind)
+        )
+
+    def preview_publication(
+        self, bundle_id, *, kind, validation_report_id=None,
+    ):
+        bundle = self._bundle(bundle_id)
+        report = self._publication_report(bundle, validation_report_id)
+        return self.publication_engine.preview(
+            bundle, report, PublicationKind(kind)
+        )
+
+    def publication_history(self, bundle_id):
+        self._bundle(bundle_id)
+        return tuple(sorted(
+            (item for item in self.publication_packages.values()
+             if item.manifest.theory_bundle_id == bundle_id),
+            key=lambda item: (
+                item.manifest.generated_at, item.manifest.publication_id,
+            ), reverse=True,
+        ))
+
+    def publication_package(self, bundle_id, publication_id):
+        self._bundle(bundle_id)
+        package = self.publication_packages.get(publication_id)
+        if package is None or package.manifest.theory_bundle_id != bundle_id:
+            raise KeyError(f"Unknown publication package: {publication_id}")
+        return package
+
+    def _publication_report(self, bundle, report_id=None):
+        if report_id:
+            report = self.validation_reports.get(report_id)
+            if report is None:
+                raise KeyError(f"Unknown validation report: {report_id}")
+            return report
+        reports = sorted(
+            (item for item in self.validation_reports.values()
+             if item.theory_bundle_id == bundle.bundle_id
+             and item.theory_bundle_hash == bundle.content_hash),
+            key=lambda item: (item.assessed_at, item.report_id), reverse=True,
+        )
+        if not reports:
+            raise ValueError("No active validation report for current theory bundle")
+        return reports[0]
 
     def _bundle(self, bundle_id):
         bundle = self.bundles.get(bundle_id)
