@@ -143,6 +143,18 @@ def test_alignment_candidates_are_advisory_ranked_and_accepted_only() -> None:
     assert candidates[0].graph_ids == ("graph-one", "graph-two")
     assert candidates[0].lexical_overlap_score == 0.4286
     assert candidates[0].advisory is True
+    assert candidates[0].evidence_by_theory[0][0].object_id
+    assert candidates[0].evidence_by_theory[0][0].document_id == "document"
+    assert candidates[0].evidence_by_theory[0][0].page == 1
+
+    decided = builder.keep_separate(
+        bundle, theory_ids=candidates[0].theory_ids, reviewer="reviewer@example",
+        rationale="The populations and outcome definitions are materially different",
+        occurred_at="decision-time",
+    )
+    assert decided.alignment_decisions[0].decision == "keep_separate"
+    assert decided.alignment_decisions[0].reviewer == "reviewer@example"
+    assert builder.alignment_candidates(decided) == ()
 
 
 def test_theory_review_is_attributable_and_requires_rationale() -> None:
@@ -185,6 +197,11 @@ def test_theory_store_verifies_and_migrates_legacy_snapshot(tmp_path: Path) -> N
     )
     raw = asdict(bundle)
     raw.pop("alignments")
+    raw.pop("alignment_decisions")
+    for proposal in raw["proposals"]:
+        for evidence in proposal["evidence"]:
+            evidence.pop("document_id")
+            evidence.pop("page")
     raw["schema_version"] = "1.0"
     raw["content_hash"] = ""
     raw["content_hash"] = sha256(json.dumps(
@@ -199,6 +216,7 @@ def test_theory_store_verifies_and_migrates_legacy_snapshot(tmp_path: Path) -> N
 
     restored = TheoryBundleStore(tmp_path).load_all()
 
-    assert restored[0].schema_version == "1.1"
+    assert restored[0].schema_version == "1.2"
     assert restored[0].alignments == ()
+    assert restored[0].alignment_decisions == ()
     assert restored[0].verify()

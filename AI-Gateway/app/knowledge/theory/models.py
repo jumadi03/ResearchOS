@@ -25,6 +25,8 @@ class TheoryEvidence:
     stance: EvidenceStance
     confidence: float
     quote_hash: str
+    document_id: str | None = None
+    page: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,11 +67,22 @@ class TheoryAlignmentEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class TheoryAlignmentDecisionEvent:
+    decision_id: str
+    theory_ids: tuple[str, str]
+    decision: str
+    reviewer: str
+    rationale: str
+    occurred_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class TheoryAlignmentCandidate:
     candidate_id: str
     theory_ids: tuple[str, str]
     statements: tuple[str, str]
     graph_ids: tuple[str, ...]
+    evidence_by_theory: tuple[tuple[TheoryEvidence, ...], tuple[TheoryEvidence, ...]]
     lexical_overlap_score: float
     method: str = "normalized-token-jaccard-v1"
     advisory: bool = True
@@ -84,8 +97,9 @@ class TheoryBundle:
     competing: tuple[CompetingTheory, ...]
     reviews: tuple[TheoryReviewEvent, ...] = ()
     alignments: tuple[TheoryAlignmentEvent, ...] = ()
+    alignment_decisions: tuple[TheoryAlignmentDecisionEvent, ...] = ()
     content_hash: str = ""
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
 
     def finalized(self):
         payload = asdict(replace(self, content_hash=""))

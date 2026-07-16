@@ -82,6 +82,12 @@ class KnowledgeTheoryPipeline:
     def alignment_candidates(self, bundle_id):
         return self.theory_builder.alignment_candidates(self._bundle(bundle_id))
 
+    def keep_theories_separate(self, bundle_id, **options):
+        bundle = self._bundle(bundle_id)
+        decided = self.theory_builder.keep_separate(bundle, **options)
+        self.bundles[bundle_id] = decided
+        return decided, self.theory_store.save(decided)
+
     def list_theory_bundles(self):
         summaries = []
         for bundle in self.bundles.values():
@@ -105,6 +111,7 @@ class KnowledgeTheoryPipeline:
                     for item in bundle.proposals
                 ),
                 "alignment_count": len(bundle.alignments),
+                "keep_separate_count": len(bundle.alignment_decisions),
                 "candidate_count": len(candidates),
                 "latest_validation": ({
                     "report_id": reports[0].report_id,

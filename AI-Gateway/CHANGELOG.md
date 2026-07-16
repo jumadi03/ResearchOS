@@ -34,6 +34,8 @@ follows Semantic Versioning.
   graph, schema, integrity, and latest-validation summaries.
 - Restore integrity-verified theory bundles and validation reports from their
   persistent snapshots when the API restarts.
+- Add evidence-level candidate provenance and immutable reviewer decisions to
+  keep semantically distinct theory pairs separate and suppress repeat prompts.
 
 ## [0.4.0] - 2026-07-16
 

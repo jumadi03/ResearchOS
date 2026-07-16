@@ -90,8 +90,12 @@ least two shared words and evidence spanning at least two graphs, and returns a
 transparent overlap score. Only accepted theories are considered.
 
 A candidate is not evidence of semantic equivalence. It is a navigation aid;
-the reviewer must still inspect source statements and provenance, then either
-submit an alignment with a scoped rationale or leave the theories separate.
+the reviewer must still inspect source statements and evidence provenance,
+including document ID, page, object ID, graph ID, confidence, and quote hash.
+The reviewer then either submits an alignment with a scoped rationale or records
+an immutable `keep_separate` decision at
+`POST /knowledge/theories/{bundle_id}/alignment-decisions`. A decided pair is
+suppressed from later candidate queues so the same review is not repeated.
 
 ### Theory bundle registry
 
@@ -103,8 +107,8 @@ bundle ID can still be entered directly when following an external audit link.
 
 Theory bundle and validation snapshots live on the persistent knowledge volume.
 At startup, ResearchOS verifies their hashes and restores the latest append-only
-state. Valid schema 1.0 theory snapshots are verified in their historical shape
-and migrated in memory to schema 1.1; corrupt snapshots fail closed.
+state. Valid historical theory snapshots are verified in their original shape
+and migrated in memory to schema 1.2; corrupt snapshots fail closed.
 
 ## Validation statuses
 

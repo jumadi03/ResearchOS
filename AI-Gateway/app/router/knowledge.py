@@ -11,7 +11,7 @@ from app.models.knowledge import (
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
     ArtifactTransitionRequest, EvidenceReviewRequest, PublicationRequest,
     SemanticIndexRequest, SemanticSearchRequest, TheoryBuildRequest,
-    TheoryAlignmentRequest, TheoryReviewRequest,
+    TheoryAlignmentDecisionRequest, TheoryAlignmentRequest, TheoryReviewRequest,
     TheoryValidationRequest,
 )
 from app.knowledge.ingestion.models import AccessStatus, DocumentCandidate
@@ -240,6 +240,25 @@ def alignment_candidates(
         "advisory": True,
         "items": [asdict(item) for item in candidates],
     }
+
+
+@router.post("/theories/{bundle_id}/alignment-decisions", status_code=201)
+def decide_alignment(
+    bundle_id: str, req: TheoryAlignmentDecisionRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        bundle, snapshot = request.app.state.knowledge_service.keep_theories_separate(
+            bundle_id, theory_ids=tuple(req.theory_ids), reviewer=principal.actor_id,
+            rationale=req.rationale, occurred_at=req.occurred_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(bundle); result["snapshot"] = snapshot.name
+    return result
 
 
 @router.post("/theories/{bundle_id}/gaps", status_code=201)

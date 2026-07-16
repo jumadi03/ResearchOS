@@ -524,6 +524,15 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     assert candidates.json()["advisory"] is True
     assert candidates.json()["method"] == "normalized-token-jaccard-v1"
     assert candidates.json()["items"] == []
+    invalid_keep_separate = api.post(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-decisions",
+        json={
+            "theory_ids": [proposal["theory_id"], proposal["theory_id"]],
+            "decision": "keep_separate", "rationale": "Scopes differ materially",
+            "occurred_at": "2026-07-15T00:02:00Z",
+        }, headers={"Authorization": "Bearer review"},
+    )
+    assert invalid_keep_separate.status_code == 422
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
     assert gaps.status_code == 201
     assert gaps.json()["gaps"][0]["gap_type"] == "limited_coverage"
@@ -609,6 +618,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "cookie HttpOnly" in response.text
     assert "Theory Alignment" in response.text
     assert "/workspace-assets/theory.js" in response.text
+    assert 'id="separateDialog"' in response.text
+    assert "Simpan sebagai terpisah" in response.text
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:

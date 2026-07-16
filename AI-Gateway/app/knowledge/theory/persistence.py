@@ -7,8 +7,9 @@ from pathlib import Path
 
 from app.architecture.persistence import atomic_write
 from app.knowledge.theory.models import (
-    CompetingTheory, EvidenceStance, TheoryAlignmentEvent, TheoryBundle,
-    TheoryEvidence, TheoryProposal, TheoryReviewEvent, TheoryReviewState,
+    CompetingTheory, EvidenceStance, TheoryAlignmentDecisionEvent,
+    TheoryAlignmentEvent, TheoryBundle, TheoryEvidence, TheoryProposal,
+    TheoryReviewEvent, TheoryReviewState,
 )
 
 
@@ -35,7 +36,10 @@ class TheoryBundleStore:
                 continue
             def snapshot_rank(item: Path) -> tuple[int, int, str]:
                 value = json.loads(item.read_text(encoding="utf-8"))
-                event_count = len(value.get("reviews", ())) + len(value.get("alignments", ()))
+                event_count = (
+                    len(value.get("reviews", ())) + len(value.get("alignments", ()))
+                    + len(value.get("alignment_decisions", ()))
+                )
                 return event_count, item.stat().st_mtime_ns, item.name
             path = max(snapshots, key=snapshot_rank)
             raw = json.loads(path.read_text(encoding="utf-8"))
@@ -44,26 +48,33 @@ class TheoryBundleStore:
                 tuple(TheoryEvidence(
                     evidence["edge_id"], evidence["graph_id"], evidence["object_id"],
                     EvidenceStance(evidence["stance"]), evidence["confidence"],
-                    evidence["quote_hash"],
+                    evidence["quote_hash"], evidence.get("document_id"),
+                    evidence.get("page"),
                 ) for evidence in item["evidence"]),
                 item["support_count"], item["contradiction_count"],
                 TheoryReviewState(item.get("review_state", "proposed")),
             ) for item in raw["proposals"])
             bundle = TheoryBundle(
-                raw["bundle_id"], tuple(raw["graph_ids"]), raw["created_at"], proposals,
-                tuple(CompetingTheory(**item) for item in raw.get("competing", ())),
-                tuple(TheoryReviewEvent(
+                bundle_id=raw["bundle_id"], graph_ids=tuple(raw["graph_ids"]),
+                created_at=raw["created_at"], proposals=proposals,
+                competing=tuple(CompetingTheory(**item) for item in raw.get("competing", ())),
+                reviews=tuple(TheoryReviewEvent(
                     item["theory_id"], TheoryReviewState(item["decision"]),
                     item["reviewer"], item["rationale"], item["occurred_at"],
                 ) for item in raw.get("reviews", ())),
-                tuple(TheoryAlignmentEvent(
+                alignments=tuple(TheoryAlignmentEvent(
                     item["alignment_id"], tuple(item["source_theory_ids"]),
                     item["resulting_theory_id"], item["statement"], item["reviewer"],
                     item["rationale"], item["occurred_at"],
                 ) for item in raw.get("alignments", ())),
-                raw["content_hash"], raw.get("schema_version", "1.0"),
+                alignment_decisions=tuple(TheoryAlignmentDecisionEvent(
+                    item["decision_id"], tuple(item["theory_ids"]), item["decision"],
+                    item["reviewer"], item["rationale"], item["occurred_at"],
+                ) for item in raw.get("alignment_decisions", ())),
+                content_hash=raw["content_hash"],
+                schema_version=raw.get("schema_version", "1.0"),
             )
-            if raw.get("schema_version", "1.0") == "1.0":
+            if raw.get("schema_version", "1.0") != "1.2":
                 historical = dict(raw)
                 expected = historical.get("content_hash", "")
                 historical["content_hash"] = ""
@@ -75,7 +86,8 @@ class TheoryBundleStore:
                 bundle = TheoryBundle(
                     bundle.bundle_id, bundle.graph_ids, bundle.created_at,
                     bundle.proposals, bundle.competing, bundle.reviews,
-                    bundle.alignments, schema_version="1.1",
+                    bundle.alignments, bundle.alignment_decisions,
+                    schema_version="1.2",
                 ).finalized()
             elif not bundle.verify():
                 raise ValueError(f"Theory bundle snapshot integrity failed: {path.name}")

@@ -68,6 +68,9 @@ class KnowledgeDiscoveryService:
     def alignment_candidates(self, bundle_id):
         return self.theory_pipeline.alignment_candidates(bundle_id)
 
+    def keep_theories_separate(self, bundle_id, **options):
+        return self.theory_pipeline.keep_theories_separate(bundle_id, **options)
+
     def list_theory_bundles(self):
         return self.theory_pipeline.list_theory_bundles()
 

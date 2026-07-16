@@ -7,8 +7,8 @@ import unicodedata
 
 from app.knowledge.modeling.models import KnowledgeEdgeType, KnowledgeNodeType, ScientificKnowledgeGraph
 from app.knowledge.theory.models import (
-    CompetingTheory, EvidenceStance, TheoryAlignmentCandidate, TheoryAlignmentEvent,
-    TheoryBundle, TheoryEvidence,
+    CompetingTheory, EvidenceStance, TheoryAlignmentCandidate,
+    TheoryAlignmentDecisionEvent, TheoryAlignmentEvent, TheoryBundle, TheoryEvidence,
     TheoryProposal, TheoryReviewEvent, TheoryReviewState,
 )
 
@@ -25,7 +25,12 @@ class TheoryBuilder:
                 evidence = []
                 for edge in graph.edges:
                     if edge.target_id == node.node_id and edge.edge_type is KnowledgeEdgeType.SUPPORTS:
-                        evidence.append(TheoryEvidence(edge.edge_id, graph.graph_id, edge.provenance.object_id, EvidenceStance.SUPPORTS, edge.provenance.confidence, edge.provenance.quote_hash))
+                        evidence.append(TheoryEvidence(
+                            edge.edge_id, graph.graph_id, edge.provenance.object_id,
+                            EvidenceStance.SUPPORTS, edge.provenance.confidence,
+                            edge.provenance.quote_hash, edge.provenance.document_id,
+                            edge.provenance.page,
+                        ))
                 key = self._claim_key(node.label)
                 if key:
                     claims.setdefault(key, []).append((node.label.strip(), tuple(evidence)))
@@ -47,7 +52,7 @@ class TheoryBuilder:
                 if self._compete(left.statement, right.statement):
                     competing.append(CompetingTheory(left.theory_id, right.theory_id, "Shared subject with opposing polarity"))
         graph_ids = tuple(sorted(graph.graph_id for graph in graphs))
-        identity = f"{':'.join(graph_ids)}:{created_at}:1.1"
+        identity = f"{':'.join(graph_ids)}:{created_at}:1.2"
         return TheoryBundle(
             f"theory-bundle-{sha256(identity.encode()).hexdigest()[:24]}", graph_ids,
             created_at, tuple(sorted(proposals, key=lambda item: item.theory_id)),
@@ -120,8 +125,12 @@ class TheoryBuilder:
             key=lambda item: item.theory_id,
         ))
         candidates = []
+        decided_pairs = {item.theory_ids for item in bundle.alignment_decisions}
         for index, left in enumerate(accepted):
             for right in accepted[index + 1:]:
+                pair = (left.theory_id, right.theory_id)
+                if pair in decided_pairs:
+                    continue
                 left_tokens = set(self._claim_key(left.statement).split())
                 right_tokens = set(self._claim_key(right.statement).split())
                 shared = left_tokens & right_tokens
@@ -135,12 +144,34 @@ class TheoryBuilder:
                 identity = f"{left.theory_id}:{right.theory_id}:normalized-token-jaccard-v1"
                 candidates.append(TheoryAlignmentCandidate(
                     f"alignment-candidate-{sha256(identity.encode()).hexdigest()[:24]}",
-                    (left.theory_id, right.theory_id),
-                    (left.statement, right.statement), graph_ids, score,
+                    pair, (left.statement, right.statement), graph_ids,
+                    (left.evidence, right.evidence), score,
                 ))
         return tuple(sorted(
             candidates, key=lambda item: (-item.lexical_overlap_score, item.candidate_id)
         ))
+
+    def keep_separate(
+        self, bundle: TheoryBundle, *, theory_ids: tuple[str, ...], reviewer: str,
+        rationale: str, occurred_at: str,
+    ) -> TheoryBundle:
+        source_ids = tuple(sorted(set(theory_ids)))
+        if len(source_ids) != 2:
+            raise ValueError("Keep-separate decision requires two distinct theories")
+        if not rationale.strip():
+            raise ValueError("Keep-separate rationale is required")
+        candidates = {item.theory_ids for item in self.alignment_candidates(bundle)}
+        if source_ids not in candidates:
+            raise ValueError("Theory pair is not an active alignment candidate")
+        identity = f"keep-separate:{':'.join(source_ids)}:{reviewer}:{occurred_at}"
+        event = TheoryAlignmentDecisionEvent(
+            f"alignment-decision-{sha256(identity.encode()).hexdigest()[:24]}",
+            source_ids, "keep_separate", reviewer, rationale.strip(), occurred_at,
+        )
+        return replace(
+            bundle, alignment_decisions=bundle.alignment_decisions + (event,),
+            content_hash="",
+        ).finalized()
 
     @staticmethod
     def _claim_key(statement: str) -> str:
