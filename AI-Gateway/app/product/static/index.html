@@ -12,13 +12,14 @@
   <link rel="stylesheet" href="/workspace-assets/intelligence.css">
   <link rel="stylesheet" href="/workspace-assets/intelligence-history.css">
   <link rel="stylesheet" href="/workspace-assets/theory.css">
+  <link rel="stylesheet" href="/workspace-assets/i18n.css">
 </head>
 <body>
   <div class="shell">
     <header class="topbar">
       <a class="brand" href="/workspace" aria-label="ResearchOS home"><span class="brand-mark">R</span><span>ResearchOS</span></a>
       <div class="project-switcher"><span class="eyebrow">PROJECT</span><select id="projectSelect" aria-label="Pilih project"></select></div>
-      <div class="top-actions"><span class="status-dot" id="connectionDot"></span><span id="connectionLabel">Belum terhubung</span><button class="ghost mobile-theory" id="mobileTheoryButton">Theory</button><button class="ghost" id="authButton">Hubungkan</button></div>
+      <div class="top-actions"><label class="ui-language"><span>Bahasa</span><select id="uiLanguage" aria-label="Bahasa antarmuka"><option value="id">Bahasa Indonesia</option><option value="source">Bahasa Sumber / English</option></select></label><span class="status-dot" id="connectionDot"></span><span id="connectionLabel">Belum terhubung</span><button class="ghost mobile-theory" id="mobileTheoryButton">Theory</button><button class="ghost" id="authButton">Hubungkan</button></div>
     </header>
 
     <aside class="rail" aria-label="Navigasi utama">
@@ -107,6 +108,7 @@
   <dialog id="separateDialog"><form id="separateForm"><input type="hidden" id="separateBundle"><input type="hidden" id="separateTheoryIds"><div class="dialog-mark">T</div><h2>Keep theories separate</h2><p id="separateSources"></p><label>Reviewer rationale<textarea id="separateRationale" rows="4" minlength="12" required placeholder="Jelaskan perbedaan konstruk, arah, populasi, atau outcome…"></textarea></label><label class="confirm-row"><input type="checkbox" id="separateConfirm" required><span>Saya telah memeriksa pernyataan dan provenance bukti. Pasangan ini tidak akan ditawarkan kembali sebagai kandidat alignment.</span></label><div class="dialog-actions"><button type="button" id="cancelSeparate" class="ghost">Batal</button><button type="submit">Simpan sebagai terpisah</button></div><p class="error" id="separateError"></p></form></dialog>
   <dialog id="revalidationDialog"><form id="revalidationForm"><input type="hidden" id="revalidationBundle"><input type="hidden" id="revalidationTrigger"><div class="dialog-mark">V</div><h2>Revalidate theory bundle</h2><p>Nilai risk of bias untuk setiap teori aktif. Hasil dihitung dengan metode transparan dan disimpan sebagai snapshot immutable.</p><label>Literature search completed<input id="searchCompletedAt" type="datetime-local" required></label><label>Maximum search age (days)<input id="maxAgeDays" type="number" value="180" min="1" required></label><div id="riskOfBiasFields" class="risk-fields"></div><label class="confirm-row"><input type="checkbox" id="revalidationConfirm" required><span>Saya telah menilai risk of bias dan memahami hasil dapat berupa pass, fail, incomplete, atau stale.</span></label><div class="dialog-actions"><button type="button" id="cancelRevalidation" class="ghost">Batal</button><button type="submit">Run validation</button></div><p class="error" id="revalidationError"></p></form></dialog>
   <div class="toast" id="toast" role="status"></div>
+  <script src="/workspace-assets/i18n.js" defer></script>
   <script src="/workspace-assets/workspace.js" defer></script>
   <script src="/workspace-assets/graph.js" defer></script>
   <script src="/workspace-assets/discovery.js" defer></script>

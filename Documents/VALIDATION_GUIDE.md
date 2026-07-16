@@ -181,6 +181,21 @@ The workspace defaults to Bahasa Indonesia when a current translation exists
 and provides an `Original` toggle. Alignment decisions and provenance remain
 bound to the original statement regardless of the selected display language.
 
+### Bilingual workspace interface
+
+The workspace uses Bahasa Indonesia by default and stores the user's interface
+choice locally in the browser. A global selector switches navigation, forms,
+dialogs, workflow labels, statuses, placeholders, and accessibility labels
+between Bahasa Indonesia and the source/English interface. Dynamic elements
+added after API responses are localized through the same catalog.
+
+Scientific source content is deliberately excluded from generic interface
+translation. Object titles, evidence quotations, theory source statements,
+stable identifiers, hashes, and provenance remain exact. Theory statements use
+the separately governed translation representation described above. Selecting
+the global source language also switches translated theory statements back to
+their originals.
+
 ### Theory bundle registry
 
 The reviewer workspace loads `GET /knowledge/theories` to list available

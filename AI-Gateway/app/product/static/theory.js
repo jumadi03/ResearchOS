@@ -46,6 +46,7 @@ $('theoryButton').onclick=showTheory;$('mobileTheoryButton').onclick=showTheory;
 $('simulateQuality').onclick=loadCandidateQuality;
 $('languageIndonesian').onclick=()=>{state.theoryLanguage='id';applyTheoryLanguage()};
 $('languageOriginal').onclick=()=>{state.theoryLanguage='original';applyTheoryLanguage()};
+document.addEventListener('researchos:language',event=>{state.theoryLanguage=event.detail.language==='source'?'original':'id';applyTheoryLanguage()});
 $('generateTranslations').onclick=generateTheoryTranslations;
 $('refreshCalibrationQueue').onclick=refreshCalibrationQueue;
 $('loadCalibrationCase').onclick=loadNextCalibrationCase;

@@ -7,6 +7,10 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added global bilingual UI localization with Bahasa Indonesia as the persisted
+  default, source/English switching, dynamic DOM localization, translated
+  placeholders and accessibility labels, and protection for scientific source
+  content, identifiers, hashes, and provenance.
 - Added source-bound Bahasa Indonesia theory representations with AI-assisted
   generation, manual reviewer entry, immutable source hashes, human correction
   and review, stale-translation suppression, and an Original/Indonesia toggle.

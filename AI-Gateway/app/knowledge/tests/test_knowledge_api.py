@@ -791,6 +791,10 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "cookie HttpOnly" in response.text
     assert "Theory Alignment" in response.text
     assert "/workspace-assets/theory.js" in response.text
+    assert "/workspace-assets/i18n.js" in response.text
+    assert "/workspace-assets/i18n.css" in response.text
+    assert 'id="uiLanguage"' in response.text
+    assert "Bahasa Sumber / English" in response.text
     assert 'id="qualityThreshold"' in response.text
     assert 'id="qualityMetrics"' in response.text
     assert 'id="calibrationForm"' in response.text
@@ -809,6 +813,26 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert 'id="readinessChecks"' in response.text
     assert 'id="publicationPreview"' in response.text
     assert 'id="publicationHistory"' in response.text
+
+
+def test_workspace_i18n_defaults_to_indonesian_and_covers_every_product_area() -> None:
+    static = Path(__file__).resolve().parents[2] / "product" / "static"
+    catalog = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert "researchos-ui-language')||'id'" in catalog
+    assert "MutationObserver" in catalog
+    assert ".candidate-claim>strong" in catalog
+    for source, indonesian in {
+        "SCIENTIFIC LIBRARY": "PERPUSTAKAAN ILMIAH",
+        "OPERATIONAL WORKFLOW": "ALUR KERJA OPERASIONAL",
+        "SCIENTIFIC RELATIONSHIPS": "HUBUNGAN ILMIAH",
+        "LITERATURE PIPELINE": "ALUR LITERATUR",
+        "CONTROL PLANE": "PANEL KENDALI",
+        "REVIEWER-GOVERNED SYNTHESIS": "SINTESIS TERKENDALI REVIEWER",
+        "SCIENTIFIC INTELLIGENCE": "KECERDASAN ILMIAH",
+        "Publication Readiness": "Kesiapan Publikasi",
+    }.items():
+        assert f'"{source}":"{indonesian}"' in catalog
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:
