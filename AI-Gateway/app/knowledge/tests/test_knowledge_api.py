@@ -481,6 +481,23 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     )
     assert review.status_code == 200
     assert review.json()["reviews"][0]["reviewer"] == "reviewer@example"
+    alignment_request = {
+        "theory_ids": [proposal["theory_id"], proposal["theory_id"]],
+        "statement": "Governance improves village performance",
+        "rationale": "Reviewer evaluated semantic scope",
+        "occurred_at": "2026-07-15T00:01:00Z",
+    }
+    forbidden_alignment = api.post(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/alignments",
+        json=alignment_request,
+    )
+    assert forbidden_alignment.status_code == 403
+    invalid_alignment = api.post(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/alignments",
+        json=alignment_request, headers={"Authorization": "Bearer review"},
+    )
+    assert invalid_alignment.status_code == 422
+    assert "distinct theories" in invalid_alignment.text
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
     assert gaps.status_code == 201
     assert gaps.json()["gaps"][0]["gap_type"] == "limited_coverage"

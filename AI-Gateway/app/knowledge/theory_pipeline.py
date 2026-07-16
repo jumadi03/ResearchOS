@@ -65,6 +65,16 @@ class KnowledgeTheoryPipeline:
         self.bundles[bundle_id] = reviewed
         return reviewed, self.theory_store.save(reviewed)
 
+    def align_theories(self, bundle_id, **options):
+        bundle = self._bundle(bundle_id)
+        aligned = self.theory_builder.align(bundle, **options)
+        self.bundles[bundle_id] = aligned
+        self.validation_reports = {
+            key: report for key, report in self.validation_reports.items()
+            if report.theory_bundle_id != bundle_id
+        }
+        return aligned, self.theory_store.save(aligned)
+
     def detect_research_gaps(self, bundle_id: str, *, generated_by: str):
         bundle = self._bundle(bundle_id)
         analysis = self.gap_detector.analyze(

@@ -24,6 +24,8 @@ follows Semantic Versioning.
   on ranked bibliographic search results.
 - Consolidate textually equivalent conclusions across independent knowledge
   graphs while preserving every evidence edge's graph and object provenance.
+- Add reviewer-governed semantic theory alignment with required prior
+  acceptance, multi-graph evidence, rationale, attribution, and immutable audit events.
 
 ## [0.4.0] - 2026-07-16
 

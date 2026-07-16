@@ -11,7 +11,7 @@ from app.models.knowledge import (
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
     ArtifactTransitionRequest, EvidenceReviewRequest, PublicationRequest,
     SemanticIndexRequest, SemanticSearchRequest, TheoryBuildRequest,
-    TheoryReviewRequest,
+    TheoryAlignmentRequest, TheoryReviewRequest,
     TheoryValidationRequest,
 )
 from app.knowledge.ingestion.models import AccessStatus, DocumentCandidate
@@ -186,6 +186,26 @@ def review_theory(bundle_id: str, req: TheoryReviewRequest, request: Request, cr
         bundle, snapshot = request.app.state.knowledge_service.review_theory(
             bundle_id, theory_id=req.theory_id, decision=req.decision,
             reviewer=principal.actor_id, rationale=req.rationale, occurred_at=req.occurred_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(bundle); result["snapshot"] = snapshot.name
+    return result
+
+
+@router.post("/theories/{bundle_id}/alignments", status_code=201)
+def align_theories(
+    bundle_id: str, req: TheoryAlignmentRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        bundle, snapshot = request.app.state.knowledge_service.align_theories(
+            bundle_id, theory_ids=tuple(req.theory_ids), statement=req.statement,
+            reviewer=principal.actor_id, rationale=req.rationale,
+            occurred_at=req.occurred_at,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

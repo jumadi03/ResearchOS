@@ -54,6 +54,17 @@ class TheoryReviewEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class TheoryAlignmentEvent:
+    alignment_id: str
+    source_theory_ids: tuple[str, ...]
+    resulting_theory_id: str
+    statement: str
+    reviewer: str
+    rationale: str
+    occurred_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class TheoryBundle:
     bundle_id: str
     graph_ids: tuple[str, ...]
@@ -61,8 +72,9 @@ class TheoryBundle:
     proposals: tuple[TheoryProposal, ...]
     competing: tuple[CompetingTheory, ...]
     reviews: tuple[TheoryReviewEvent, ...] = ()
+    alignments: tuple[TheoryAlignmentEvent, ...] = ()
     content_hash: str = ""
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
 
     def finalized(self):
         payload = asdict(replace(self, content_hash=""))

@@ -57,8 +57,31 @@ similar claims have the same scientific meaning.
 Every consolidated evidence assertion retains its graph ID, evidence object ID,
 confidence, and quote hash. Validation counts distinct graph IDs, not repeated
 wording or multiple assertions from one graph. Related claims that need semantic
-alignment must therefore remain separate until a reviewer-governed method is
-defined.
+alignment must therefore remain separate until a reviewer-governed decision is
+applied.
+
+### Reviewer-governed semantic alignment
+
+Semantic alignment is an explicit mutation of a versioned theory bundle. It is
+available at `POST /knowledge/theories/{bundle_id}/alignments` and requires the
+`reviewer` role. ResearchOS never invokes this operation based on similarity
+scores alone.
+
+```json
+{
+  "theory_ids": ["theory-source-a", "theory-source-b"],
+  "statement": "Open and transparent practices improve reproducibility",
+  "rationale": "The reviewed constructs, direction, and outcome scope match",
+  "occurred_at": "2026-07-16T04:00:00Z"
+}
+```
+
+The source theories must already be accepted and must collectively contain
+evidence from at least two graphs. A successful alignment records the source
+theory IDs, resulting theory ID, reviewer, rationale, statement, and timestamp
+in an immutable bundle event. It preserves all evidence provenance and removes
+active validation reports for the older bundle content, requiring a new
+validation before publication.
 
 ## Validation statuses
 

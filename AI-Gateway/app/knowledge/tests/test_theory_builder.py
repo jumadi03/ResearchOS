@@ -69,6 +69,53 @@ def test_related_but_non_equivalent_claims_remain_separate() -> None:
     assert len(bundle.proposals) == 2
 
 
+def test_reviewer_alignment_merges_accepted_theories_and_records_audit_event() -> None:
+    builder = TheoryBuilder()
+    bundle = builder.build((
+        graph("one", "Open practices improve reproducibility"),
+        graph("two", "Transparent workflows support reproducible research"),
+    ), created_at="time")
+    source_ids = tuple(item.theory_id for item in bundle.proposals)
+    for theory_id in source_ids:
+        bundle = builder.review(
+            bundle, theory_id=theory_id, decision=TheoryReviewState.ACCEPTED,
+            reviewer="reviewer@example", rationale="Source claim reviewed",
+            occurred_at=f"review-{theory_id}",
+        )
+
+    aligned = builder.align(
+        bundle, theory_ids=source_ids,
+        statement="Open and transparent practices improve reproducibility",
+        reviewer="reviewer@example", rationale="Scoped constructs and outcomes match",
+        occurred_at="alignment-time",
+    )
+
+    assert aligned.verify() and len(aligned.proposals) == 1
+    proposal = aligned.proposals[0]
+    assert proposal.review_state is TheoryReviewState.ACCEPTED
+    assert proposal.support_count == 2
+    assert {item.graph_id for item in proposal.evidence} == {"graph-one", "graph-two"}
+    assert aligned.alignments[0].source_theory_ids == tuple(sorted(source_ids))
+    assert aligned.alignments[0].resulting_theory_id == proposal.theory_id
+    assert aligned.alignments[0].reviewer == "reviewer@example"
+
+
+def test_alignment_fails_closed_without_prior_acceptance() -> None:
+    import pytest
+    builder = TheoryBuilder()
+    bundle = builder.build((
+        graph("one", "Open practices improve reproducibility"),
+        graph("two", "Transparent workflows support reproducible research"),
+    ), created_at="time")
+
+    with pytest.raises(ValueError, match="accepted first"):
+        builder.align(
+            bundle, theory_ids=tuple(item.theory_id for item in bundle.proposals),
+            statement="Open practices improve reproducibility", reviewer="reviewer@example",
+            rationale="Constructs match", occurred_at="alignment-time",
+        )
+
+
 def test_theory_review_is_attributable_and_requires_rationale() -> None:
     import pytest
     builder = TheoryBuilder()

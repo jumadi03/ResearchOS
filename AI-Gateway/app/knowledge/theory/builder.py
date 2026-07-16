@@ -7,7 +7,7 @@ import unicodedata
 
 from app.knowledge.modeling.models import KnowledgeEdgeType, KnowledgeNodeType, ScientificKnowledgeGraph
 from app.knowledge.theory.models import (
-    CompetingTheory, EvidenceStance, TheoryBundle, TheoryEvidence,
+    CompetingTheory, EvidenceStance, TheoryAlignmentEvent, TheoryBundle, TheoryEvidence,
     TheoryProposal, TheoryReviewEvent, TheoryReviewState,
 )
 
@@ -46,7 +46,7 @@ class TheoryBuilder:
                 if self._compete(left.statement, right.statement):
                     competing.append(CompetingTheory(left.theory_id, right.theory_id, "Shared subject with opposing polarity"))
         graph_ids = tuple(sorted(graph.graph_id for graph in graphs))
-        identity = f"{':'.join(graph_ids)}:{created_at}:1.0"
+        identity = f"{':'.join(graph_ids)}:{created_at}:1.1"
         return TheoryBundle(
             f"theory-bundle-{sha256(identity.encode()).hexdigest()[:24]}", graph_ids,
             created_at, tuple(sorted(proposals, key=lambda item: item.theory_id)),
@@ -63,6 +63,53 @@ class TheoryBuilder:
         proposals = tuple(replace(item, review_state=decision) if item.theory_id == theory_id else item for item in bundle.proposals)
         event = TheoryReviewEvent(theory_id, decision, reviewer, rationale.strip(), occurred_at)
         return replace(bundle, proposals=proposals, reviews=bundle.reviews + (event,), content_hash="").finalized()
+
+    def align(
+        self, bundle: TheoryBundle, *, theory_ids: tuple[str, ...], statement: str,
+        reviewer: str, rationale: str, occurred_at: str,
+    ) -> TheoryBundle:
+        if not bundle.verify():
+            raise ValueError("Theory alignment requires a verified bundle")
+        source_ids = tuple(sorted(set(theory_ids)))
+        if len(source_ids) < 2:
+            raise ValueError("Theory alignment requires at least two distinct theories")
+        if not statement.strip() or not rationale.strip():
+            raise ValueError("Alignment statement and rationale are required")
+        by_id = {proposal.theory_id: proposal for proposal in bundle.proposals}
+        missing = [theory_id for theory_id in source_ids if theory_id not in by_id]
+        if missing:
+            raise KeyError(f"Unknown theory proposal: {missing[0]}")
+        sources = tuple(by_id[theory_id] for theory_id in source_ids)
+        if any(item.review_state is not TheoryReviewState.ACCEPTED for item in sources):
+            raise ValueError("All aligned theories must be accepted first")
+        evidence = tuple(sorted(
+            {item.edge_id: item for proposal in sources for item in proposal.evidence}.values(),
+            key=lambda item: (item.graph_id, item.edge_id),
+        ))
+        if len({item.graph_id for item in evidence}) < 2:
+            raise ValueError("Theory alignment requires evidence from at least two graphs")
+        identity = f"semantic:{':'.join(source_ids)}:{self._claim_key(statement)}"
+        resulting_id = f"theory-{sha256(identity.encode()).hexdigest()[:24]}"
+        merged = TheoryProposal(
+            resulting_id, statement.strip(), evidence,
+            sum(item.stance is EvidenceStance.SUPPORTS for item in evidence),
+            sum(item.stance is EvidenceStance.CONTRADICTS for item in evidence),
+            TheoryReviewState.ACCEPTED,
+        )
+        proposals = tuple(sorted(
+            tuple(item for item in bundle.proposals if item.theory_id not in source_ids) + (merged,),
+            key=lambda item: item.theory_id,
+        ))
+        competing = self._competing(proposals)
+        alignment_id = f"alignment-{sha256(f'{identity}:{reviewer}:{occurred_at}'.encode()).hexdigest()[:24]}"
+        event = TheoryAlignmentEvent(
+            alignment_id, source_ids, resulting_id, statement.strip(), reviewer,
+            rationale.strip(), occurred_at,
+        )
+        return replace(
+            bundle, proposals=proposals, competing=competing,
+            alignments=bundle.alignments + (event,), content_hash="",
+        ).finalized()
 
     @staticmethod
     def _claim_key(statement: str) -> str:
@@ -86,3 +133,12 @@ class TheoryBuilder:
         shared = (left_tokens - negations) & (right_tokens - negations)
         polarity_differs = bool(left_tokens & negations) != bool(right_tokens & negations)
         return polarity_differs and len(shared) >= 2
+
+    @classmethod
+    def _competing(cls, proposals: tuple[TheoryProposal, ...]) -> tuple[CompetingTheory, ...]:
+        return tuple(
+            CompetingTheory(left.theory_id, right.theory_id, "Shared subject with opposing polarity")
+            for index, left in enumerate(proposals)
+            for right in proposals[index + 1:]
+            if cls._compete(left.statement, right.statement)
+        )

@@ -51,6 +51,14 @@ class TheoryReviewRequest(BaseModel):
     occurred_at: str = Field(min_length=1)
 
 
+class TheoryAlignmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    theory_ids: list[str] = Field(min_length=2)
+    statement: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+    occurred_at: str = Field(min_length=1)
+
+
 class EvidenceReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     decision: str
