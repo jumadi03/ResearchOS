@@ -42,7 +42,12 @@ class KnowledgeDiscoveryService:
 
     def object_translation_source(self, project_id, object_id, principal):
         obj = self.get_object_read_model(object_id, project_id, principal)
-        text = obj["summary"]["title"]
+        text = obj["summary"]["title"].strip()
+        if not text:
+            document = obj.get("document") or {}
+            journal = document.get("journal") or "Unknown journal"
+            doi = document.get("doi") or obj["identity"]["stable_key"]
+            text = f"Untitled scientific document — {journal} — {doi}"
         return {
             "project_id": project_id, "object_id": obj["identity"]["object_id"],
             "source_text": text,

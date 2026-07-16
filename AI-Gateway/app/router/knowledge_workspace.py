@@ -27,6 +27,11 @@ AI_ACTIONS = {
 }
 
 
+def _translation_generation_options(source_text: str) -> dict:
+    estimated_tokens = max(1, len(source_text) // 2)
+    return {"num_predict": min(4096, max(768, estimated_tokens))}
+
+
 class ObjectIntelligenceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: str
@@ -98,7 +103,9 @@ def _run_object_translation_job(app, job_id, project_id, generated_at, principal
                         "actor_id": principal.actor_id,
                         "action": "bulk_translate_scientific_object",
                         "think": False,
-                        "generation_options": {"num_predict": 768},
+                        "generation_options": _translation_generation_options(
+                            source["source_text"]
+                        ),
                     },
                 ))
                 translated, _ = app.state.knowledge_service.record_object_translation(
@@ -207,7 +214,9 @@ def create_object_translation(
                     "actor_id": principal.actor_id,
                     "action": "translate_scientific_object",
                     "think": False,
-                    "generation_options": {"num_predict": 768},
+                    "generation_options": _translation_generation_options(
+                        source["source_text"]
+                    ),
                 },
             ))
             translated, provider, model = answer.text, answer.provider, answer.model
@@ -269,7 +278,9 @@ def generate_missing_object_translations(
                     "actor_id": principal.actor_id,
                     "action": "bulk_translate_scientific_object",
                     "think": False,
-                    "generation_options": {"num_predict": 768},
+                    "generation_options": _translation_generation_options(
+                        source["source_text"]
+                    ),
                 },
             ))
             translated, _ = request.app.state.knowledge_service.record_object_translation(

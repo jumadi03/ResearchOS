@@ -979,6 +979,55 @@ def test_object_translation_job_survives_the_start_request(
     assert job.json()["remaining"] == 0
 
 
+def test_object_translation_uses_a_traceable_fallback_for_an_empty_title(
+    tmp_path: Path,
+) -> None:
+    repository = RecordingRepository()
+    repository.object_title = ""
+    api = client(tmp_path, "review", repository=repository)
+
+    created = api.post(
+        "/knowledge/projects/researchos-default/object-translations",
+        json={
+            "object_id": "object-1",
+            "generated_at": "2026-07-16T10:00:00Z",
+            "translated_text": "Objek bukti ilmiah tanpa judul",
+        },
+    )
+
+    assert created.status_code == 201
+    assert created.json()["source_text"] == (
+        "Untitled scientific document — Unknown journal — evidence:object-1"
+    )
+
+
+def test_long_object_translation_receives_a_larger_bounded_output_budget(
+    tmp_path: Path,
+) -> None:
+    repository = RecordingRepository()
+    repository.object_title = "x" * 9_000
+    api = client(tmp_path, "review", repository=repository)
+
+    class TranslationRouter:
+        def execute(self, request):
+            assert request.metadata["generation_options"] == {"num_predict": 4096}
+            return RuntimeResponse(
+                provider="test", model="translation-v1", text="Terjemahan panjang",
+            )
+
+    api.app.state.ai_router = TranslationRouter()
+    created = api.post(
+        "/knowledge/projects/researchos-default/object-translations",
+        json={
+            "object_id": "object-1",
+            "generated_at": "2026-07-16T10:00:00Z",
+            "translated_text": None,
+        },
+    )
+
+    assert created.status_code == 201
+
+
 def test_discovery_capabilities_drive_workspace_without_client_guesses(tmp_path: Path) -> None:
     response = client(tmp_path, "audit", repository=RecordingRepository()).get(
         "/knowledge/discovery/capabilities"
