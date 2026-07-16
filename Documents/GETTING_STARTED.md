@@ -132,9 +132,10 @@ these services to the local computer only.
 
 ## Next steps
 
+- Complete [your first ResearchOS workflow](FIRST_RESEARCH_WORKFLOW.md) to turn
+  a research question into a provenance-bearing literature snapshot.
 - Explore the interactive API at <http://127.0.0.1:8080/docs>.
 - Read the [scientific knowledge roadmap](SCIENTIFIC_KNOWLEDGE_ROADMAP.md).
 - Review [local deployment and operations](LOCAL_STACK.md) before changing the
   stack or restoring backups.
 - Read the [security policy](../SECURITY.md) before reporting a vulnerability.
-
