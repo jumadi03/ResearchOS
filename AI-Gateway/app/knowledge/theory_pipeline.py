@@ -1,6 +1,7 @@
 """Theory, gap, validation, and publication orchestration."""
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
+from hashlib import sha256
 from pathlib import Path
 
 from app.knowledge.gaps.detector import ResearchGapDetector
@@ -10,6 +11,9 @@ from app.knowledge.publication.engine import PublicationEngine
 from app.knowledge.publication.models import PublicationKind
 from app.knowledge.publication.persistence import PublicationStore
 from app.knowledge.theory.builder import TheoryBuilder
+from app.knowledge.theory.calibration import (
+    AlignmentCalibration, AlignmentCalibrationStore,
+)
 from app.knowledge.theory.models import TheoryReviewState
 from app.knowledge.theory.persistence import TheoryBundleStore
 from app.knowledge.theory.quality import AlignmentQualityEvaluator
@@ -28,6 +32,17 @@ class KnowledgeTheoryPipeline:
         self.object_store = object_store
         self.theory_builder = TheoryBuilder()
         self.alignment_quality_evaluator = AlignmentQualityEvaluator()
+        self.calibration_store = AlignmentCalibrationStore(
+            output_root / "alignment-calibrations"
+        )
+        self.calibrations = list(self.calibration_store.load_all())
+        approved_calibrations = [
+            item for item in self.calibrations if item.status == "approved"
+        ]
+        if approved_calibrations:
+            active = approved_calibrations[0]
+            self.theory_builder.candidate_method = active.method
+            self.theory_builder.candidate_threshold = active.proposed_threshold
         self.theory_store = TheoryBundleStore(output_root / "theories")
         self.gap_detector = ResearchGapDetector()
         self.gap_store = GapAnalysisStore(output_root / "gaps")
@@ -150,6 +165,154 @@ class KnowledgeTheoryPipeline:
             "score_distribution": tuple(distribution),
             "benchmark": benchmark,
         }
+
+    def alignment_calibration_summary(self):
+        observations = self._calibration_observations()
+        recommendation = self._recommended_threshold(observations)
+        return {
+            "method": self.theory_builder.candidate_method,
+            "production_threshold": self.theory_builder.candidate_threshold,
+            "minimum_reviewed_outcomes": 30,
+            "reviewed_outcomes": len(observations),
+            "eligible_to_propose": len(observations) >= 30,
+            "recommendation": recommendation,
+            "proposals": tuple(asdict(item) for item in self.calibrations),
+        }
+
+    def propose_alignment_calibration(
+        self, *, threshold, proposer, rationale, proposed_at,
+    ):
+        if not 0.0 <= threshold <= 1.0:
+            raise ValueError("threshold must be between 0 and 1")
+        if not rationale.strip():
+            raise ValueError("Calibration rationale is required")
+        observations = self._calibration_observations()
+        if len(observations) < 30:
+            raise ValueError("Calibration requires at least 30 reviewed candidate outcomes")
+        observed = self._threshold_metrics(observations, threshold)
+        if observed["precision"] < 0.75 or observed["recall"] < 0.8:
+            raise ValueError("Proposed threshold fails the observed reviewer-outcome floor")
+        benchmark = self.alignment_quality_evaluator.benchmark(threshold=threshold)
+        benchmark_metrics = benchmark["metrics"]
+        if benchmark_metrics["precision"] < 0.75 or benchmark_metrics["recall"] < 1.0:
+            raise ValueError("Proposed threshold fails the benchmark quality floor")
+        sequence = len(self.calibrations) + 1
+        identity = f"{threshold}:{proposer}:{proposed_at}:{sequence}"
+        item = AlignmentCalibration(
+            calibration_id=f"alignment-calibration-{sha256(identity.encode()).hexdigest()[:24]}",
+            method=f"explainable-lexical-v2.{sequence}",
+            version=f"2.{sequence}.0",
+            current_threshold=self.theory_builder.candidate_threshold,
+            proposed_threshold=threshold,
+            reviewed_outcomes=len(observations),
+            observed_precision=observed["precision"],
+            observed_recall=observed["recall"],
+            benchmark_precision=benchmark_metrics["precision"],
+            benchmark_recall=benchmark_metrics["recall"],
+            proposer=proposer, rationale=rationale.strip(),
+            proposed_at=proposed_at,
+            previous_version=self.theory_builder.candidate_method,
+        ).finalized()
+        self.calibrations.insert(0, item)
+        return item, self.calibration_store.save(item)
+
+    def approve_alignment_calibration(self, calibration_id, *, approver, approved_at):
+        item = next((
+            entry for entry in self.calibrations
+            if entry.calibration_id == calibration_id
+        ), None)
+        if item is None:
+            raise KeyError(f"Unknown alignment calibration: {calibration_id}")
+        if item.status != "pending":
+            raise ValueError("Calibration proposal is no longer pending")
+        if item.proposer == approver:
+            raise ValueError("Calibration approval requires a different reviewer")
+        approved = replace(
+            item, status="approved", approver=approver,
+            approved_at=approved_at, content_hash="",
+        ).finalized()
+        self.calibrations = [
+            approved if entry.calibration_id == calibration_id else entry
+            for entry in self.calibrations
+        ]
+        self.theory_builder.candidate_method = approved.method
+        self.theory_builder.candidate_threshold = approved.proposed_threshold
+        return approved, self.calibration_store.save(approved)
+
+    def rollback_alignment_calibration(
+        self, *, approver, rationale, occurred_at,
+    ):
+        if not rationale.strip():
+            raise ValueError("Rollback rationale is required")
+        approved = [
+            item for item in self.calibrations if item.status == "approved"
+        ]
+        if not approved:
+            raise ValueError("No approved calibration is available to roll back")
+        active = approved[0]
+        if active.approver == approver:
+            raise ValueError("Rollback requires a different reviewer")
+        sequence = len(self.calibrations) + 1
+        identity = f"rollback:{active.calibration_id}:{approver}:{occurred_at}"
+        rollback = AlignmentCalibration(
+            calibration_id=f"alignment-calibration-{sha256(identity.encode()).hexdigest()[:24]}",
+            method=f"explainable-lexical-v2.{sequence}",
+            version=f"2.{sequence}.0",
+            current_threshold=active.proposed_threshold,
+            proposed_threshold=active.current_threshold,
+            reviewed_outcomes=active.reviewed_outcomes,
+            observed_precision=active.observed_precision,
+            observed_recall=active.observed_recall,
+            benchmark_precision=active.benchmark_precision,
+            benchmark_recall=active.benchmark_recall,
+            proposer="system-rollback", rationale=rationale.strip(),
+            proposed_at=occurred_at, status="approved", approver=approver,
+            approved_at=occurred_at, previous_version=active.method,
+        ).finalized()
+        self.calibrations.insert(0, rollback)
+        self.theory_builder.candidate_method = rollback.method
+        self.theory_builder.candidate_threshold = rollback.proposed_threshold
+        return rollback, self.calibration_store.save(rollback)
+
+    def _calibration_observations(self):
+        return tuple(
+            (True, item.candidate_score)
+            for bundle in self.bundles.values() for item in bundle.alignments
+            if item.candidate_method and item.candidate_score is not None
+        ) + tuple(
+            (False, item.candidate_score)
+            for bundle in self.bundles.values() for item in bundle.alignment_decisions
+            if item.candidate_method and item.candidate_score is not None
+        )
+
+    @staticmethod
+    def _threshold_metrics(observations, threshold):
+        true_positive = sum(expected and score >= threshold for expected, score in observations)
+        false_positive = sum(not expected and score >= threshold for expected, score in observations)
+        false_negative = sum(expected and score < threshold for expected, score in observations)
+        precision = true_positive / (true_positive + false_positive) if true_positive + false_positive else 0.0
+        recall = true_positive / (true_positive + false_negative) if true_positive + false_negative else 0.0
+        return {"precision": round(precision, 4), "recall": round(recall, 4)}
+
+    def _recommended_threshold(self, observations):
+        if not observations:
+            return None
+        candidates = sorted({
+            self.theory_builder.candidate_threshold,
+            *(score for _, score in observations),
+        })
+        ranked = []
+        for threshold in candidates:
+            metrics = self._threshold_metrics(observations, threshold)
+            precision, recall = metrics["precision"], metrics["recall"]
+            f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+            benchmark = self.alignment_quality_evaluator.benchmark(threshold=threshold)["metrics"]
+            if benchmark["precision"] >= 0.75 and benchmark["recall"] >= 1.0:
+                ranked.append((round(f1, 4), -abs(threshold - self.theory_builder.candidate_threshold), threshold, metrics))
+        if not ranked:
+            return None
+        _, _, threshold, metrics = max(ranked)
+        return {"threshold": threshold, **metrics}
 
     def keep_theories_separate(self, bundle_id, **options):
         bundle = self._bundle(bundle_id)

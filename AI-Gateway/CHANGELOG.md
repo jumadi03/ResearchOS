@@ -7,6 +7,10 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added a two-person calibration and promotion gate for theory alignment
+  thresholds, requiring 30 labeled reviewer outcomes, observed and benchmark
+  quality floors, immutable version snapshots, restart-safe activation, and
+  audited rollback.
 - Added versioned theory-alignment quality evaluation with immutable candidate
   score snapshots, observed reviewer outcomes, score distributions, benchmark
   precision/recall, and non-mutating threshold simulation in the workspace.

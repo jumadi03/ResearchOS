@@ -76,6 +76,20 @@ class KnowledgeDiscoveryService:
             bundle_id, threshold=threshold
         )
 
+    def alignment_calibration_summary(self):
+        return self.theory_pipeline.alignment_calibration_summary()
+
+    def propose_alignment_calibration(self, **options):
+        return self.theory_pipeline.propose_alignment_calibration(**options)
+
+    def approve_alignment_calibration(self, calibration_id, **options):
+        return self.theory_pipeline.approve_alignment_calibration(
+            calibration_id, **options
+        )
+
+    def rollback_alignment_calibration(self, **options):
+        return self.theory_pipeline.rollback_alignment_calibration(**options)
+
     def keep_theories_separate(self, bundle_id, **options):
         return self.theory_pipeline.keep_theories_separate(bundle_id, **options)
 

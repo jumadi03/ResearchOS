@@ -1,5 +1,5 @@
 from pathlib import Path
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from hashlib import sha256
 import json
 
@@ -11,7 +11,9 @@ from app.knowledge.modeling.models import (
     KnowledgeNodeType, ScientificKnowledgeGraph,
 )
 from app.knowledge.theory.builder import TheoryBuilder
-from app.knowledge.theory.models import TheoryReviewState
+from app.knowledge.theory.models import (
+    TheoryAlignmentDecisionEvent, TheoryAlignmentEvent, TheoryReviewState,
+)
 from app.knowledge.theory.persistence import TheoryBundleStore
 from app.knowledge.theory.quality import AlignmentQualityEvaluator
 from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
@@ -245,9 +247,78 @@ def test_alignment_quality_benchmark_is_versioned_and_threshold_is_simulated() -
     assert baseline["method"] == "explainable-lexical-v2"
     assert baseline["version"] == "1.0.0"
     assert len(baseline["cases"]) == 8
+    assert baseline["metrics"]["precision"] >= 0.75
+    assert baseline["metrics"]["recall"] >= 1.0
     assert baseline["metrics"]["recall"] >= stricter["metrics"]["recall"]
     with pytest.raises(ValueError, match="between 0 and 1"):
         evaluator.benchmark(threshold=1.1)
+
+
+def test_calibration_requires_evidence_separate_approval_and_supports_rollback(
+    tmp_path: Path,
+) -> None:
+    pipeline = KnowledgeTheoryPipeline(tmp_path, {})
+    bundle = TheoryBuilder().build(
+        (graph("calibration", "Calibration evidence"),), created_at="time"
+    )
+    decision_events = tuple(
+        TheoryAlignmentDecisionEvent(
+            f"decision-{index}", (f"left-{index}", f"right-{index}"),
+            "keep_separate", "reviewer", "Scopes differ", f"time-{index}",
+            candidate_id=f"candidate-{index}",
+            candidate_method="explainable-lexical-v2",
+            candidate_score=0.21 + index / 1000,
+            candidate_threshold=0.2,
+            candidate_shared_terms=("shared", "terms"),
+        )
+        for index in range(15)
+    )
+    alignment_events = tuple(
+        TheoryAlignmentEvent(
+            f"alignment-{index}", (f"a-left-{index}", f"a-right-{index}"),
+            f"result-{index}", "Aligned statement", "reviewer",
+            "Equivalent scopes", f"alignment-time-{index}",
+            candidate_id=f"aligned-candidate-{index}",
+            candidate_method="explainable-lexical-v2",
+            candidate_score=0.4 + index / 1000,
+            candidate_threshold=0.2,
+            candidate_shared_terms=("shared", "terms"),
+        )
+        for index in range(15)
+    )
+    bundle = replace(
+        bundle, alignments=alignment_events,
+        alignment_decisions=decision_events, content_hash="",
+    ).finalized()
+    pipeline.bundles[bundle.bundle_id] = bundle
+
+    summary = pipeline.alignment_calibration_summary()
+    assert summary["eligible_to_propose"] is True
+    proposal, _ = pipeline.propose_alignment_calibration(
+        threshold=0.3, proposer="reviewer-one",
+        rationale="Observed labels support this conservative threshold",
+        proposed_at="2026-07-16T06:00:00Z",
+    )
+    assert proposal.status == "pending"
+    with pytest.raises(ValueError, match="different reviewer"):
+        pipeline.approve_alignment_calibration(
+            proposal.calibration_id, approver="reviewer-one",
+            approved_at="2026-07-16T06:01:00Z",
+        )
+    approved, _ = pipeline.approve_alignment_calibration(
+        proposal.calibration_id, approver="reviewer-two",
+        approved_at="2026-07-16T06:02:00Z",
+    )
+    assert approved.status == "approved"
+    assert pipeline.theory_builder.candidate_threshold == 0.3
+    restored = KnowledgeTheoryPipeline(tmp_path, {})
+    assert restored.theory_builder.candidate_threshold == 0.3
+    rollback, _ = restored.rollback_alignment_calibration(
+        approver="reviewer-three", rationale="Rollback after monitored regression",
+        occurred_at="2026-07-16T06:03:00Z",
+    )
+    assert rollback.proposed_threshold == 0.2
+    assert restored.theory_builder.candidate_threshold == 0.2
 
 
 def test_theory_review_is_attributable_and_requires_rationale() -> None:

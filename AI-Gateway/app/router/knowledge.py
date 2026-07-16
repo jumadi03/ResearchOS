@@ -8,6 +8,8 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.knowledge.authentication import KnowledgeRole
 from app.knowledge.models import ScientificQuestion, SearchPlan
 from app.models.knowledge import (
+    AlignmentCalibrationApprovalRequest, AlignmentCalibrationProposalRequest,
+    AlignmentCalibrationRollbackRequest,
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
     ArtifactTransitionRequest, EvidenceReviewRequest, PublicationPreviewRequest,
     PublicationRequest,
@@ -289,6 +291,71 @@ def alignment_quality(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/theory-alignment/calibration")
+def alignment_calibration_summary(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    return request.app.state.knowledge_service.alignment_calibration_summary()
+
+
+@router.post("/theory-alignment/calibrations", status_code=201)
+def propose_alignment_calibration(
+    req: AlignmentCalibrationProposalRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        item, snapshot = request.app.state.knowledge_service.propose_alignment_calibration(
+            threshold=req.threshold, proposer=principal.actor_id,
+            rationale=req.rationale, proposed_at=req.proposed_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(item); result["snapshot"] = snapshot.name
+    return result
+
+
+@router.post(
+    "/theory-alignment/calibrations/{calibration_id}/approval", status_code=201,
+)
+def approve_alignment_calibration(
+    calibration_id: str, req: AlignmentCalibrationApprovalRequest,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        item, snapshot = request.app.state.knowledge_service.approve_alignment_calibration(
+            calibration_id, approver=principal.actor_id,
+            approved_at=req.approved_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(item); result["snapshot"] = snapshot.name
+    return result
+
+
+@router.post("/theory-alignment/calibrations/rollback", status_code=201)
+def rollback_alignment_calibration(
+    req: AlignmentCalibrationRollbackRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        item, snapshot = request.app.state.knowledge_service.rollback_alignment_calibration(
+            approver=principal.actor_id, rationale=req.rationale,
+            occurred_at=req.occurred_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(item); result["snapshot"] = snapshot.name
+    return result
 
 
 @router.post("/theories/{bundle_id}/gaps", status_code=201)

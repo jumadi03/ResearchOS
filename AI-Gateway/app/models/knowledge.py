@@ -67,6 +67,24 @@ class TheoryAlignmentDecisionRequest(BaseModel):
     occurred_at: str = Field(min_length=1)
 
 
+class AlignmentCalibrationProposalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    threshold: float = Field(ge=0.0, le=1.0)
+    rationale: str = Field(min_length=12)
+    proposed_at: str = Field(min_length=1)
+
+
+class AlignmentCalibrationApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    approved_at: str = Field(min_length=1)
+
+
+class AlignmentCalibrationRollbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rationale: str = Field(min_length=12)
+    occurred_at: str = Field(min_length=1)
+
+
 class EvidenceReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     decision: str

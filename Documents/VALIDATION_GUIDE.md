@@ -122,6 +122,28 @@ and recall only. It never changes the production threshold, candidate queue,
 review events, bundle hash, or publication state. The workspace labels this
 operation as a simulation and shows both production and simulated thresholds.
 
+### Calibration and promotion gate
+
+Production thresholds are not changed by simulations. The global calibration
+workspace requires at least 30 reviewer decisions that retain candidate score
+snapshots. A proposal must meet observed precision of at least 0.75, observed
+recall of at least 0.80, benchmark precision of at least 0.75, and benchmark
+recall of 1.00. These floors are regression-tested in CI.
+
+Calibration follows a two-person rule: the authenticated reviewer who creates
+a proposal cannot approve it. Approval creates an immutable configuration
+version, activates it for new candidate queues, and restores it after service
+restart. Existing bundle events retain the exact method and threshold used at
+decision time. Rollback creates another approved version pointing to the prior
+threshold; it never deletes or rewrites calibration history.
+
+The reviewer-only endpoints are:
+
+- `GET /knowledge/theory-alignment/calibration`
+- `POST /knowledge/theory-alignment/calibrations`
+- `POST /knowledge/theory-alignment/calibrations/{id}/approval`
+- `POST /knowledge/theory-alignment/calibrations/rollback`
+
 ### Theory bundle registry
 
 The reviewer workspace loads `GET /knowledge/theories` to list available

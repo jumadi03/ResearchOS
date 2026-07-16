@@ -148,7 +148,10 @@ class TheoryBuilder:
                 pair = (left.theory_id, right.theory_id)
                 if pair in decided_pairs:
                     continue
-                signals = self.candidate_signals(left.statement, right.statement)
+                signals = self.candidate_signals(
+                    left.statement, right.statement,
+                    threshold=self.candidate_threshold,
+                )
                 graph_ids = tuple(sorted({
                     item.graph_id for proposal in (left, right) for item in proposal.evidence
                 }))
@@ -161,6 +164,7 @@ class TheoryBuilder:
                     (left.evidence, right.evidence), signals["score"],
                     signals["shared_terms"], signals["shared_bigrams"],
                     signals["score_components"], signals["explanation"],
+                    method=self.candidate_method,
                 ))
         return tuple(sorted(
             candidates, key=lambda item: (-item.lexical_overlap_score, item.candidate_id)
@@ -209,7 +213,9 @@ class TheoryBuilder:
         )
 
     @classmethod
-    def candidate_signals(cls, left: str, right: str) -> dict:
+    def candidate_signals(
+        cls, left: str, right: str, *, threshold: float | None = None,
+    ) -> dict:
         left_sequence = cls._candidate_tokens(left)
         right_sequence = cls._candidate_tokens(right)
         left_tokens, right_tokens = set(left_sequence), set(right_sequence)
@@ -223,7 +229,8 @@ class TheoryBuilder:
         terms = tuple(sorted(shared))
         phrases = tuple(sorted(" ".join(item) for item in shared_bigrams))
         polarity_match = cls._polarity(left) == cls._polarity(right)
-        eligible = len(terms) >= 2 and polarity_match and score >= cls.candidate_threshold
+        effective_threshold = cls.candidate_threshold if threshold is None else threshold
+        eligible = len(terms) >= 2 and polarity_match and score >= effective_threshold
         return {
             "eligible": eligible, "score": score, "shared_terms": terms,
             "shared_bigrams": phrases, "polarity_match": polarity_match,
@@ -233,7 +240,7 @@ class TheoryBuilder:
             ),
             "explanation": (
                 f"Shared {len(terms)} content terms and {len(phrases)} content phrases; "
-                f"score must be at least {cls.candidate_threshold:.2f}."
+                f"score must be at least {effective_threshold:.2f}."
             ),
         }
 

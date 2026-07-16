@@ -579,6 +579,25 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
         quality_path + "?threshold=1.1",
         headers={"Authorization": "Bearer review"},
     ).status_code == 422
+    calibration_path = "/knowledge/theory-alignment/calibration"
+    assert api.get(calibration_path).status_code == 403
+    calibration = api.get(
+        calibration_path, headers={"Authorization": "Bearer review"}
+    )
+    assert calibration.status_code == 200
+    assert calibration.json()["minimum_reviewed_outcomes"] == 30
+    assert calibration.json()["eligible_to_propose"] is False
+    calibration_response = api.post(
+        "/knowledge/theory-alignment/calibrations",
+        json={
+            "threshold": 0.3,
+            "rationale": "Observed outcomes justify a conservative calibration",
+            "proposed_at": "2026-07-16T06:00:00Z",
+        },
+        headers={"Authorization": "Bearer review"},
+    )
+    assert calibration_response.status_code == 422
+    assert "at least 30" in calibration_response.text
     assert api.get(
         f"/knowledge/theories/{theories.json()['bundle_id']}/validation-history"
     ).status_code == 403
@@ -718,6 +737,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "/workspace-assets/theory.js" in response.text
     assert 'id="qualityThreshold"' in response.text
     assert 'id="qualityMetrics"' in response.text
+    assert 'id="calibrationForm"' in response.text
+    assert 'id="calibrationHistory"' in response.text
     assert 'id="separateDialog"' in response.text
     assert "Simpan sebagai terpisah" in response.text
     assert 'id="decisionHistory"' in response.text
