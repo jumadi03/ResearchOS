@@ -22,6 +22,8 @@ follows Semantic Versioning.
   and derive open-access state only from explicit provider or license signals.
 - Resolve exact DOI queries through Crossref's work endpoint instead of relying
   on ranked bibliographic search results.
+- Consolidate textually equivalent conclusions across independent knowledge
+  graphs while preserving every evidence edge's graph and object provenance.
 
 ## [0.4.0] - 2026-07-16
 

@@ -87,8 +87,10 @@ validation pass while still producing an integrity-verified review artifact.
 
 ## Follow-up
 
-- Define a reviewed cross-graph claim-consolidation method that can identify
-  semantically equivalent assertions without erasing study-specific context.
+- Textually equivalent conclusions are now consolidated across graphs using a
+  conservative, deterministic normalization while retaining full provenance.
+- Define a reviewer-governed method for aligning semantically similar but
+  non-identical assertions without erasing study-specific context.
 - Add a pilot whose independent studies explicitly test the same scoped claim.
 - Preserve the current fail-safe replication threshold and reviewer-visible
   validation reasons.

@@ -47,6 +47,19 @@ The following body is submitted to
 defines when that search becomes stale; it is not an instruction to rewrite
 historical timestamps.
 
+## Independent graph consolidation
+
+Before validation, Theory Builder consolidates conclusions only when their
+normalized words are identical. Normalization handles Unicode presentation,
+capitalization, punctuation, and whitespace; it does not infer that merely
+similar claims have the same scientific meaning.
+
+Every consolidated evidence assertion retains its graph ID, evidence object ID,
+confidence, and quote hash. Validation counts distinct graph IDs, not repeated
+wording or multiple assertions from one graph. Related claims that need semantic
+alignment must therefore remain separate until a reviewer-governed method is
+defined.
+
 ## Validation statuses
 
 - `pass`: all configured method gates pass.
@@ -62,3 +75,6 @@ The [end-to-end pilot](END_TO_END_PILOT.md) intentionally produced
 `incomplete`: one open-access paper was traceable and reviewable, but one source
 was insufficient for a stronger conclusion.
 
+The [multi-source pilot](MULTI_SOURCE_PILOT.md) demonstrated that using two
+papers alone does not guarantee replication: its study-specific claims remained
+separate and correctly retained an `incomplete` result.
