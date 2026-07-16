@@ -48,6 +48,21 @@ services:
       timeout: 5s
       retries: 10
 
+  minio-init:
+    image: minio/mc:RELEASE.2025-05-21T01-59-54Z
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set researchos http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" --api S3v4 &&
+        mc mb --ignore-existing researchos/researchos-documents &&
+        mc mb --ignore-existing researchos/researchos-backups
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-researchos}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    depends_on:
+      minio: {condition: service_healthy}
+
   api:
     build: {context: ../AI-Gateway}
     restart: unless-stopped
@@ -65,7 +80,7 @@ services:
     ports: ["127.0.0.1:8080:8000"]
     depends_on:
       migrate: {condition: service_completed_successfully}
-      minio: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
 
   worker:
     build: {context: ../AI-Gateway}
@@ -75,6 +90,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-researchos}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOCUMENT_BUCKET: researchos-documents
       KNOWLEDGE_OUTPUT_ROOT: /data/knowledge
       JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-3}
       JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-660}
@@ -85,7 +103,7 @@ services:
     expose: ["9102"]
     depends_on:
       migrate: {condition: service_completed_successfully}
-      minio: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.17.1
@@ -137,7 +155,7 @@ services:
       - knowledge_data:/source/knowledge:ro
     depends_on:
       migrate: {condition: service_completed_successfully}
-      minio: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
 
 volumes:
   postgres_data:
