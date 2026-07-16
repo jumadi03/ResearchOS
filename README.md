@@ -13,6 +13,13 @@ ResearchOS preserves a strict boundary between machine assistance and human
 decisions. AI-generated material is advisory: it cannot silently promote
 evidence, approve theories, or declare architecture compliance.
 
+![ResearchOS secure local workspace login](Documents/images/researchos-workspace-login.png)
+
+The browser workspace provides role-separated access to scientific objects,
+literature discovery, provenance, review queues, knowledge graphs, and
+administration. Credentials remain in ignored local files and are never stored
+in this repository.
+
 ## Current capabilities
 
 - Literature discovery with versioned provider snapshots and provenance.

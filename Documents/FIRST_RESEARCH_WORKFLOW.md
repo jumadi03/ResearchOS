@@ -32,6 +32,8 @@ commit, or pull request.
 
 ## 1. Sign in to the workspace
 
+![ResearchOS workspace login with empty credential fields](images/researchos-workspace-login.png)
+
 1. Open <http://127.0.0.1:8080/workspace>.
 2. Enter the discoverer username and password from `deploy/local-access.env`.
 3. Select **Masuk**.
@@ -117,4 +119,3 @@ or access restrictions for a demo.
 Use **Ganti akses** and log out when you are finished. To stop the local stack
 without deleting its data, follow the safe shutdown instructions in
 [ResearchOS in 5 Minutes](GETTING_STARTED.md#5-stop-safely).
-
