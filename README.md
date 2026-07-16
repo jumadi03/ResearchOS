@@ -108,6 +108,8 @@ schema and persistence, and dependency-security gates.
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report
 security vulnerabilities privately according to [SECURITY.md](SECURITY.md);
 do not disclose credentials or vulnerabilities in a public issue.
+For usage questions, reproducible bugs, feature proposals, and documentation
+problems, choose the appropriate channel in [SUPPORT.md](SUPPORT.md).
 
 ## Citation
 

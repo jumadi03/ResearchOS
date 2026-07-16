@@ -1,0 +1,45 @@
+name: Documentation report
+description: Report incorrect, unclear, or missing ResearchOS documentation
+title: "docs: "
+labels: [documentation]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, private research data, copyrighted documents, or vulnerabilities.
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Link to the page and identify the relevant heading.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is incorrect, unclear, missing, or no longer reproducible?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Suggested outcome
+      description: Describe what a reader should be able to understand or complete.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: ResearchOS version or commit
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials, personal data, and private research content.
+          required: true
+        - label: This is not a security vulnerability requiring private reporting.
+          required: true
+
