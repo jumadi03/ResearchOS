@@ -18,7 +18,8 @@
 - Completed: SCAN-001E Controlled Web Acquisition
 - Completed: SCAN-001F Raw Capture and Integrity Store
 - Completed: SCAN-001G Source Inspection
-- Next deliverable: SCAN-001H Identity Resolution
+- Completed: SCAN-001H Identity Resolution
+- Next deliverable: SCAN-001I Screening Engine
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,

@@ -62,6 +62,17 @@ class _PostgresRepositoryCore:
     def _stable_key(record: LiteratureRecord) -> str:
         return f"doi:{record.doi}" if record.doi else f"literature:{record.record_id}"
 
+    @staticmethod
+    def _record_identifiers(record: LiteratureRecord):
+        identifiers = []
+        if record.doi:
+            identifiers.append(("doi", record.doi))
+        identifiers.extend(
+            (f"provider:{source.provider}", source.source_id.strip().casefold())
+            for source in record.source_records
+        )
+        return tuple(sorted(set(identifiers)))
+
     def persist_discovery(self, run: DiscoveryRun) -> None:
         run.validate_query_plan()
         with self._connect() as connection:
@@ -92,13 +103,76 @@ class _PostgresRepositoryCore:
 
     def _upsert_document(self, cursor, record: LiteratureRecord):
         stable_key = self._stable_key(record)
+        identifiers = self._record_identifiers(record)
+        clauses = " OR ".join(
+            "(identifier_type=%s AND normalized_value=%s)"
+            for _ in identifiers
+        )
+        cursor.execute(
+            f"SELECT DISTINCT document_id FROM scientific_identifiers "
+            f"WHERE {clauses}",
+            tuple(value for item in identifiers for value in item),
+        )
+        resolved = tuple(row[0] for row in cursor.fetchall())
+        if len(resolved) > 1:
+            raise ValueError("Identifier conflict resolves to multiple documents")
+        if resolved:
+            document_id = resolved[0]
+            if record.doi:
+                cursor.execute("""
+                    UPDATE canonical_objects SET stable_key=%s,updated_at=now()
+                    WHERE object_id=%s AND stable_key LIKE 'literature:%%'
+                      AND NOT EXISTS(
+                        SELECT 1 FROM canonical_objects WHERE stable_key=%s
+                      )
+                """, (stable_key, document_id, stable_key))
+        else:
+            cursor.execute("""
+                INSERT INTO canonical_objects(object_type,stable_key,lifecycle_status)
+                VALUES ('scientific_document',%s,'draft')
+                ON CONFLICT(stable_key) DO UPDATE SET updated_at=now()
+                RETURNING object_id
+            """, (stable_key,))
+            document_id = cursor.fetchone()[0]
+        for identifier_type, normalized_value in identifiers:
+            cursor.execute("""
+                INSERT INTO scientific_identifiers(
+                    document_id,identifier_type,normalized_value
+                ) VALUES (%s,%s,%s)
+                ON CONFLICT(identifier_type,normalized_value) DO NOTHING
+            """, (document_id, identifier_type, normalized_value))
+            cursor.execute("""
+                SELECT document_id FROM scientific_identifiers
+                WHERE identifier_type=%s AND normalized_value=%s
+            """, (identifier_type, normalized_value))
+            if cursor.fetchone()[0] != document_id:
+                raise ValueError("Scientific identifier belongs to another document")
+        decision = {
+            "record_id": record.record_id,
+            "document_id": str(document_id),
+            "match_kind": record.match_kind.value,
+            "identifiers": identifiers,
+            "sources": tuple(
+                (item.provider, item.source_id, item.response_hash)
+                for item in record.source_records
+            ),
+        }
+        decision_hash = sha256(canonical_json(decision).encode()).hexdigest()
+        basis = "doi" if record.doi else "provider_identifier"
         cursor.execute("""
-            INSERT INTO canonical_objects(object_type,stable_key,lifecycle_status)
-            VALUES ('scientific_document',%s,'draft')
-            ON CONFLICT(stable_key) DO UPDATE SET updated_at=now()
-            RETURNING object_id
-        """, (stable_key,))
-        document_id = cursor.fetchone()[0]
+            INSERT INTO identity_resolution_events(
+                document_id,record_id,match_kind,match_basis,rationale,
+                compared_identifiers,decision_hash
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT(decision_hash) DO NOTHING
+        """, (
+            document_id, record.record_id, record.match_kind.value, basis,
+            (
+                "Exact normalized DOI" if record.doi
+                else "Unique provider-scoped identifier"
+            ),
+            json.dumps(identifiers), decision_hash,
+        ))
         payload = {
             "title": record.title, "abstract": record.abstract,
             "authors": record.authors, "year": record.year,

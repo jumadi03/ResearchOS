@@ -10,6 +10,7 @@ from app.knowledge.discovery.providers import (
     CrossrefProvider, OpenAlexProvider, ProviderError, ProviderPage,
 )
 from app.knowledge.discovery.query_planner import ScientificQueryPlanner
+from app.knowledge.discovery.normalization import normalize_doi
 from app.knowledge.discovery.source_registry import (
     CANONICAL_SOURCE_DEFINITIONS, CanonicalSourceRegistry,
 )
@@ -87,11 +88,11 @@ def planned(*providers: str, budget=100, limit=25):
 def test_discovery_normalizes_and_exactly_merges_doi_records() -> None:
     openalex = StubProvider("openalex", ({
         "id": "https://openalex.org/W1", "title": "Tourism Village Failure",
-        "doi": "https://doi.org/10.1/ABC", "publication_year": 2024,
+        "doi": "https://doi.org/10.1000/ABC", "publication_year": 2024,
         "authorships": [{"author": {"display_name": "Ada Lovelace"}}],
     },))
     crossref = StubProvider("crossref", ({
-        "DOI": "10.1/abc", "title": ["Tourism Village Failure"],
+        "DOI": "10.1000/abc", "title": ["Tourism Village Failure"],
         "published": {"date-parts": [[2024]]}, "container-title": ["Journal"],
     },))
     engine = LiteratureDiscoveryEngine(
@@ -104,9 +105,31 @@ def test_discovery_normalizes_and_exactly_merges_doi_records() -> None:
     )
 
     assert len(run.records) == 1
-    assert run.records[0].doi == "10.1/abc"
+    assert run.records[0].doi == "10.1000/abc"
     assert run.records[0].match_kind is MatchKind.EXACT
     assert tuple(source.provider for source in run.records[0].source_records) == ("crossref", "openalex")
+
+
+def test_doi_normalization_is_strict_and_merge_is_order_independent() -> None:
+    assert normalize_doi("HTTPS://DOI.ORG/10.1234/ABC") == "10.1234/abc"
+    assert normalize_doi("not-a-doi") is None
+    assert normalize_doi("10.12/too-short-prefix") is None
+    left = StubProvider("openalex", ({
+        "id": "W1", "title": "Canonical title",
+        "doi": "10.1234/same", "publication_year": 2024,
+    },))
+    right = StubProvider("crossref", ({
+        "DOI": "https://doi.org/10.1234/SAME",
+        "title": ["Canonical title"], "published": {"date-parts": [[2024]]},
+    },))
+    first = LiteratureDiscoveryEngine(
+        (left, right), clock=lambda: "now", run_id_factory=lambda: "run",
+    ).discover(question(), contract(), planned("openalex", "crossref"))
+    second = LiteratureDiscoveryEngine(
+        (right, left), clock=lambda: "now", run_id_factory=lambda: "run",
+    ).discover(question(), contract(), planned("crossref", "openalex"))
+    assert first.records[0].title == second.records[0].title
+    assert first.records[0].authors == second.records[0].authors
 
 
 def test_provider_failure_is_explicit_and_preserves_other_results() -> None:

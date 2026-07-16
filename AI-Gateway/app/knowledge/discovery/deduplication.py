@@ -21,7 +21,14 @@ def deduplicate(
     """Merge DOI-identical records and flag, but never merge, fuzzy matches."""
     exact: dict[str, LiteratureRecord] = {}
     unique: list[LiteratureRecord] = []
-    for record in records:
+    ordered = sorted(
+        records,
+        key=lambda item: (
+            item.doi or "", item.source_records[0].provider,
+            item.source_records[0].source_id, item.record_id,
+        ),
+    )
+    for record in ordered:
         if not record.doi:
             unique.append(record)
             continue
@@ -29,14 +36,19 @@ def deduplicate(
         if existing is None:
             exact[record.doi] = record
             continue
+        candidates = (existing, record)
         exact[record.doi] = replace(
             existing,
-            authors=existing.authors or record.authors,
-            year=existing.year or record.year,
-            abstract=existing.abstract or record.abstract,
-            venue=existing.venue or record.venue,
-            work_type=existing.work_type or record.work_type,
-            source_records=tuple(sorted(existing.source_records + record.source_records, key=lambda s: s.provider)),
+            title=next((item.title for item in candidates if item.title), ""),
+            authors=next((item.authors for item in candidates if item.authors), ()),
+            year=next((item.year for item in candidates if item.year is not None), None),
+            abstract=next((item.abstract for item in candidates if item.abstract), None),
+            venue=next((item.venue for item in candidates if item.venue), None),
+            work_type=next((item.work_type for item in candidates if item.work_type), None),
+            source_records=tuple(sorted(
+                existing.source_records + record.source_records,
+                key=lambda s: (s.provider, s.source_id, s.response_hash),
+            )),
             match_kind=MatchKind.EXACT,
         )
     output = list(exact.values()) + unique

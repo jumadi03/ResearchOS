@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import os
 
 from app.knowledge.models import (
@@ -152,8 +153,60 @@ def main() -> None:
                 GROUP BY d.metadata_version
             """, (f"doi:{DOI}",))
             row = cursor.fetchone()
+            cursor.execute("""
+                SELECT count(*)
+                FROM scientific_identifiers i
+                JOIN canonical_objects c ON c.object_id=i.document_id
+                WHERE c.stable_key=%s
+            """, (f"doi:{DOI}",))
+            identifier_count = cursor.fetchone()[0]
+            cursor.execute("""
+                SELECT count(*)
+                FROM identity_resolution_events e
+                JOIN canonical_objects c ON c.object_id=e.document_id
+                WHERE c.stable_key=%s
+            """, (f"doi:{DOI}",))
+            resolution_count = cursor.fetchone()[0]
+            cursor.execute("SAVEPOINT immutable_resolution_check")
+            try:
+                cursor.execute("""
+                    UPDATE identity_resolution_events SET rationale='mutated'
+                    WHERE document_id=(
+                        SELECT object_id FROM canonical_objects
+                        WHERE stable_key=%s
+                    )
+                """, (f"doi:{DOI}",))
+            except Exception:
+                cursor.execute(
+                    "ROLLBACK TO SAVEPOINT immutable_resolution_check"
+                )
+            else:
+                raise AssertionError(
+                    "Identity resolution immutable trigger did not reject update"
+                )
+            original = discovery_run().records[0]
+            source = replace(
+                original.source_records[0],
+                source_id="W-LATE-IDENTIFIER",
+                response_hash="late-identifier-v1",
+            )
+            without_doi = replace(
+                original, record_id="late-identifier-healthcheck",
+                doi=None, source_records=(source,),
+            )
+            initial_id = repository._upsert_document(cursor, without_doi)
+            with_doi = replace(
+                without_doi, doi="10.0000/researchos.late-identifier",
+                source_records=(replace(
+                    source, response_hash="late-identifier-v2",
+                ),),
+            )
+            resolved_id = repository._upsert_document(cursor, with_doi)
 
     assert row == (2, 1, 2), row
+    assert identifier_count == 2, identifier_count
+    assert resolution_count == 1, resolution_count
+    assert resolved_id == initial_id, (initial_id, resolved_id)
     print("canonical repository healthcheck: passed")
 
 

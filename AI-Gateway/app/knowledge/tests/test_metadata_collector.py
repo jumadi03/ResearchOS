@@ -22,12 +22,12 @@ class Provider:
 
 def test_metadata_collector_retains_conflicts_citations_and_retraction() -> None:
     openalex = Provider("openalex", {
-        "id": "W1", "doi": "10.1/a", "title": "Study", "cited_by_count": 8,
+            "id": "W1", "doi": "10.1000/a", "title": "Study", "cited_by_count": 8,
         "is_retracted": True, "open_access": {"is_oa": True},
         "concepts": [{"display_name": "Tourism"}], "referenced_works": ["W0"],
     })
     crossref = Provider("crossref", {
-        "DOI": "10.1/a", "title": ["Study"], "is-referenced-by-count": 5,
+            "DOI": "10.1000/a", "title": ["Study"], "is-referenced-by-count": 5,
         "subject": ["Development"], "reference": [{"DOI": "10.1/old"}],
     })
     question = ScientificQuestion("q", "Why?")

@@ -23,7 +23,10 @@ def normalize_doi(value: str | None) -> str | None:
         return None
     doi = value.strip().lower()
     doi = re.sub(r"^(https?://(dx\.)?doi\.org/|doi:\s*)", "", doi)
-    return doi or None
+    doi = doi.strip()
+    if not re.fullmatch(r"10\.\d{4,9}/[^\s]+", doi):
+        return None
+    return doi
 
 
 def _inverted_abstract(index: dict[str, list[int]] | None) -> str | None:
