@@ -77,8 +77,8 @@ remains a literature-review artifact requiring qualified human interpretation.
 
 ## Follow-up
 
-- Explain allowed risk-of-bias values (`low`, `some_concerns`, `high`, and
-  `unknown`) in user-facing validation documentation.
+- Keep the [risk-of-bias vocabulary](VALIDATION_GUIDE.md) synchronized with the
+  API schema and versioned validation method.
 - Keep metadata observation, citation-edge, and conflict counts visible in the
   API and browser workspace so successful enrichment cannot be misread as empty.
 - Repeat the pilot with multiple independent studies before evaluating a

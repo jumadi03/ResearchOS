@@ -485,6 +485,13 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     assert gaps.status_code == 201
     assert gaps.json()["gaps"][0]["gap_type"] == "limited_coverage"
     assert gaps.json()["hypotheses"][0]["advisory"] is True
+    invalid_bias = api.post(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/validations",
+        json={"assessed_at": "2026-07-15T00:00:00Z", "search_completed_at": "2026-07-01T00:00:00Z", "max_age_days": 180, "risk_of_bias_by_theory": {proposal["theory_id"]: "unclear"}},
+        headers={"Authorization": "Bearer review"},
+    )
+    assert invalid_bias.status_code == 422
+    assert "some_concerns" in invalid_bias.text
     validation = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/validations",
         json={"assessed_at": "2026-07-15T00:00:00Z", "search_completed_at": "2026-07-01T00:00:00Z", "max_age_days": 180, "risk_of_bias_by_theory": {proposal["theory_id"]: "low"}},

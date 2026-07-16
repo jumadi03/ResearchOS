@@ -96,6 +96,7 @@ schema and persistence, and dependency-security gates.
 - [ResearchOS in 5 Minutes](Documents/GETTING_STARTED.md)
 - [Your first ResearchOS workflow](Documents/FIRST_RESEARCH_WORKFLOW.md)
 - [End-to-end scientific workflow pilot](Documents/END_TO_END_PILOT.md)
+- [Theory validation and risk-of-bias guide](Documents/VALIDATION_GUIDE.md)
 - [ResearchOS v0.4.0 launch announcement](Documents/LAUNCH_ANNOUNCEMENT.md)
 - [Local deployment and operations](Documents/LOCAL_STACK.md)
 - [Scientific data storage architecture](Documents/SCIENTIFIC_DATA_STORAGE.md)

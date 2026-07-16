@@ -11,6 +11,8 @@ follows Semantic Versioning.
   authenticated reviewer principals.
 - Added explicit metadata enrichment status and counts for records,
   observations, citation edges, and conflicts to API and workspace results.
+- Exposed the closed risk-of-bias vocabulary in the validation API schema and
+  reject unsupported values before service execution.
 
 ### Fixed
 

@@ -1,5 +1,7 @@
 """HTTP request models for Scientific Knowledge discovery."""
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -85,7 +87,13 @@ class TheoryValidationRequest(BaseModel):
     assessed_at: str = Field(min_length=1)
     search_completed_at: str = Field(min_length=1)
     max_age_days: int = Field(default=180, ge=1)
-    risk_of_bias_by_theory: dict[str, str]
+    risk_of_bias_by_theory: dict[
+        str, Literal["low", "some_concerns", "high", "unknown"]
+    ] = Field(
+        description=(
+            "Reviewer assessment for each theory: low, some_concerns, high, or unknown"
+        )
+    )
 
 
 class PublicationRequest(BaseModel):
