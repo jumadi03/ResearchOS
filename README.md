@@ -33,6 +33,10 @@ before using outputs in consequential workflows.
 
 ## Quick start
 
+For the complete first-run walkthrough, including verification, credentials,
+safe shutdown, and troubleshooting, read
+[ResearchOS in 5 Minutes](Documents/GETTING_STARTED.md).
+
 Requirements:
 
 - Docker Desktop with Docker Compose
@@ -82,6 +86,7 @@ schema and persistence, and dependency-security gates.
 
 ## Documentation
 
+- [ResearchOS in 5 Minutes](Documents/GETTING_STARTED.md)
 - [Local deployment and operations](Documents/LOCAL_STACK.md)
 - [Scientific data storage architecture](Documents/SCIENTIFIC_DATA_STORAGE.md)
 - [Scientific knowledge roadmap](Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md)
