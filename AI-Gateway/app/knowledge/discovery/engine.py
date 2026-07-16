@@ -10,8 +10,8 @@ from app.knowledge.discovery.normalization import normalize
 from app.knowledge.discovery.providers import LiteratureProvider, ProviderError
 from app.knowledge.discovery.source_registry import CanonicalSourceRegistry
 from app.knowledge.models import (
-    DiscoveryContract, DiscoveryRun, ProviderFailure, ScientificQuestion,
-    SearchPlan,
+    DiscoveryContract, DiscoveryRun, ProviderEnumeration, ProviderFailure,
+    ScientificQuestion, SearchPlan,
 )
 
 
@@ -58,6 +58,13 @@ class LiteratureDiscoveryEngine:
         run_id = self._run_id_factory()
         records = []
         failures = []
+        enumerations = []
+        source_by_provider = {
+            item.name: item for item in source_definitions
+        }
+        query_by_provider = {
+            item.provider: item for item in plan.source_queries
+        }
         for provider_name in plan.providers:
             provider = self._providers.get(provider_name)
             if provider is None:
@@ -67,16 +74,46 @@ class LiteratureDiscoveryEngine:
                 pages = provider.search(plan)
                 if hasattr(pages, "records"):
                     pages = (pages,)
+                rank = 0
+                totals = []
                 for page_number, page in enumerate(pages, start=1):
+                    if page.total_results is not None:
+                        totals.append(page.total_results)
                     page_hash = None
                     if self._raw_page_store is not None:
                         page_hash = self._raw_page_store.save(
                             run_id, provider_name, page_number, page,
                         )
-                    records.extend(
-                        normalize(provider_name, raw, started_at, response_hash=page_hash)
-                        for raw in page.records
-                    )
+                    for raw in page.records:
+                        rank += 1
+                        records.append(normalize(
+                            provider_name, raw, started_at,
+                            response_hash=page_hash,
+                            source_definition_id=source_by_provider[
+                                provider_name
+                            ].source_id,
+                            query_family_id=query_by_provider[
+                                provider_name
+                            ].family_id,
+                            source_query=query_by_provider[
+                                provider_name
+                            ].query,
+                            discovery_rank=rank, page_number=page_number,
+                            request_url=page.request_url,
+                        ))
+                total_available = max(totals) if totals else None
+                enumerations.append(ProviderEnumeration(
+                    provider_name,
+                    source_by_provider[provider_name].source_id,
+                    query_by_provider[provider_name].family_id,
+                    plan.limit_per_provider, rank, total_available,
+                    len(pages),
+                    (
+                        total_available > rank
+                        if total_available is not None
+                        else rank == plan.limit_per_provider
+                    ),
+                ))
             except (ProviderError, ValueError, KeyError, TypeError) as exc:
                 failures.append(
                     ProviderFailure(
@@ -89,7 +126,8 @@ class LiteratureDiscoveryEngine:
         return DiscoveryRun(
             run_id=run_id, question=question, discovery_contract=contract,
             source_definitions=source_definitions, search_plan=plan,
-            started_at=started_at, records=deduplicate(tuple(records)),
+            started_at=started_at, enumerations=tuple(enumerations),
+            records=deduplicate(tuple(records)),
             failures=tuple(failures),
         )
 

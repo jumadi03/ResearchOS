@@ -8,7 +8,7 @@ from app.knowledge.models import (
     DiscoveryContract,
     DiscoveryRun,
     LiteratureRecord,
-    MatchKind, QueryConcept,
+    MatchKind, ProviderEnumeration, QueryConcept,
     ScientificQuestion,
     SearchPlan,
     SourceRecord,
@@ -31,30 +31,6 @@ SOURCE_HASH = "repository-healthcheck-source-v1"
 
 
 def discovery_run() -> DiscoveryRun:
-    source = SourceRecord(
-        provider="openalex",
-        source_id="W-REPOSITORY-HEALTHCHECK",
-        retrieved_at="2026-07-15T12:00:00Z",
-        response_hash=SOURCE_HASH,
-        raw={
-            "id": "W-REPOSITORY-HEALTHCHECK",
-            "doi": f"https://doi.org/{DOI}",
-            "title": "ResearchOS canonical repository health check",
-            "type": "article",
-        },
-    )
-    record = LiteratureRecord(
-        record_id="repository-healthcheck",
-        title="ResearchOS canonical repository health check",
-        authors=("ResearchOS",),
-        year=2026,
-        doi=DOI,
-        abstract="A deterministic integration record.",
-        venue="ResearchOS",
-        work_type="article",
-        source_records=(source,),
-        match_kind=MatchKind.EXACT,
-    )
     question = ScientificQuestion(
         "repository-healthcheck", "Is persistence healthy?",
     )
@@ -83,11 +59,47 @@ def discovery_run() -> DiscoveryRun:
         ),),
         sources,
     )
+    source_query = plan.source_queries[0]
+    source = SourceRecord(
+        provider="openalex",
+        source_id="W-REPOSITORY-HEALTHCHECK",
+        retrieved_at="2026-07-15T12:00:00Z",
+        response_hash=SOURCE_HASH,
+        source_definition_id=sources[0].source_id,
+        query_family_id=source_query.family_id,
+        source_query=source_query.query,
+        discovery_rank=1,
+        page_number=1,
+        request_url="https://api.openalex.org/works?search=healthcheck",
+        canonical_url="https://openalex.org/W-REPOSITORY-HEALTHCHECK",
+        raw={
+            "id": "W-REPOSITORY-HEALTHCHECK",
+            "doi": f"https://doi.org/{DOI}",
+            "title": "ResearchOS canonical repository health check",
+            "type": "article",
+        },
+    )
+    record = LiteratureRecord(
+        record_id="repository-healthcheck",
+        title="ResearchOS canonical repository health check",
+        authors=("ResearchOS",),
+        year=2026,
+        doi=DOI,
+        abstract="A deterministic integration record.",
+        venue="ResearchOS",
+        work_type="article",
+        source_records=(source,),
+        match_kind=MatchKind.EXACT,
+    )
     return DiscoveryRun(
         run_id="repository-healthcheck",
         question=question, discovery_contract=contract,
         source_definitions=sources, search_plan=plan,
         started_at="2026-07-15T12:00:00Z",
+        enumerations=(ProviderEnumeration(
+            "openalex", sources[0].source_id, source_query.family_id,
+            25, 1, 1, 1, False,
+        ),),
         records=(record,),
     )
 

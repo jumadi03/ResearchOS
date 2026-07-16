@@ -284,11 +284,30 @@ class SourceRecord:
     source_id: str
     retrieved_at: str
     response_hash: str
+    source_definition_id: str
+    query_family_id: str
+    source_query: str
+    discovery_rank: int
+    page_number: int
+    request_url: str
+    canonical_url: str | None
     raw: dict[str, Any] = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        for name in ("provider", "source_id", "retrieved_at", "response_hash"):
+        for name in (
+            "provider", "source_id", "retrieved_at", "response_hash",
+            "source_definition_id", "query_family_id", "source_query",
+            "request_url",
+        ):
             object.__setattr__(self, name, _required(getattr(self, name), name))
+        if self.discovery_rank < 1:
+            raise ValueError("discovery_rank must be positive")
+        if self.page_number < 1:
+            raise ValueError("page_number must be positive")
+        if not self.request_url.startswith("https://"):
+            raise ValueError("request_url must use HTTPS")
+        if self.canonical_url and not self.canonical_url.startswith("https://"):
+            raise ValueError("canonical_url must use HTTPS")
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,6 +334,53 @@ class ProviderFailure:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderEnumeration:
+    provider: str
+    source_definition_id: str
+    query_family_id: str
+    requested_limit: int
+    enumerated_count: int
+    total_available: int | None
+    page_count: int
+    truncated: bool
+    status: str = "complete"
+
+    def __post_init__(self) -> None:
+        for name in (
+            "provider", "source_definition_id", "query_family_id", "status",
+        ):
+            object.__setattr__(self, name, _required(getattr(self, name), name))
+        if self.status != "complete":
+            raise ValueError("Provider enumeration status is not recognized")
+        if self.requested_limit < 1:
+            raise ValueError("requested_limit must be positive")
+        if not 0 <= self.enumerated_count <= self.requested_limit:
+            raise ValueError(
+                "enumerated_count must be within requested limit"
+            )
+        if self.page_count < 1:
+            raise ValueError(
+                "Successful provider enumeration requires at least one page"
+            )
+        if self.total_available is not None:
+            if self.total_available < self.enumerated_count:
+                raise ValueError(
+                    "total_available must not be below enumerated_count"
+                )
+            expected_truncated = self.total_available > self.enumerated_count
+            if self.truncated is not expected_truncated:
+                raise ValueError(
+                    "truncated status does not match provider total"
+                )
+        elif self.truncated != (
+            self.enumerated_count == self.requested_limit
+        ):
+            raise ValueError(
+                "truncated status does not match requested limit"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class DiscoveryRun:
     run_id: str
     question: ScientificQuestion
@@ -322,6 +388,7 @@ class DiscoveryRun:
     source_definitions: tuple[SourceDefinition, ...]
     search_plan: SearchPlan
     started_at: str
+    enumerations: tuple[ProviderEnumeration, ...]
     records: tuple[LiteratureRecord, ...]
     failures: tuple[ProviderFailure, ...] = ()
     schema_version: str = "1.0"
@@ -349,6 +416,64 @@ class DiscoveryRun:
             raise ValueError(
                 "Discovery run source query provenance is invalid"
             )
+        summaries = {item.provider: item for item in self.enumerations}
+        if len(summaries) != len(self.enumerations):
+            raise ValueError("Provider enumerations must be unique")
+        failed = {item.provider for item in self.failures}
+        if len(failed) != len(self.failures):
+            raise ValueError("Provider failures must be unique")
+        if set(summaries) & failed:
+            raise ValueError(
+                "Provider cannot be both enumerated and failed"
+            )
+        if set(summaries) | failed != set(self.search_plan.providers):
+            raise ValueError(
+                "Discovery run does not account for every planned provider"
+            )
+        source_queries = {
+            item.provider: item for item in self.search_plan.source_queries
+        }
+        observations = [
+            source for record in self.records
+            for source in record.source_records
+        ]
+        if any(item.provider not in summaries for item in observations):
+            raise ValueError(
+                "Source observation has no provider enumeration"
+            )
+        for provider, summary in summaries.items():
+            definition = definitions[provider]
+            source_query = source_queries[provider]
+            provider_observations = [
+                item for item in observations if item.provider == provider
+            ]
+            if (
+                summary.source_definition_id != definition.source_id
+                or summary.query_family_id != source_query.family_id
+                or summary.enumerated_count != len(provider_observations)
+            ):
+                raise ValueError(
+                    f"Provider enumeration provenance is inconsistent: "
+                    f"{provider}"
+                )
+            if any(
+                item.source_definition_id != definition.source_id
+                or item.query_family_id != source_query.family_id
+                or item.source_query != source_query.query
+                or item.page_number > summary.page_count
+                for item in provider_observations
+            ):
+                raise ValueError(
+                    f"Source observation provenance is inconsistent: "
+                    f"{provider}"
+                )
+            ranks = sorted(
+                item.discovery_rank for item in provider_observations
+            )
+            if ranks != list(range(1, len(ranks) + 1)):
+                raise ValueError(
+                    f"Provider discovery ranks are inconsistent: {provider}"
+                )
 
     @classmethod
     def timestamp(cls) -> str:

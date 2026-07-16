@@ -46,7 +46,12 @@ class RawPageStore:
         self, run_id: str, provider: str, page_number: int, page: ProviderPage
     ) -> str:
         payload = canonical_json(
-            {"provider": provider, "request_url": page.request_url, "records": page.records}
+            {
+                "provider": provider,
+                "request_url": page.request_url,
+                "total_results": page.total_results,
+                "records": page.records,
+            }
         ).encode("utf-8")
         digest = sha256(payload).hexdigest()
         path = self.root / run_id / "raw" / provider / f"page-{page_number:05d}-{digest}.json"

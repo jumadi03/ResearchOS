@@ -35,7 +35,9 @@ def _inverted_abstract(index: dict[str, list[int]] | None) -> str | None:
 
 def normalize(
     provider: str, raw: dict[str, Any], retrieved_at: str,
-    *, response_hash: str | None = None,
+    *, response_hash: str | None = None, source_definition_id: str,
+    query_family_id: str, source_query: str, discovery_rank: int,
+    page_number: int, request_url: str,
 ) -> LiteratureRecord:
     if provider == "openalex":
         source_id = str(raw.get("id") or raw.get("doi") or raw.get("title"))
@@ -76,7 +78,30 @@ def normalize(
     if provider == "crossref":
         parts = ((raw.get("published") or raw.get("issued") or {}).get("date-parts") or [[]])[0]
         year = parts[0] if parts else None
-    source = SourceRecord(provider, source_id, retrieved_at, response_hash or content_hash(raw), raw)
+    canonical_url = None
+    if provider == "openalex":
+        openalex_id = str(raw.get("id") or "").strip()
+        if openalex_id:
+            canonical_url = (
+                openalex_id if openalex_id.startswith("https://")
+                else f"https://openalex.org/{openalex_id.rsplit('/', 1)[-1]}"
+            )
+    elif provider == "crossref":
+        canonical_url = raw.get("URL") or (
+            f"https://doi.org/{doi}" if doi else None
+        )
+    elif provider == "semantic_scholar" and raw.get("paperId"):
+        canonical_url = (
+            f"https://www.semanticscholar.org/paper/{raw['paperId']}"
+        )
+    source = SourceRecord(
+        provider=provider, source_id=source_id, retrieved_at=retrieved_at,
+        response_hash=response_hash or content_hash(raw),
+        source_definition_id=source_definition_id,
+        query_family_id=query_family_id, source_query=source_query,
+        discovery_rank=discovery_rank, page_number=page_number,
+        request_url=request_url, canonical_url=canonical_url, raw=raw,
+    )
     identity = doi or f"{provider}:{source_id}"
     return LiteratureRecord(
         record_id=sha256(identity.encode("utf-8")).hexdigest()[:24],

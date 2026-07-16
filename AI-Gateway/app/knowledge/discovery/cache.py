@@ -28,7 +28,10 @@ class CachedProvider:
         if path.exists():
             payload = json.loads(path.read_text(encoding="utf-8"))
             return tuple(
-                ProviderPage(tuple(page["records"]), page["request_url"])
+                ProviderPage(
+                    tuple(page["records"]), page["request_url"],
+                    page.get("total_results"),
+                )
                 for page in payload["pages"]
             )
         pages = self.provider.search(plan)
@@ -37,7 +40,11 @@ class CachedProvider:
                 "provider": self.name,
                 "plan": asdict(plan),
                 "pages": [
-                    {"records": page.records, "request_url": page.request_url}
+                    {
+                        "records": page.records,
+                        "request_url": page.request_url,
+                        "total_results": page.total_results,
+                    }
                     for page in pages
                 ],
             }

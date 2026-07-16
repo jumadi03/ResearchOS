@@ -287,6 +287,22 @@ def test_discovery_api_is_authenticated_and_persists_run(tmp_path: Path) -> None
         "scientific-query-planner-v1"
     )
     assert body["search_plan"]["source_queries"][0]["provider"] == "openalex"
+    assert body["enumerations"] == [{
+        "provider": "openalex",
+        "source_definition_id": "source-openalex",
+        "query_family_id": body["search_plan"]["query_families"][0]["family_id"],
+        "requested_limit": 10,
+        "enumerated_count": 1,
+        "total_available": None,
+        "page_count": 1,
+        "truncated": False,
+        "status": "complete",
+    }]
+    source = body["records"][0]["source_records"][0]
+    assert source["discovery_rank"] == 1
+    assert source["page_number"] == 1
+    assert source["request_url"] == "https://example.test"
+    assert source["source_query"]
     assert "raw" not in body["records"][0]["source_records"][0]
     assert tuple((tmp_path / "runs" / body["run_id"]).glob("discovery-*.json"))
     assert tuple((tmp_path / "runs" / body["run_id"] / "raw").rglob("*.json"))

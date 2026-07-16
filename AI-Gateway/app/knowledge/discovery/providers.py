@@ -23,6 +23,7 @@ class ProviderError(RuntimeError):
 class ProviderPage:
     records: tuple[dict[str, Any], ...]
     request_url: str
+    total_results: int | None = None
 
 
 class LiteratureProvider(Protocol):
@@ -100,7 +101,9 @@ class OpenAlexProvider(HttpProvider):
             response = self._get(params)
             payload = response.json()
             records = tuple(payload.get("results", ()))[: plan.limit_per_provider - collected]
-            pages.append(ProviderPage(records, response.url))
+            pages.append(ProviderPage(
+                records, response.url, payload.get("meta", {}).get("count"),
+            ))
             collected += len(records)
             cursor = payload.get("meta", {}).get("next_cursor")
             if not records or not cursor or collected >= plan.limit_per_provider:
@@ -119,7 +122,9 @@ class CrossrefProvider(HttpProvider):
         if re.fullmatch(r"10\.\d{4,9}/\S+", doi, flags=re.IGNORECASE):
             response = self._get({}, url=f"{self.base_url}/{quote(doi, safe='')}")
             record = response.json().get("message") or {}
-            return (ProviderPage((record,) if record else (), response.url),)
+            return (ProviderPage(
+                (record,) if record else (), response.url, 1 if record else 0,
+            ),)
 
         page_size = min(plan.limit_per_provider, 1000)
         params: dict[str, Any] = {
@@ -139,7 +144,9 @@ class CrossrefProvider(HttpProvider):
             response = self._get(params)
             message = response.json().get("message", {})
             records = tuple(message.get("items", ()))[: plan.limit_per_provider - collected]
-            pages.append(ProviderPage(records, response.url))
+            pages.append(ProviderPage(
+                records, response.url, message.get("total-results"),
+            ))
             collected += len(records)
             cursor = message.get("next-cursor")
             if not records or not cursor or collected >= plan.limit_per_provider:
@@ -171,8 +178,11 @@ class SemanticScholarProvider(HttpProvider):
         collected = 0
         while collected < plan.limit_per_provider:
             response = self._get(params, headers)
-            records = tuple(response.json().get("data", ()))[: plan.limit_per_provider - collected]
-            pages.append(ProviderPage(records, response.url))
+            payload = response.json()
+            records = tuple(payload.get("data", ()))[: plan.limit_per_provider - collected]
+            pages.append(ProviderPage(
+                records, response.url, payload.get("total"),
+            ))
             collected += len(records)
             if len(records) < page_size or collected >= plan.limit_per_provider:
                 break

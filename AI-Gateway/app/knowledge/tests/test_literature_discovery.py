@@ -20,23 +20,33 @@ from app.knowledge.models import (
 
 
 class StubProvider:
-    def __init__(self, name: str, records=(), failure: Exception | None = None) -> None:
+    def __init__(
+        self, name: str, records=(), failure: Exception | None = None,
+        total_results: int | None = None,
+    ) -> None:
         self.name = name
         self.records = tuple(records)
         self.failure = failure
+        self.total_results = total_results
 
     def search(self, plan: SearchPlan) -> tuple[ProviderPage, ...]:
         if self.failure:
             raise self.failure
-        return (ProviderPage(self.records, f"https://example.test/{self.name}"),)
+        return (ProviderPage(
+            self.records, f"https://example.test/{self.name}",
+            self.total_results,
+        ),)
 
 
 def question() -> ScientificQuestion:
     return ScientificQuestion("question-1", "Why do some tourism villages fail?")
 
 
-def plan(*providers: str) -> SearchPlan:
-    return SearchPlan("plan-1", "tourism village failure", providers)
+def plan(*providers: str, limit=25) -> SearchPlan:
+    return SearchPlan(
+        "plan-1", "tourism village failure", providers,
+        limit_per_provider=limit,
+    )
 
 
 def contract(*, budget=100, question_id="question-1", plan_id="plan-1"):
@@ -65,8 +75,8 @@ def concepts():
     )
 
 
-def planned(*providers: str, budget=100):
-    draft = plan(*providers)
+def planned(*providers: str, budget=100, limit=25):
+    draft = plan(*providers, limit=limit)
     registry = CanonicalSourceRegistry(CANONICAL_SOURCE_DEFINITIONS)
     return ScientificQueryPlanner().plan(
         question(), contract(budget=budget), draft, concepts(),
@@ -312,6 +322,56 @@ def test_discovery_run_preserves_complete_source_policy() -> None:
     assert definition.robots_policy
     assert definition.license_policy
     assert definition.trust_profile
+
+
+def test_enumerator_preserves_rank_query_page_url_and_truncation() -> None:
+    provider = StubProvider(
+        "openalex",
+        (
+            {"id": "W1", "title": "First"},
+            {"id": "W2", "title": "Second"},
+        ),
+        total_results=50,
+    )
+    run = LiteratureDiscoveryEngine(
+        (provider,), clock=lambda: "now", run_id_factory=lambda: "run",
+    ).discover(
+        question(), contract(), planned("openalex", limit=2),
+    )
+
+    summary = run.enumerations[0]
+    assert summary.enumerated_count == 2
+    assert summary.total_available == 50
+    assert summary.page_count == 1
+    assert summary.truncated is True
+    observations = tuple(
+        source for record in run.records
+        for source in record.source_records
+    )
+    assert sorted(item.discovery_rank for item in observations) == [1, 2]
+    assert all(
+        item.source_definition_id == "source-openalex"
+        and item.query_family_id == run.search_plan.query_families[0].family_id
+        and item.source_query == run.search_plan.query_for("openalex")
+        and item.page_number == 1
+        and item.request_url == "https://example.test/openalex"
+        and item.canonical_url.startswith("https://openalex.org/")
+        for item in observations
+    )
+
+
+def test_discovery_run_rejects_inconsistent_enumeration_inventory() -> None:
+    import pytest
+
+    run = LiteratureDiscoveryEngine(
+        (StubProvider("openalex", ({"id": "W1", "title": "First"},)),),
+        clock=lambda: "now", run_id_factory=lambda: "run",
+    ).discover(question(), contract(), planned("openalex"))
+    inconsistent = replace(
+        run.enumerations[0], enumerated_count=0,
+    )
+    with pytest.raises(ValueError, match="enumeration provenance"):
+        replace(run, enumerations=(inconsistent,))
 
 
 def test_scientific_query_planner_is_deterministic_and_traceable() -> None:
