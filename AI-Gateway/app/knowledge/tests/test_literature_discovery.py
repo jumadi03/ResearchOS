@@ -9,11 +9,13 @@ from app.knowledge.discovery.persistence import (
 from app.knowledge.discovery.providers import (
     CrossrefProvider, OpenAlexProvider, ProviderError, ProviderPage,
 )
+from app.knowledge.discovery.query_planner import ScientificQueryPlanner
 from app.knowledge.discovery.source_registry import (
     CANONICAL_SOURCE_DEFINITIONS, CanonicalSourceRegistry,
 )
 from app.knowledge.models import (
-    DiscoveryContract, MatchKind, ScientificQuestion, SearchPlan,
+    DiscoveryContract, MatchKind, QueryConcept, ScientificQuestion,
+    SearchPlan,
 )
 
 
@@ -48,6 +50,30 @@ def contract(*, budget=100, question_id="question-1", plan_id="plan-1"):
     )
 
 
+def concepts():
+    return (
+        QueryConcept(
+            "concept-tourism-village", "tourism village",
+            ("community tourism",), ("tourism",),
+            "researcher@example", "Core phenomenon in the research question",
+        ),
+        QueryConcept(
+            "concept-failure", "failure", ("unsuccessful",),
+            ("organizational studies",), "researcher@example",
+            "Outcome specified by the research question",
+        ),
+    )
+
+
+def planned(*providers: str, budget=100):
+    draft = plan(*providers)
+    registry = CanonicalSourceRegistry(CANONICAL_SOURCE_DEFINITIONS)
+    return ScientificQueryPlanner().plan(
+        question(), contract(budget=budget), draft, concepts(),
+        registry.resolve(draft, contract(budget=budget)),
+    )
+
+
 def test_discovery_normalizes_and_exactly_merges_doi_records() -> None:
     openalex = StubProvider("openalex", ({
         "id": "https://openalex.org/W1", "title": "Tourism Village Failure",
@@ -63,7 +89,9 @@ def test_discovery_normalizes_and_exactly_merges_doi_records() -> None:
         run_id_factory=lambda: "run-1",
     )
 
-    run = engine.discover(question(), contract(), plan("openalex", "crossref"))
+    run = engine.discover(
+        question(), contract(), planned("openalex", "crossref"),
+    )
 
     assert len(run.records) == 1
     assert run.records[0].doi == "10.1/abc"
@@ -78,7 +106,7 @@ def test_provider_failure_is_explicit_and_preserves_other_results() -> None:
 
     run = engine.discover(
         question(), contract(),
-        plan("openalex", "crossref", "semantic_scholar"),
+        planned("openalex", "crossref", "semantic_scholar"),
     )
 
     assert len(run.records) == 1
@@ -94,7 +122,7 @@ def test_fuzzy_title_match_is_flagged_but_not_merged() -> None:
     ))
     run = LiteratureDiscoveryEngine(
         (provider,), clock=lambda: "now", run_id_factory=lambda: "run"
-    ).discover(question(), contract(), plan("semantic_scholar"))
+    ).discover(question(), contract(), planned("semantic_scholar"))
 
     assert len(run.records) == 2
     assert all(record.match_kind is MatchKind.POSSIBLE for record in run.records)
@@ -106,8 +134,8 @@ def test_snapshot_is_byte_stable_and_content_addressed(tmp_path: Path) -> None:
     engine = LiteratureDiscoveryEngine(
         (provider,), clock=lambda: "2026-01-01T00:00:00Z", run_id_factory=lambda: "run-1"
     )
-    first = engine.discover(question(), contract(), plan("openalex"))
-    second = engine.discover(question(), contract(), plan("openalex"))
+    first = engine.discover(question(), contract(), planned("openalex"))
+    second = engine.discover(question(), contract(), planned("openalex"))
 
     assert serialize_run(first) == serialize_run(second)
     store = DiscoverySnapshotStore(tmp_path)
@@ -201,7 +229,7 @@ def test_cache_and_raw_pages_avoid_second_provider_call_and_preserve_hash(tmp_pa
         (cached,), clock=lambda: "now", run_id_factory=lambda: "run",
         raw_page_store=RawPageStore(tmp_path / "runs"),
     )
-    run = engine.discover(question(), contract(), plan("openalex"))
+    run = engine.discover(question(), contract(), planned("openalex"))
     raw_files = tuple((tmp_path / "runs" / "run" / "raw" / "openalex").glob("*.json"))
     assert len(raw_files) == 1
     assert run.records[0].source_records[0].response_hash in raw_files[0].name
@@ -214,11 +242,11 @@ def test_discovery_contract_is_bound_and_budgeted_before_provider_call() -> None
     engine = LiteratureDiscoveryEngine((provider,))
     with pytest.raises(ValueError, match="research question"):
         engine.discover(
-            question(), contract(question_id="other"), plan("openalex"),
+            question(), contract(question_id="other"), planned("openalex"),
         )
     with pytest.raises(ValueError, match="search plan"):
         engine.discover(
-            question(), contract(plan_id="other"), plan("openalex"),
+            question(), contract(plan_id="other"), planned("openalex"),
         )
     with pytest.raises(ValueError, match="retrieval budget"):
         engine.discover(
@@ -274,7 +302,7 @@ def test_discovery_run_preserves_complete_source_policy() -> None:
     provider = StubProvider("openalex", ({"id": "W1", "title": "Result"},))
     run = LiteratureDiscoveryEngine(
         (provider,), clock=lambda: "now", run_id_factory=lambda: "run",
-    ).discover(question(), contract(), plan("openalex"))
+    ).discover(question(), contract(), planned("openalex"))
 
     definition = run.source_definitions[0]
     assert definition.name == "openalex"
@@ -284,3 +312,87 @@ def test_discovery_run_preserves_complete_source_policy() -> None:
     assert definition.robots_policy
     assert definition.license_policy
     assert definition.trust_profile
+
+
+def test_scientific_query_planner_is_deterministic_and_traceable() -> None:
+    first = planned("openalex", "crossref")
+    second = planned("openalex", "crossref")
+
+    assert first == second
+    assert first.planning_method == "scientific-query-planner-v1"
+    assert tuple(item.concept_id for item in first.concepts) == (
+        "concept-tourism-village", "concept-failure",
+    )
+    assert len(first.query_families) == 1
+    assert {item.provider for item in first.source_queries} == {
+        "openalex", "crossref",
+    }
+    assert all(item.source_id for item in first.source_queries)
+    assert first.query_for("openalex") == (
+        '("tourism village" OR "community tourism") AND '
+        '("failure" OR "unsuccessful")'
+    )
+
+
+def test_discovery_rejects_manual_query_plan_bypass() -> None:
+    import pytest
+
+    engine = LiteratureDiscoveryEngine((StubProvider("openalex"),))
+    with pytest.raises(ValueError, match="Query Planner is required"):
+        engine.discover(question(), contract(), plan("openalex"))
+
+
+def test_planned_search_contract_rejects_duplicate_concept_identity() -> None:
+    import pytest
+
+    valid = planned("openalex")
+    duplicate = replace(valid, concepts=(valid.concepts[0], valid.concepts[0]))
+    with pytest.raises(ValueError, match="concept IDs must be unique"):
+        duplicate.validate_planned()
+
+
+def test_query_planner_rejects_missing_attribution_and_duplicate_synonyms() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="attributed_by"):
+        QueryConcept(
+            "concept", "governance", (), ("social science",), "",
+            "Research scope",
+        )
+    with pytest.raises(ValueError, match="synonyms must be unique"):
+        QueryConcept(
+            "concept", "governance", ("Governance",),
+            ("social science",), "researcher@example", "Research scope",
+        )
+    with pytest.raises(ValueError, match="empty values"):
+        QueryConcept(
+            "concept", "governance", ("",), ("social science",),
+            "researcher@example", "Research scope",
+        )
+
+
+def test_query_planner_preserves_exact_doi_lookup() -> None:
+    question = ScientificQuestion("doi-question", "Find this exact paper")
+    contract = DiscoveryContract(
+        "doi-contract", "researchos-default", "doi-question", "doi-plan",
+        "Exact paper lookup", ("scholarly_index",), ("Exact DOI",),
+        ("Other works",), ("en",), ("journal_article",),
+        ("reported_result",), 1, 10, "metadata_only",
+        "human_review_required", ("exact work found",),
+    )
+    draft = SearchPlan(
+        "doi-plan", "https://doi.org/10.1371/journal.pone.0319334",
+        ("crossref",), limit_per_provider=10,
+    )
+    registry = CanonicalSourceRegistry(CANONICAL_SOURCE_DEFINITIONS)
+    planned_doi = ScientificQueryPlanner().plan(
+        question, contract, draft,
+        (QueryConcept(
+            "doi-concept", "reproducibility", ("replicability",),
+            ("metascience",), "researcher@example", "Known target paper",
+        ),),
+        registry.resolve(draft, contract),
+    )
+
+    assert planned_doi.query_for("crossref") == draft.query
+    assert planned_doi.query_families[0].purpose == "Exact DOI lookup"

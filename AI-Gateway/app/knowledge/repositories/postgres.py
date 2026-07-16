@@ -60,6 +60,7 @@ class _PostgresRepositoryCore:
         return f"doi:{record.doi}" if record.doi else f"literature:{record.record_id}"
 
     def persist_discovery(self, run: DiscoveryRun) -> None:
+        run.validate_query_plan()
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 for record in run.records:

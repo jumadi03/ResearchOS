@@ -149,6 +149,55 @@ class DiscoveryContract:
 
 
 @dataclass(frozen=True, slots=True)
+class QueryConcept:
+    concept_id: str
+    preferred_term: str
+    synonyms: tuple[str, ...]
+    disciplines: tuple[str, ...]
+    attributed_by: str
+    rationale: str
+
+    def __post_init__(self) -> None:
+        for name in (
+            "concept_id", "preferred_term", "attributed_by", "rationale",
+        ):
+            object.__setattr__(self, name, _required(getattr(self, name), name))
+        if any(not item.strip() for item in self.synonyms):
+            raise ValueError("synonyms must not contain empty values")
+        synonyms = tuple(item.strip() for item in self.synonyms)
+        synonym_keys = tuple(item.casefold() for item in synonyms)
+        if (
+            len(set(synonym_keys)) != len(synonyms)
+            or self.preferred_term.casefold() in synonym_keys
+        ):
+            raise ValueError("synonyms must be unique")
+        disciplines = tuple(dict.fromkeys(
+            item.strip().casefold() for item in self.disciplines
+            if item.strip()
+        ))
+        if not disciplines:
+            raise ValueError("disciplines must not be empty")
+        object.__setattr__(self, "synonyms", synonyms)
+        object.__setattr__(self, "disciplines", disciplines)
+
+
+@dataclass(frozen=True, slots=True)
+class QueryFamily:
+    family_id: str
+    concept_ids: tuple[str, ...]
+    terms: tuple[str, ...]
+    purpose: str
+
+
+@dataclass(frozen=True, slots=True)
+class SourceQuery:
+    provider: str
+    source_id: str
+    family_id: str
+    query: str
+
+
+@dataclass(frozen=True, slots=True)
 class SearchPlan:
     plan_id: str
     query: str
@@ -156,6 +205,10 @@ class SearchPlan:
     limit_per_provider: int = 25
     year_from: int | None = None
     year_to: int | None = None
+    concepts: tuple[QueryConcept, ...] = ()
+    query_families: tuple[QueryFamily, ...] = ()
+    source_queries: tuple[SourceQuery, ...] = ()
+    planning_method: str = "manual-query-v1"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "plan_id", _required(self.plan_id, "plan_id"))
@@ -168,6 +221,61 @@ class SearchPlan:
         if self.year_from and self.year_to and self.year_from > self.year_to:
             raise ValueError("year_from must not exceed year_to")
         object.__setattr__(self, "providers", normalized)
+
+    def query_for(self, provider: str) -> str:
+        matches = tuple(
+            item.query for item in self.source_queries
+            if item.provider == provider
+        )
+        if len(matches) > 1:
+            raise ValueError(
+                f"Search plan has duplicate source queries: {provider}"
+            )
+        return matches[0] if matches else self.query
+
+    def validate_planned(self) -> None:
+        if self.planning_method != "scientific-query-planner-v1":
+            raise ValueError(
+                "Scientific Query Planner is required for discovery"
+            )
+        if not self.concepts or not self.query_families:
+            raise ValueError(
+                "Scientific query plan requires concepts and query families"
+            )
+        concept_ids_sequence = tuple(
+            item.concept_id for item in self.concepts
+        )
+        if len(concept_ids_sequence) != len(set(concept_ids_sequence)):
+            raise ValueError("Scientific query concept IDs must be unique")
+        providers = tuple(item.provider for item in self.source_queries)
+        if len(providers) != len(set(providers)):
+            raise ValueError("Source queries must be unique by provider")
+        if set(providers) != set(self.providers):
+            raise ValueError(
+                "Scientific query plan requires one query per provider"
+            )
+        family_ids = {item.family_id for item in self.query_families}
+        if len(family_ids) != len(self.query_families):
+            raise ValueError("Query family IDs must be unique")
+        concept_ids = {item.concept_id for item in self.concepts}
+        if any(
+            not family.family_id.strip()
+            or not family.purpose.strip()
+            or not family.terms
+            or not family.concept_ids
+            or not set(family.concept_ids).issubset(concept_ids)
+            for family in self.query_families
+        ):
+            raise ValueError("Query family provenance is incomplete")
+        if any(item.family_id not in family_ids for item in self.source_queries):
+            raise ValueError(
+                "Source query is not bound to a query family"
+            )
+        if any(
+            not item.source_id.strip() or not item.query.strip()
+            for item in self.source_queries
+        ):
+            raise ValueError("Source query provenance is incomplete")
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +325,30 @@ class DiscoveryRun:
     records: tuple[LiteratureRecord, ...]
     failures: tuple[ProviderFailure, ...] = ()
     schema_version: str = "1.0"
+
+    def __post_init__(self) -> None:
+        self.validate_query_plan()
+
+    def validate_query_plan(self) -> None:
+        self.discovery_contract.validate_binding(
+            self.question, self.search_plan,
+        )
+        self.search_plan.validate_planned()
+        definitions = {
+            item.name: item for item in self.source_definitions
+        }
+        if set(definitions) != set(self.search_plan.providers):
+            raise ValueError(
+                "Discovery run sources do not match search plan providers"
+            )
+        if any(
+            definitions.get(item.provider) is None
+            or definitions[item.provider].source_id != item.source_id
+            for item in self.search_plan.source_queries
+        ):
+            raise ValueError(
+                "Discovery run source query provenance is invalid"
+            )
 
     @classmethod
     def timestamp(cls) -> str:

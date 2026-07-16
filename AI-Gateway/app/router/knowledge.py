@@ -6,7 +6,9 @@ from fastapi import APIRouter, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.knowledge.authentication import KnowledgeRole
-from app.knowledge.models import DiscoveryContract, ScientificQuestion, SearchPlan
+from app.knowledge.models import (
+    DiscoveryContract, QueryConcept, ScientificQuestion, SearchPlan,
+)
 from app.models.knowledge import (
     AlignmentCalibrationApprovalRequest, AlignmentCalibrationProposalRequest,
     AlignmentCalibrationRollbackRequest,
@@ -48,6 +50,12 @@ def discovery_capabilities(
             "retrieval_budget": {"minimum": 1, "maximum": 100000},
             "binding": ["research_question_id", "search_plan_id", "date_range"],
         },
+        "query_planner": {
+            "required": True,
+            "method": "scientific-query-planner-v1",
+            "concept_authority": "human_attributed",
+            "source_specific_queries": True,
+        },
         "acquisition_access_statuses": ["open", "restricted", "unavailable"],
         "workflow": ["discover", "collect_metadata", "acquire", "extract"],
     }
@@ -73,8 +81,18 @@ def discover(
         plan_data = req.search_plan.model_dump()
         plan_data["providers"] = tuple(plan_data["providers"])
         plan = SearchPlan(**plan_data)
+        concepts = tuple(
+            QueryConcept(
+                **{
+                    **item.model_dump(),
+                    "synonyms": tuple(item.synonyms),
+                    "disciplines": tuple(item.disciplines),
+                }
+            )
+            for item in req.query_concepts
+        )
         run, snapshot = request.app.state.knowledge_service.discover(
-            question, contract, plan,
+            question, contract, plan, concepts,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -13,7 +13,8 @@
 - Completed: P0 Evidence-to-Theory Safety Gate
 - Completed: SCAN-001A Discovery Contract Foundation
 - Completed: SCAN-001B Canonical Source Registry
-- Next deliverable: SCAN-001C Scientific Query Planner
+- Completed: SCAN-001C Scientific Query Planner
+- Next deliverable: SCAN-001D Source Enumerator Hardening
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,

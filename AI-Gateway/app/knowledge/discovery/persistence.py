@@ -24,6 +24,7 @@ class DiscoverySnapshotStore:
         self.root = root
 
     def save(self, run: DiscoveryRun) -> Path:
+        run.validate_query_plan()
         payload = serialize_run(run)
         digest = sha256(payload).hexdigest()
         path = self.root / run.run_id / f"discovery-{digest}.json"

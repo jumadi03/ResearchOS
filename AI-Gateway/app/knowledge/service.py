@@ -7,6 +7,7 @@ from app.knowledge.models import (
     DiscoveryContract, DiscoveryRun, ScientificQuestion, SearchPlan,
 )
 from app.knowledge.ingestion.models import DocumentCandidate
+from app.knowledge.discovery.query_planner import ScientificQueryPlanner
 from app.knowledge.repository_service import KnowledgeRepositoryService
 from app.knowledge.ingestion_pipeline import KnowledgeIngestionPipeline
 from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
@@ -21,6 +22,7 @@ class KnowledgeDiscoveryService:
         *, document_acquirer=None, data_repository=None, object_store=None,
     ) -> None:
         self.output_root = output_root
+        self.query_planner = ScientificQueryPlanner()
         self.data_repository = data_repository
         self.repository_service = KnowledgeRepositoryService(data_repository)
         self.object_store = object_store
@@ -112,9 +114,13 @@ class KnowledgeDiscoveryService:
 
     def discover(
         self, question: ScientificQuestion, contract: DiscoveryContract,
-        plan: SearchPlan,
+        plan: SearchPlan, concepts,
     ):
-        return self.ingestion_pipeline.discover(question, contract, plan)
+        sources = self.ingestion_pipeline.engine.resolve_sources(plan, contract)
+        planned = self.query_planner.plan(
+            question, contract, plan, concepts, sources,
+        )
+        return self.ingestion_pipeline.discover(question, contract, planned)
 
     def discovery_source_definitions(self):
         return self.ingestion_pipeline.engine.source_definitions

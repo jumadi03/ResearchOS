@@ -44,10 +44,21 @@ class SearchPlanRequest(BaseModel):
     year_to: int | None = Field(default=None, ge=1000, le=9999)
 
 
+class QueryConceptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    concept_id: str = Field(min_length=1)
+    preferred_term: str = Field(min_length=1)
+    synonyms: list[str] = Field(default_factory=list)
+    disciplines: list[str] = Field(min_length=1)
+    attributed_by: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+
+
 class LiteratureDiscoveryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: ScientificQuestionRequest
     discovery_contract: DiscoveryContractRequest
+    query_concepts: list[QueryConceptRequest] = Field(min_length=1)
     search_plan: SearchPlanRequest
 
 

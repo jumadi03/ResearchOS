@@ -2,10 +2,11 @@
 
 from .discovery.engine import LiteratureDiscoveryEngine
 from .models import (
-    DiscoveryContract, ScientificQuestion, SearchPlan, SourceDefinition,
+    DiscoveryContract, QueryConcept, ScientificQuestion, SearchPlan,
+    SourceDefinition,
 )
 
 __all__ = [
-    "DiscoveryContract", "LiteratureDiscoveryEngine", "ScientificQuestion",
-    "SearchPlan", "SourceDefinition",
+    "DiscoveryContract", "LiteratureDiscoveryEngine", "QueryConcept",
+    "ScientificQuestion", "SearchPlan", "SourceDefinition",
 ]

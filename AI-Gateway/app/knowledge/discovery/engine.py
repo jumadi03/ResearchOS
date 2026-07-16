@@ -42,7 +42,18 @@ class LiteratureDiscoveryEngine:
         plan: SearchPlan,
     ) -> DiscoveryRun:
         contract.validate_binding(question, plan)
+        plan.validate_planned()
         source_definitions = self._source_registry.resolve(plan, contract)
+        source_ids = {
+            item.name: item.source_id for item in source_definitions
+        }
+        if any(
+            source_ids.get(item.provider) != item.source_id
+            for item in plan.source_queries
+        ):
+            raise ValueError(
+                "Source query does not match canonical source definition"
+            )
         started_at = self._clock()
         run_id = self._run_id_factory()
         records = []
@@ -85,3 +96,6 @@ class LiteratureDiscoveryEngine:
     @property
     def source_definitions(self):
         return self._source_registry.definitions
+
+    def resolve_sources(self, plan, contract):
+        return self._source_registry.resolve(plan, contract)

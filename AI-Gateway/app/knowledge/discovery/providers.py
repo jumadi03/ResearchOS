@@ -88,7 +88,10 @@ class OpenAlexProvider(HttpProvider):
         if plan.year_to:
             filters.append(f"to_publication_date:{plan.year_to}-12-31")
         page_size = min(plan.limit_per_provider, 200)
-        params: dict[str, Any] = {"search": plan.query, "per-page": page_size, "cursor": "*"}
+        params: dict[str, Any] = {
+            "search": plan.query_for(self.name), "per-page": page_size,
+            "cursor": "*",
+        }
         if filters:
             params["filter"] = ",".join(filters)
         pages = []
@@ -111,7 +114,7 @@ class CrossrefProvider(HttpProvider):
     base_url = "https://api.crossref.org/works"
 
     def search(self, plan: SearchPlan) -> tuple[ProviderPage, ...]:
-        doi = plan.query.strip()
+        doi = plan.query_for(self.name).strip()
         doi = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", doi, flags=re.IGNORECASE)
         if re.fullmatch(r"10\.\d{4,9}/\S+", doi, flags=re.IGNORECASE):
             response = self._get({}, url=f"{self.base_url}/{quote(doi, safe='')}")
@@ -119,7 +122,10 @@ class CrossrefProvider(HttpProvider):
             return (ProviderPage((record,) if record else (), response.url),)
 
         page_size = min(plan.limit_per_provider, 1000)
-        params: dict[str, Any] = {"query.bibliographic": plan.query, "rows": page_size, "cursor": "*"}
+        params: dict[str, Any] = {
+            "query.bibliographic": plan.query_for(self.name),
+            "rows": page_size, "cursor": "*",
+        }
         filters = []
         if plan.year_from:
             filters.append(f"from-pub-date:{plan.year_from}-01-01")
@@ -153,7 +159,7 @@ class SemanticScholarProvider(HttpProvider):
     def search(self, plan: SearchPlan) -> tuple[ProviderPage, ...]:
         page_size = min(plan.limit_per_provider, 100)
         params: dict[str, Any] = {
-            "query": plan.query,
+            "query": plan.query_for(self.name),
             "limit": page_size,
             "offset": 0,
             "fields": "paperId,title,authors,year,externalIds,abstract,venue,publicationTypes,citationCount,references.paperId,fieldsOfStudy,openAccessPdf",

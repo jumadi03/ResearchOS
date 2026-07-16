@@ -260,6 +260,16 @@ def payload():
             "human_review_policy": "human_review_required",
             "stopping_conditions": ["retrieval budget exhausted"],
         },
+        "query_concepts": [
+            {
+                "concept_id": "concept-tourism",
+                "preferred_term": "tourism",
+                "synonyms": ["travel industry"],
+                "disciplines": ["tourism studies"],
+                "attributed_by": "researcher@example",
+                "rationale": "Primary domain in the research question",
+            }
+        ],
         "search_plan": {
             "plan_id": "p1", "query": "tourism", "providers": ["openalex"],
             "limit_per_provider": 10,
@@ -273,6 +283,10 @@ def test_discovery_api_is_authenticated_and_persists_run(tmp_path: Path) -> None
     body = response.json()
     assert body["records"][0]["title"] == "Result"
     assert body["discovery_contract"]["contract_id"] == "c1"
+    assert body["search_plan"]["planning_method"] == (
+        "scientific-query-planner-v1"
+    )
+    assert body["search_plan"]["source_queries"][0]["provider"] == "openalex"
     assert "raw" not in body["records"][0]["source_records"][0]
     assert tuple((tmp_path / "runs" / body["run_id"]).glob("discovery-*.json"))
     assert tuple((tmp_path / "runs" / body["run_id"] / "raw").rglob("*.json"))
@@ -325,6 +339,12 @@ def test_discovery_capabilities_expose_required_contract_bounds(
         "binding": [
             "research_question_id", "search_plan_id", "date_range",
         ],
+    }
+    assert response.json()["query_planner"] == {
+        "required": True,
+        "method": "scientific-query-planner-v1",
+        "concept_authority": "human_attributed",
+        "source_specific_queries": True,
     }
 
 
