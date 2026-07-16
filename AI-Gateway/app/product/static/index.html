@@ -67,7 +67,7 @@
         <div class="queue-list" id="queueList"></div>
       </section>
       <section class="graph-view" id="graphView" hidden>
-        <div class="graph-head"><div><span class="eyebrow">SCIENTIFIC RELATIONSHIPS</span><h1>Knowledge Graph</h1><p>Jelajahi hubungan kanonik dan provenance antar-object.</p></div><div class="graph-controls"><select id="relationshipFilter"><option value="">Semua hubungan</option></select><select id="reviewFilter"><option value="">Semua status</option><option value="accepted">Accepted</option><option value="provisional">Provisional</option><option value="rejected">Rejected</option></select><label>Confidence <input id="confidenceFilter" type="range" min="0" max="1" step=".1" value="0"><span id="confidenceValue">0.0</span></label><button class="ghost" id="refreshGraph">Refresh</button></div></div>
+        <div class="graph-head"><div><span class="eyebrow">SCIENTIFIC RELATIONSHIPS</span><h1>Knowledge Graph</h1><p>Jelajahi hubungan kanonik dan provenance antar-object.</p></div><div class="graph-controls"><select id="relationshipFilter"><option value="">Semua hubungan</option></select><select id="reviewFilter"><option value="">Semua status</option><option value="accepted">Accepted</option><option value="provisional">Provisional</option><option value="rejected">Rejected</option></select><label>Confidence <input id="confidenceFilter" type="range" min="0" max="1" step=".1" value="0"><span id="confidenceValue">0.0</span></label><button class="ghost" id="translateProjectObjects">Terjemahkan semua</button><button class="ghost" id="refreshGraph">Refresh</button></div></div>
         <div class="graph-summary" id="graphSummary"></div>
         <div class="graph-canvas-wrap"><svg id="graphCanvas" viewBox="0 0 1000 620" role="img" aria-label="Scientific relationship graph"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><g id="graphEdges"></g><g id="graphNodes"></g></svg><aside id="graphFocus" class="graph-focus"><h2>Pilih node</h2><p>Klik node untuk melihat identitas dan membuka inspector.</p></aside></div>
         <details class="graph-list"><summary>Relationship list (accessible view)</summary><div id="graphTable"></div></details>
@@ -110,6 +110,7 @@
   <div class="toast" id="toast" role="status"></div>
   <script src="/workspace-assets/i18n.js" defer></script>
   <script src="/workspace-assets/workspace.js" defer></script>
+  <script src="/workspace-assets/object-translation-ui.js" defer></script>
   <script src="/workspace-assets/graph.js" defer></script>
   <script src="/workspace-assets/discovery.js" defer></script>
   <script src="/workspace-assets/admin.js" defer></script>

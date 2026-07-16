@@ -52,6 +52,11 @@ class ObjectTranslationReviewRequest(BaseModel):
     reviewed_at: str
 
 
+class BulkObjectTranslationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    generated_at: str
+
+
 def _object(request: Request, project_id: str, object_ref: str, principal):
     try:
         return request.app.state.knowledge_service.get_object_read_model(
@@ -157,6 +162,67 @@ def create_object_translation(
         ) from exc
     result = asdict(item); result["snapshot"] = snapshot.name
     return result
+
+
+@router.post(
+    "/projects/{project_id}/object-translations/generate-missing",
+    status_code=201,
+)
+def generate_missing_object_translations(
+    project_id: str, body: BulkObjectTranslationRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    page = request.app.state.knowledge_service.list_objects(
+        project_id, limit=100, cursor=None, query=None, object_types=(),
+    )
+    current = {
+        item["object_id"]: item
+        for item in request.app.state.knowledge_service.list_object_translations(
+            project_id, principal
+        )
+    }
+    created, failures = [], []
+    for obj in page.items:
+        if obj.object_id in current:
+            continue
+        try:
+            source = request.app.state.knowledge_service.object_translation_source(
+                project_id, obj.object_id, principal
+            )
+            answer = request.app.state.ai_router.execute(RuntimeRequest(
+                prompt=(
+                    "Translate this scientific object title or evidence text into "
+                    "clear, precise Bahasa Indonesia. Preserve claims, quantities, "
+                    "uncertainty, citations, and journal names. Do not summarize or "
+                    "add claims. Return only the translation.\n\nSOURCE:\n"
+                    + source["source_text"]
+                ),
+                stream=False,
+                metadata={
+                    "project_id": project_id, "object_id": obj.object_id,
+                    "source_hash": source["source_hash"],
+                    "actor_id": principal.actor_id,
+                    "action": "bulk_translate_scientific_object",
+                },
+            ))
+            translated, _ = request.app.state.knowledge_service.record_object_translation(
+                project_id, obj.object_id, translated_text=answer.text,
+                provider=answer.provider, model=answer.model,
+                generated_by=principal.actor_id, generated_at=body.generated_at,
+                principal=principal,
+            )
+            created.append(translated.object_id)
+        except Exception as exc:
+            failures.append({
+                "object_id": obj.object_id, "error": type(exc).__name__,
+            })
+    return {
+        "project_id": project_id, "created": len(created),
+        "created_object_ids": created, "failures": failures,
+        "remaining": max(0, len(page.items) - len(current) - len(created)),
+        "source_preserved": True,
+    }
 
 
 @router.post("/object-translations/{translation_id}/reviews", status_code=201)

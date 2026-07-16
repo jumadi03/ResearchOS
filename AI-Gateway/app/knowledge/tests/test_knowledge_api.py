@@ -16,6 +16,7 @@ from app.knowledge.repositories.read_models import ObjectPage, ObjectSummary, Pr
 from app.router.knowledge import router
 from app.router.workspace import router as workspace_router
 from app.router.session import router as session_router
+from app.runtime.models.runtime_response import RuntimeResponse
 
 
 class Provider:
@@ -797,6 +798,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert 'id="uiLanguage"' in response.text
     assert "Bahasa Sumber / English" in response.text
     assert 'id="translateObject"' in response.text
+    assert 'id="translateProjectObjects"' in response.text
+    assert "/workspace-assets/object-translation-ui.js" in response.text
     assert 'id="qualityThreshold"' in response.text
     assert 'id="qualityMetrics"' in response.text
     assert 'id="calibrationForm"' in response.text
@@ -910,6 +913,35 @@ def test_scientific_object_translation_is_source_bound_and_reviewable(
     stale = api.get("/knowledge/projects/researchos-default/object-translations")
     assert stale.status_code == 200
     assert stale.json()["items"] == []
+
+
+def test_bulk_object_translation_generates_all_missing_project_titles(
+    tmp_path: Path,
+) -> None:
+    api = client(tmp_path, "review", repository=RecordingRepository())
+
+    class TranslationRouter:
+        def execute(self, request):
+            assert request.metadata["action"] == "bulk_translate_scientific_object"
+            return RuntimeResponse(
+                provider="test", model="translation-v1",
+                text="Tata kelola itu penting",
+            )
+
+    api.app.state.ai_router = TranslationRouter()
+    generated = api.post(
+        "/knowledge/projects/researchos-default/object-translations/generate-missing",
+        json={"generated_at": "2026-07-16T10:00:00Z"},
+    )
+
+    assert generated.status_code == 201
+    assert generated.json()["created"] == 1
+    assert generated.json()["remaining"] == 0
+    assert generated.json()["failures"] == []
+    listed = api.get(
+        "/knowledge/projects/researchos-default/object-translations"
+    ).json()
+    assert listed["items"][0]["translated_text"] == "Tata kelola itu penting"
 
 
 def test_discovery_capabilities_drive_workspace_without_client_guesses(tmp_path: Path) -> None:

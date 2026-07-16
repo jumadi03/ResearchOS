@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added project-wide generation of missing Bahasa Indonesia object
+  representations and switched graph node labels to available Indonesian text,
+  while retaining bilingual source/translation detail views.
 - Hardened GitHub container contract builds with Docker daemon diagnostics and
   three bounded, backoff retries. Deterministic failures remain blocking after
   the final attempt while transient runner/registry failures self-recover.
