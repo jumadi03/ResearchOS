@@ -33,8 +33,12 @@ class KnowledgeTheoryPipeline:
         self.validation_store = ValidationReportStore(output_root / "validations")
         self.publication_engine = PublicationEngine()
         self.publication_store = PublicationStore(output_root / "publications")
-        self.bundles = {}
-        self.validation_reports = {}
+        self.bundles = {
+            item.bundle_id: item for item in self.theory_store.load_all()
+        }
+        self.validation_reports = {
+            item.report_id: item for item in self.validation_store.load_all()
+        }
 
     def build_theories(self, graph_ids: tuple[str, ...], *, generated_by: str):
         missing = [item for item in graph_ids if item not in self.graphs]
@@ -77,6 +81,43 @@ class KnowledgeTheoryPipeline:
 
     def alignment_candidates(self, bundle_id):
         return self.theory_builder.alignment_candidates(self._bundle(bundle_id))
+
+    def list_theory_bundles(self):
+        summaries = []
+        for bundle in self.bundles.values():
+            reports = sorted(
+                (item for item in self.validation_reports.values()
+                 if item.theory_bundle_id == bundle.bundle_id),
+                key=lambda item: (item.assessed_at, item.report_id), reverse=True,
+            )
+            candidates = self.theory_builder.alignment_candidates(bundle)
+            summaries.append({
+                "bundle_id": bundle.bundle_id,
+                "created_at": bundle.created_at,
+                "graph_count": len(bundle.graph_ids),
+                "theory_count": len(bundle.proposals),
+                "accepted_count": sum(
+                    item.review_state is TheoryReviewState.ACCEPTED
+                    for item in bundle.proposals
+                ),
+                "pending_review_count": sum(
+                    item.review_state is TheoryReviewState.PROPOSED
+                    for item in bundle.proposals
+                ),
+                "alignment_count": len(bundle.alignments),
+                "candidate_count": len(candidates),
+                "latest_validation": ({
+                    "report_id": reports[0].report_id,
+                    "status": reports[0].status.value,
+                    "assessed_at": reports[0].assessed_at,
+                } if reports else None),
+                "schema_version": bundle.schema_version,
+                "content_hash": bundle.content_hash,
+            })
+        return tuple(sorted(
+            summaries, key=lambda item: (item["created_at"], item["bundle_id"]),
+            reverse=True,
+        ))
 
     def detect_research_gaps(self, bundle_id: str, *, generated_by: str):
         bundle = self._bundle(bundle_id)

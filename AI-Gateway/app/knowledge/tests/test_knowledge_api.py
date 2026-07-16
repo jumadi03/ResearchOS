@@ -469,6 +469,15 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     theories = api.post("/knowledge/theories", json={"graph_ids": [graph.json()["graph_id"]]})
     assert theories.status_code == 201
     proposal = theories.json()["proposals"][0]
+    assert api.get("/knowledge/theories").status_code == 403
+    registry = api.get(
+        "/knowledge/theories", headers={"Authorization": "Bearer review"}
+    )
+    assert registry.status_code == 200
+    assert registry.json()["items"][0]["bundle_id"] == theories.json()["bundle_id"]
+    assert registry.json()["items"][0]["theory_count"] == 1
+    assert registry.json()["items"][0]["pending_review_count"] == 1
+    assert registry.json()["items"][0]["latest_validation"] is None
     forbidden_review = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/reviews",
         json={"theory_id": proposal["theory_id"], "decision": "accepted", "rationale": "Reviewed source", "occurred_at": "2026-07-15T00:00:00Z"},
@@ -481,6 +490,11 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     )
     assert review.status_code == 200
     assert review.json()["reviews"][0]["reviewer"] == "reviewer@example"
+    reviewed_registry = api.get(
+        "/knowledge/theories", headers={"Authorization": "Bearer review"}
+    ).json()["items"][0]
+    assert reviewed_registry["accepted_count"] == 1
+    assert reviewed_registry["pending_review_count"] == 0
     alignment_request = {
         "theory_ids": [proposal["theory_id"], proposal["theory_id"]],
         "statement": "Governance improves village performance",

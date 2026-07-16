@@ -179,6 +179,15 @@ def build_theories(req: TheoryBuildRequest, request: Request, credentials: HTTPA
     return result
 
 
+@router.get("/theories")
+def list_theory_bundles(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    return {"items": list(request.app.state.knowledge_service.list_theory_bundles())}
+
+
 @router.post("/theories/{bundle_id}/reviews")
 def review_theory(bundle_id: str, req: TheoryReviewRequest, request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
     principal = authorize(request, credentials, KnowledgeRole.REVIEWER)

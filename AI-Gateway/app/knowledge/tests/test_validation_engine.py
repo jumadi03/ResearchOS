@@ -36,3 +36,16 @@ def test_validation_is_fail_safe_for_missing_bias_staleness_and_conflict() -> No
     assert stale.status is ValidationStatus.STALE
     failed = engine.validate(bundle(contradictions=1), assessed_at="2026-07-15T00:00:00Z", search_completed_at="2026-07-01T00:00:00Z", max_age_days=180, bias_by_theory={"t1": RiskOfBias.LOW}, reviewer="r")
     assert failed.status is ValidationStatus.FAIL
+
+
+def test_validation_store_restores_verified_reports(tmp_path: Path) -> None:
+    report = ValidationEngine().validate(
+        bundle(), assessed_at="2026-07-15T00:00:00Z",
+        search_completed_at="2026-07-01T00:00:00Z", max_age_days=180,
+        bias_by_theory={"t1": RiskOfBias.LOW}, reviewer="reviewer@example",
+    )
+    store = ValidationReportStore(tmp_path)
+    store.save(report)
+
+    assert store.load_all() == (report,)
+    assert store.load_all()[0].verify()

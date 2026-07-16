@@ -68,6 +68,9 @@ class KnowledgeDiscoveryService:
     def alignment_candidates(self, bundle_id):
         return self.theory_pipeline.alignment_candidates(bundle_id)
 
+    def list_theory_bundles(self):
+        return self.theory_pipeline.list_theory_bundles()
+
     def detect_research_gaps(self, bundle_id: str, *, generated_by: str = "researchos"):
         return self.theory_pipeline.detect_research_gaps(
             bundle_id, generated_by=generated_by

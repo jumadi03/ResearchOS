@@ -30,6 +30,10 @@ follows Semantic Versioning.
   normalized-token overlap without automatically changing theory bundles.
 - Add a Theory Alignment reviewer workspace for inspecting advisory candidates,
   recording scoped statements and rationales, and confirming provenance review.
+- Add a reviewer-only theory bundle registry with review, alignment, candidate,
+  graph, schema, integrity, and latest-validation summaries.
+- Restore integrity-verified theory bundles and validation reports from their
+  persistent snapshots when the API restarts.
 
 ## [0.4.0] - 2026-07-16
 

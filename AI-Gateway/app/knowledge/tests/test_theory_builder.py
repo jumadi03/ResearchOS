@@ -1,4 +1,7 @@
 from pathlib import Path
+from dataclasses import asdict
+from hashlib import sha256
+import json
 
 from app.knowledge.extraction.models import ExtractionReviewState
 from app.knowledge.modeling.models import (
@@ -156,3 +159,46 @@ def test_theory_review_is_attributable_and_requires_rationale() -> None:
     assert reviewed.content_hash != bundle.content_hash
     with pytest.raises(ValueError, match="rationale"):
         builder.review(bundle, theory_id=bundle.proposals[0].theory_id, decision=TheoryReviewState.REJECTED, reviewer="x", rationale="", occurred_at="later")
+
+
+def test_theory_store_restores_latest_verified_snapshot(tmp_path: Path) -> None:
+    builder = TheoryBuilder()
+    bundle = builder.build((graph("one", "Governance matters"),), created_at="time")
+    store = TheoryBundleStore(tmp_path)
+    store.save(bundle)
+    reviewed = builder.review(
+        bundle, theory_id=bundle.proposals[0].theory_id,
+        decision=TheoryReviewState.ACCEPTED, reviewer="reviewer@example",
+        rationale="Evidence reviewed", occurred_at="later",
+    )
+    store.save(reviewed)
+
+    restored = store.load_all()
+
+    assert restored == (reviewed,)
+    assert restored[0].verify()
+
+
+def test_theory_store_verifies_and_migrates_legacy_snapshot(tmp_path: Path) -> None:
+    bundle = TheoryBuilder().build(
+        (graph("legacy", "Governance matters"),), created_at="time"
+    )
+    raw = asdict(bundle)
+    raw.pop("alignments")
+    raw["schema_version"] = "1.0"
+    raw["content_hash"] = ""
+    raw["content_hash"] = sha256(json.dumps(
+        raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()).hexdigest()
+    directory = tmp_path / bundle.bundle_id
+    directory.mkdir(parents=True)
+    (directory / f"v1.0-{raw['content_hash']}.json").write_text(
+        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+    restored = TheoryBundleStore(tmp_path).load_all()
+
+    assert restored[0].schema_version == "1.1"
+    assert restored[0].alignments == ()
+    assert restored[0].verify()

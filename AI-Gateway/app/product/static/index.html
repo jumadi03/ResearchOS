@@ -86,7 +86,8 @@
         </div>
       </section>
       <section class="theory-view" id="theoryView" hidden>
-        <div class="theory-head"><div><span class="eyebrow">REVIEWER-GOVERNED SYNTHESIS</span><h1>Theory Alignment</h1><p>Kandidat bersifat advisory. Hanya reviewer yang dapat menetapkan kesetaraan semantik.</p></div></div>
+        <div class="theory-head"><div><span class="eyebrow">REVIEWER-GOVERNED SYNTHESIS</span><h1>Theory Alignment</h1><p>Pilih bundle aktif, lalu periksa kandidat advisory tanpa menyalin ID secara manual.</p></div><button class="ghost" id="refreshTheory">Refresh</button></div>
+        <div class="bundle-registry" id="bundleRegistry"><div class="empty-panel">Hubungkan sebagai reviewer untuk memuat theory bundle.</div></div>
         <form class="bundle-loader" id="bundleLoader"><label>Theory bundle ID<input id="theoryBundleInput" required placeholder="theory-bundle-…" autocomplete="off"></label><button type="submit">Muat kandidat</button></form>
         <div class="theory-notice">Skor hanya menunjukkan kata yang tumpang tindih. Periksa pernyataan dan provenance setiap grafik sebelum mengambil keputusan.</div>
         <div class="candidate-summary" id="candidateSummary"></div>
