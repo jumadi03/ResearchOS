@@ -97,6 +97,8 @@ def _run_object_translation_job(app, job_id, project_id, generated_at, principal
                         "source_hash": source["source_hash"],
                         "actor_id": principal.actor_id,
                         "action": "bulk_translate_scientific_object",
+                        "think": False,
+                        "generation_options": {"num_predict": 768},
                     },
                 ))
                 translated, _ = app.state.knowledge_service.record_object_translation(
@@ -204,6 +206,8 @@ def create_object_translation(
                     "source_hash": source["source_hash"],
                     "actor_id": principal.actor_id,
                     "action": "translate_scientific_object",
+                    "think": False,
+                    "generation_options": {"num_predict": 768},
                 },
             ))
             translated, provider, model = answer.text, answer.provider, answer.model
@@ -264,6 +268,8 @@ def generate_missing_object_translations(
                     "source_hash": source["source_hash"],
                     "actor_id": principal.actor_id,
                     "action": "bulk_translate_scientific_object",
+                    "think": False,
+                    "generation_options": {"num_predict": 768},
                 },
             ))
             translated, _ = request.app.state.knowledge_service.record_object_translation(

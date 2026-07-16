@@ -927,6 +927,8 @@ def test_bulk_object_translation_generates_all_missing_project_titles(
     class TranslationRouter:
         def execute(self, request):
             assert request.metadata["action"] == "bulk_translate_scientific_object"
+            assert request.metadata["think"] is False
+            assert request.metadata["generation_options"] == {"num_predict": 768}
             return RuntimeResponse(
                 provider="test", model="translation-v1",
                 text="Tata kelola itu penting",

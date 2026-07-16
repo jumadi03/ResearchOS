@@ -34,7 +34,7 @@ class RuntimeExecutor:
 
         return self._retry.execute(
             lambda: provider.execute(
-                request.prompt
+                request
             )
         )
 
@@ -46,6 +46,6 @@ class RuntimeExecutor:
 
         return self._retry.stream(
             lambda: provider.stream(
-                request.prompt
+                request
             )
         )

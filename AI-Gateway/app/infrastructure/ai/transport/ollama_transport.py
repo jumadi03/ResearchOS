@@ -34,6 +34,9 @@ class OllamaTransport:
     def generate(
         self,
         prompt: str,
+        *,
+        options: dict | None = None,
+        think: bool | None = None,
     ) -> dict:
 
         payload = {
@@ -41,6 +44,10 @@ class OllamaTransport:
             "prompt": prompt,
             "stream": True,
         }
+        if options:
+            payload["options"] = options
+        if think is not None:
+            payload["think"] = think
 
         response = requests.post(
             self.url,
@@ -109,6 +116,9 @@ class OllamaTransport:
     def generate_stream(
         self,
         prompt: str,
+        *,
+        options: dict | None = None,
+        think: bool | None = None,
     ):
 
         payload = {
@@ -116,6 +126,10 @@ class OllamaTransport:
             "prompt": prompt,
             "stream": True,
         }
+        if options:
+            payload["options"] = options
+        if think is not None:
+            payload["think"] = think
 
         response = requests.post(
             self.url,

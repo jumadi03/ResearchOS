@@ -21,7 +21,11 @@ class OllamaAdapter(AIProvider):
         request,
     ):
 
-        result = self.transport.generate(request)
+        result = self.transport.generate(
+            request.prompt,
+            options=request.metadata.get("generation_options"),
+            think=request.metadata.get("think"),
+        )
 
         return RuntimeResponse(
             provider=self.PROVIDER_NAME,
@@ -36,7 +40,9 @@ class OllamaAdapter(AIProvider):
     ):
 
         return self.transport.generate_stream(
-            request
+            request.prompt,
+            options=request.metadata.get("generation_options"),
+            think=request.metadata.get("think"),
         )
 
     def health(self):
