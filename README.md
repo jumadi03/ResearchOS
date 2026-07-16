@@ -102,6 +102,7 @@ schema and persistence, and dependency-security gates.
 - [Local deployment and operations](Documents/LOCAL_STACK.md)
 - [Scientific data storage architecture](Documents/SCIENTIFIC_DATA_STORAGE.md)
 - [Scientific knowledge roadmap](Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md)
+- [Internet discovery roadmap](Documents/INTERNET_DISCOVERY_ROADMAP.md)
 - [Architecture governance](Documents/ARCHITECTURE_GOVERNANCE.md)
 - [Storage compliance report](Documents/STORAGE_COMPLIANCE_REPORT.md)
 - [AI Gateway details](AI-Gateway/README.md)
