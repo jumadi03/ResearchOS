@@ -116,6 +116,32 @@ def test_alignment_fails_closed_without_prior_acceptance() -> None:
         )
 
 
+def test_alignment_candidates_are_advisory_ranked_and_accepted_only() -> None:
+    builder = TheoryBuilder()
+    bundle = builder.build((
+        graph("one", "Open science practices improve reproducibility"),
+        graph("two", "Open research practices support reproducibility"),
+        graph("three", "Funding affects publication speed"),
+    ), created_at="time")
+    related_ids = {
+        item.theory_id for item in bundle.proposals
+        if "reproducibility" in item.statement
+    }
+    for theory_id in related_ids:
+        bundle = builder.review(
+            bundle, theory_id=theory_id, decision=TheoryReviewState.ACCEPTED,
+            reviewer="reviewer@example", rationale="Claim reviewed", occurred_at=theory_id,
+        )
+
+    candidates = builder.alignment_candidates(bundle)
+
+    assert len(candidates) == 1
+    assert set(candidates[0].theory_ids) == related_ids
+    assert candidates[0].graph_ids == ("graph-one", "graph-two")
+    assert candidates[0].lexical_overlap_score == 0.4286
+    assert candidates[0].advisory is True
+
+
 def test_theory_review_is_attributable_and_requires_rationale() -> None:
     import pytest
     builder = TheoryBuilder()

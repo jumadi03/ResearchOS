@@ -75,6 +75,9 @@ class KnowledgeTheoryPipeline:
         }
         return aligned, self.theory_store.save(aligned)
 
+    def alignment_candidates(self, bundle_id):
+        return self.theory_builder.alignment_candidates(self._bundle(bundle_id))
+
     def detect_research_gaps(self, bundle_id: str, *, generated_by: str):
         bundle = self._bundle(bundle_id)
         analysis = self.gap_detector.analyze(

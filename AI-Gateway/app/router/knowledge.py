@@ -215,6 +215,24 @@ def align_theories(
     return result
 
 
+@router.get("/theories/{bundle_id}/alignment-candidates")
+def alignment_candidates(
+    bundle_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        candidates = request.app.state.knowledge_service.alignment_candidates(bundle_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "bundle_id": bundle_id,
+        "method": "normalized-token-jaccard-v1",
+        "advisory": True,
+        "items": [asdict(item) for item in candidates],
+    }
+
+
 @router.post("/theories/{bundle_id}/gaps", status_code=201)
 def detect_research_gaps(bundle_id: str, request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
     principal = authorize(request, credentials)

@@ -65,6 +65,17 @@ class TheoryAlignmentEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class TheoryAlignmentCandidate:
+    candidate_id: str
+    theory_ids: tuple[str, str]
+    statements: tuple[str, str]
+    graph_ids: tuple[str, ...]
+    lexical_overlap_score: float
+    method: str = "normalized-token-jaccard-v1"
+    advisory: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class TheoryBundle:
     bundle_id: str
     graph_ids: tuple[str, ...]

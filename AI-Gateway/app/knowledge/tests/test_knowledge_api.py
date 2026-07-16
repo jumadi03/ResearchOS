@@ -498,6 +498,18 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     )
     assert invalid_alignment.status_code == 422
     assert "distinct theories" in invalid_alignment.text
+    forbidden_candidates = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-candidates"
+    )
+    assert forbidden_candidates.status_code == 403
+    candidates = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-candidates",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert candidates.status_code == 200
+    assert candidates.json()["advisory"] is True
+    assert candidates.json()["method"] == "normalized-token-jaccard-v1"
+    assert candidates.json()["items"] == []
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
     assert gaps.status_code == 201
     assert gaps.json()["gaps"][0]["gap_type"] == "limited_coverage"

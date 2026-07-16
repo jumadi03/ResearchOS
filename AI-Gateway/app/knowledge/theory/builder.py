@@ -7,7 +7,8 @@ import unicodedata
 
 from app.knowledge.modeling.models import KnowledgeEdgeType, KnowledgeNodeType, ScientificKnowledgeGraph
 from app.knowledge.theory.models import (
-    CompetingTheory, EvidenceStance, TheoryAlignmentEvent, TheoryBundle, TheoryEvidence,
+    CompetingTheory, EvidenceStance, TheoryAlignmentCandidate, TheoryAlignmentEvent,
+    TheoryBundle, TheoryEvidence,
     TheoryProposal, TheoryReviewEvent, TheoryReviewState,
 )
 
@@ -110,6 +111,36 @@ class TheoryBuilder:
             bundle, proposals=proposals, competing=competing,
             alignments=bundle.alignments + (event,), content_hash="",
         ).finalized()
+
+    def alignment_candidates(self, bundle: TheoryBundle) -> tuple[TheoryAlignmentCandidate, ...]:
+        if not bundle.verify():
+            raise ValueError("Alignment candidates require a verified theory bundle")
+        accepted = tuple(sorted(
+            (item for item in bundle.proposals if item.review_state is TheoryReviewState.ACCEPTED),
+            key=lambda item: item.theory_id,
+        ))
+        candidates = []
+        for index, left in enumerate(accepted):
+            for right in accepted[index + 1:]:
+                left_tokens = set(self._claim_key(left.statement).split())
+                right_tokens = set(self._claim_key(right.statement).split())
+                shared = left_tokens & right_tokens
+                union = left_tokens | right_tokens
+                graph_ids = tuple(sorted({
+                    item.graph_id for proposal in (left, right) for item in proposal.evidence
+                }))
+                if len(shared) < 2 or len(graph_ids) < 2:
+                    continue
+                score = round(len(shared) / len(union), 4) if union else 0.0
+                identity = f"{left.theory_id}:{right.theory_id}:normalized-token-jaccard-v1"
+                candidates.append(TheoryAlignmentCandidate(
+                    f"alignment-candidate-{sha256(identity.encode()).hexdigest()[:24]}",
+                    (left.theory_id, right.theory_id),
+                    (left.statement, right.statement), graph_ids, score,
+                ))
+        return tuple(sorted(
+            candidates, key=lambda item: (-item.lexical_overlap_score, item.candidate_id)
+        ))
 
     @staticmethod
     def _claim_key(statement: str) -> str:

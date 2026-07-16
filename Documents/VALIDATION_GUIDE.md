@@ -83,6 +83,16 @@ in an immutable bundle event. It preserves all evidence provenance and removes
 active validation reports for the older bundle content, requiring a new
 validation before publication.
 
+Reviewers can retrieve a prioritized advisory queue from
+`GET /knowledge/theories/{bundle_id}/alignment-candidates`. The current
+`normalized-token-jaccard-v1` method compares normalized word sets, requires at
+least two shared words and evidence spanning at least two graphs, and returns a
+transparent overlap score. Only accepted theories are considered.
+
+A candidate is not evidence of semantic equivalence. It is a navigation aid;
+the reviewer must still inspect source statements and provenance, then either
+submit an alignment with a scoped rationale or leave the theories separate.
+
 ## Validation statuses
 
 - `pass`: all configured method gates pass.

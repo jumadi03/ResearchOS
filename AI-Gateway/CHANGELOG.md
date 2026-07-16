@@ -26,6 +26,8 @@ follows Semantic Versioning.
   graphs while preserving every evidence edge's graph and object provenance.
 - Add reviewer-governed semantic theory alignment with required prior
   acceptance, multi-graph evidence, rationale, attribution, and immutable audit events.
+- Expose a reviewer-only, advisory alignment-candidate queue using transparent
+  normalized-token overlap without automatically changing theory bundles.
 
 ## [0.4.0] - 2026-07-16
 
