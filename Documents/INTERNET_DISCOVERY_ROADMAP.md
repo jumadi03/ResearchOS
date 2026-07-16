@@ -2,18 +2,31 @@
 
 ## Status
 
-- Document status: accepted long-term implementation roadmap
-- Accepted by: project owner
+- Document status: project-owner-accepted working roadmap
+- Formal ratification status: not defined by current repository governance
+- Classification: implementation roadmap
+- Owner: Scientific Knowledge Subsystem
+- Architectural scope: Discovery Engine
+- Authority: project owner
 - Recorded: 2026-07-17
 - Safety prerequisite: P0 Evidence-to-Theory Safety Gate
 - Current status: P0 completed and verified
 - Next deliverable: SCAN-001A Discovery Contract Foundation
+- Change policy: focused, reviewable documentation commits; no implementation
+  begins from a roadmap change without deliverable-specific verification
+- Related documents: `README.md`,
+  `Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md`,
+  `Documents/SCIENTIFIC_DATA_STORAGE.md`, and
+  `Documents/ARCHITECTURE_GOVERNANCE.md`
 
-This document is the canonical long-term roadmap for discovering scientific
-data on the internet. Existing canonical code remains the single source of
-truth for constructors, enums, lifecycle terms, service boundaries, and
-dependencies. Each sprint must extend that implementation consistently rather
-than rebuild it.
+This document is the accepted long-term working roadmap for discovering
+scientific data on the internet. The repository does not currently define a
+formal roadmap ID family or documentation-ratification lifecycle, so this
+document does not claim a new ID, `Ratified`, `Published`, or `Canonical
+Edition` status. Existing canonical code and accepted architecture documents
+remain the single source of truth for constructors, enums, lifecycle terms,
+service boundaries, and dependencies. Each sprint must extend that
+implementation consistently rather than rebuild it.
 
 ## Scientific position
 
@@ -198,6 +211,153 @@ For every sprint:
 6. report changed files, extended contracts, enforced invariants, test
    results, and remaining risks; and
 7. proceed to the next deliverable only after the current one is validated.
+
+## Governance and traceability
+
+This document remains a roadmap. It is not an Architecture Definition
+Framework, Architecture Component Specification, Architecture Law Artifact,
+decision record, or scientific Artifact.
+
+Its governance position and intended traceability are:
+
+```text
+Scientific Principles
+  -> ResearchOS Project Context
+  -> Internet Discovery Roadmap
+  -> Sprint
+  -> Architecture or Component Specification
+  -> Implementation
+  -> Tests and Verifiers
+  -> Compliance Review
+```
+
+No standalone Project Master Context, glossary, decision repository, formal
+roadmap document family, or documentation-ratification lifecycle exists in the
+repository at the time of this review. Those are governance gaps, not implicit
+authorization to invent identifiers or statuses.
+
+### P0 implementation traceability
+
+P0 is implemented and verified through the following existing paths:
+
+- extraction lifecycle:
+  `AI-Gateway/app/knowledge/extraction/models.py`;
+- admission invariant and graph construction:
+  `AI-Gateway/app/knowledge/modeling/admission.py`,
+  `AI-Gateway/app/knowledge/modeling/models.py`, and
+  `AI-Gateway/app/knowledge/modeling/graph_builder.py`;
+- graph snapshot validation:
+  `AI-Gateway/app/knowledge/modeling/persistence.py`;
+- repository contract and PostgreSQL authority:
+  `AI-Gateway/app/knowledge/repositories/contracts.py` and
+  `AI-Gateway/app/knowledge/repositories/postgres_evidence.py`;
+- intake and service boundaries:
+  `AI-Gateway/app/knowledge/ingestion_pipeline.py` and
+  `AI-Gateway/app/router/knowledge.py`;
+- final theory validation:
+  `AI-Gateway/app/knowledge/theory/builder.py` and
+  `AI-Gateway/app/knowledge/theory_pipeline.py`;
+- domain, API, and theory regression:
+  `AI-Gateway/app/knowledge/tests/test_knowledge_graph.py`,
+  `AI-Gateway/app/knowledge/tests/test_knowledge_api.py`, and
+  `AI-Gateway/app/knowledge/tests/test_theory_builder.py`;
+- canonical storage verification:
+  `deploy/verify/canonical_evidence.py` and
+  `deploy/verify/canonical_graph.py`; and
+- integration and compliance execution:
+  `.github/workflows/architecture-quality-gates.yml`.
+
+Future SCAN deliverables must add verified traceability to their actual
+component specifications, implementation paths, tests, verifiers, and
+compliance closure. Paths must never be added from assumption.
+
+## Canonical documentation review protocol
+
+Before this roadmap or a related governance document is pushed, the reviewer
+must perform the following focused review. This protocol governs documentation
+placement and traceability; it does not authorize implementation work.
+
+### Dependency verification
+
+- Inspect `README.md`, this roadmap, the applicable project context, active
+  roadmaps, documentation naming and metadata patterns, relevant terminology,
+  any decision repository, and the structure of `Documents/`.
+- Determine which standards and canonical terms actually exist.
+- Verify whether roadmap prefixes and document statuses have defined meanings.
+- Make no documentation change until this verification and the governance
+  position are complete and reported.
+
+### Architecture and governance position
+
+- Confirm ownership by the Scientific Knowledge Subsystem and architectural
+  placement under the Discovery Engine.
+- Preserve the relationship among scientific principles, project context,
+  this roadmap, sprint, component specification, implementation, tests, and
+  compliance review.
+- Do not relabel the roadmap as another document or Artifact type.
+
+### Canonical document review
+
+- Evaluate title, version, status, classification, owner, authority, purpose,
+  scope, related documents, traceability, revision history, and change policy.
+- Use a document ID or lifecycle status only when repository governance
+  already defines it.
+- If no official family exists, report the gap and retain the existing file
+  name rather than silently creating a prefix.
+
+### Content integrity review
+
+- Preserve the scientific principles, canonical pipeline, P0-before-SCAN
+  safety correction, SCAN-001A through SCAN-001O roadmap, and capability
+  boundaries in this document.
+- Preserve the rule that provisional, pending, rejected, missing-review, or
+  incompletely provenanced evidence cannot enter canonical knowledge or
+  theory construction.
+- Keep structured scientific APIs ahead of general-web crawling.
+
+### Traceability and README review
+
+- Verify every referenced implementation path instead of assuming it.
+- Ensure the README link is relative, valid, consistently named, appropriately
+  placed, and does not duplicate the roadmap.
+- Ensure readers can identify the governing principle, owning subsystem,
+  implementing sprint, derived specification, code, tests, verifier, and
+  compliance closure.
+
+### Required validation
+
+- Run repository-provided documentation lint, link validation, consistency,
+  and architecture/document compliance checks when they exist.
+- Always run `git diff --check`.
+- Reproducibly inspect local Markdown links when no dedicated validator exists.
+- Confirm that only intended documentation files changed and no source code
+  changed.
+- Report missing validation tooling rather than building a large new system
+  during a documentation-only sprint.
+
+### Commit discipline
+
+- Keep documentation changes in focused follow-up commits.
+- Do not amend, rebase, force-push, open a pull request, or push before review,
+  verification, reporting, and project-owner approval.
+- Do not mix implementation changes into a documentation-review commit.
+
+### Documentation review Definition of Done
+
+- [ ] Dependency verification is complete and reported.
+- [ ] Governance position is explicit.
+- [ ] No unsupported document prefix, type, or lifecycle status was created.
+- [ ] Status reflects the actual repository governance.
+- [ ] Principles, pipeline, P0, SCAN-001A through SCAN-001O, and capability
+  boundaries remain intact.
+- [ ] Roadmap-to-implementation traceability is clear and path-verified.
+- [ ] README link is valid.
+- [ ] No source code changed.
+- [ ] Available documentation and repository validations pass.
+- [ ] Changes remain unpushed until project-owner approval.
+- [ ] Working tree and commit position are reported.
+- [ ] Governance gaps, tooling gaps, and recommendations are separated from
+  actual changes.
 
 ## Mandatory implementation checklist
 
