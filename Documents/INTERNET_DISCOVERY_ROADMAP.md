@@ -199,3 +199,53 @@ For every sprint:
    results, and remaining risks; and
 7. proceed to the next deliverable only after the current one is validated.
 
+## Mandatory implementation checklist
+
+This checklist is a permanent gate for every implementation sprint. Work must
+not be declared complete until every applicable item has been examined,
+reported, and satisfied.
+
+### 1. Dependency Verification
+
+- [ ] Existing canonical code has been identified and verified.
+
+### 2. Architecture Position
+
+- [ ] Layer is explicit and correct.
+- [ ] Subsystem is explicit and correct.
+- [ ] Engine ownership is explicit and correct.
+- [ ] Capability boundary is explicit and correct.
+
+### 3. Contract Review
+
+- [ ] Existing contract has been inspected.
+- [ ] Required extension is explicit and minimal.
+- [ ] Backward and architectural compatibility have been verified.
+
+### 4. Domain Invariant
+
+- [ ] New invariant is stated explicitly.
+- [ ] Conditions that must never be violated are stated explicitly.
+
+### 5. Safety Review
+
+- [ ] All possible bypass paths have been examined and closed.
+- [ ] Stale-state behavior has been examined and fails safely.
+- [ ] Provenance remains complete and intact across every boundary.
+
+### 6. Test Plan
+
+- [ ] Unit tests cover domain behavior and explicit rejection reasons.
+- [ ] Integration tests cover actual service and persistence boundaries.
+- [ ] Architecture tests enforce ownership and dependency boundaries.
+- [ ] Compliance tests verify the accepted scientific and governance rules.
+
+### 7. Definition of Done
+
+- [ ] A deliverable-specific Definition of Done is written before
+  implementation.
+- [ ] Every Definition of Done item has objective verification evidence.
+- [ ] Existing tests remain successful.
+- [ ] Changed files, contracts, invariants, test results, and residual risks
+  are reported.
+- [ ] The sprint is not advanced until the Definition of Done is satisfied.
