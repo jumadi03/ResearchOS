@@ -79,6 +79,23 @@ class KnowledgeDiscoveryService:
     def alignment_calibration_summary(self):
         return self.theory_pipeline.alignment_calibration_summary()
 
+    def refresh_calibration_queue(self, **options):
+        return self.theory_pipeline.refresh_calibration_queue(**options)
+
+    def next_calibration_case(self, **options):
+        return self.theory_pipeline.next_calibration_case(**options)
+
+    def review_calibration_case(self, case_id, **options):
+        return self.theory_pipeline.review_calibration_case(case_id, **options)
+
+    def calibration_disputes(self, **options):
+        return self.theory_pipeline.calibration_disputes(**options)
+
+    def adjudicate_calibration_case(self, case_id, **options):
+        return self.theory_pipeline.adjudicate_calibration_case(
+            case_id, **options
+        )
+
     def propose_alignment_calibration(self, **options):
         return self.theory_pipeline.propose_alignment_calibration(**options)
 

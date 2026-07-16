@@ -144,6 +144,25 @@ The reviewer-only endpoints are:
 - `POST /knowledge/theory-alignment/calibrations/{id}/approval`
 - `POST /knowledge/theory-alignment/calibrations/rollback`
 
+### Stratified blind calibration review
+
+`POST /knowledge/theory-alignment/calibration-cases/refresh` deterministically
+samples up to six accepted cross-graph pairs from each of five score strata.
+Sampling may include pairs below the production threshold, but still requires
+two shared content terms, matching polarity, and evidence from at least two
+graphs. Repeated refreshes are idempotent for the same bundle and theory pair.
+
+The reviewer queue never returns the score, method, shared terms, or score
+stratum. `GET /knowledge/theory-alignment/calibration-cases/next` prioritizes
+cases awaiting a second independent review. A reviewer cannot review the same
+case twice. Agreement between the first two reviewers finalizes the label;
+disagreement changes the case to `disputed` and excludes both reviewers from
+adjudication. A third reviewer resolves it through the adjudication endpoint.
+
+Only finalized labels are added to calibration observations. Queue summaries
+report counts by score stratum and aggregate inter-reviewer agreement, while
+individual blind-review responses continue to hide score information.
+
 ### Theory bundle registry
 
 The reviewer workspace loads `GET /knowledge/theories` to list available

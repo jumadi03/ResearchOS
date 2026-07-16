@@ -587,6 +587,29 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     assert calibration.status_code == 200
     assert calibration.json()["minimum_reviewed_outcomes"] == 30
     assert calibration.json()["eligible_to_propose"] is False
+    assert calibration.json()["queue"]["total"] == 0
+    assert api.get(
+        "/knowledge/theory-alignment/calibration-cases/next"
+    ).status_code == 403
+    next_case = api.get(
+        "/knowledge/theory-alignment/calibration-cases/next",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert next_case.status_code == 200
+    assert next_case.json() == {"blind": True, "item": None}
+    refresh_queue = api.post(
+        "/knowledge/theory-alignment/calibration-cases/refresh",
+        json={"created_at": "2026-07-16T07:00:00Z"},
+        headers={"Authorization": "Bearer review"},
+    )
+    assert refresh_queue.status_code == 201
+    assert refresh_queue.json()["created"] == 0
+    disputes = api.get(
+        "/knowledge/theory-alignment/calibration-disputes",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert disputes.status_code == 200
+    assert disputes.json() == {"blind": True, "items": []}
     calibration_response = api.post(
         "/knowledge/theory-alignment/calibrations",
         json={
@@ -739,6 +762,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert 'id="qualityMetrics"' in response.text
     assert 'id="calibrationForm"' in response.text
     assert 'id="calibrationHistory"' in response.text
+    assert 'id="calibrationQueueStats"' in response.text
+    assert 'id="blindCalibrationCase"' in response.text
     assert 'id="separateDialog"' in response.text
     assert "Simpan sebagai terpisah" in response.text
     assert 'id="decisionHistory"' in response.text

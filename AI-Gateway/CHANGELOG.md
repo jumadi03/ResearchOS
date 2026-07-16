@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added a stratified blind calibration queue with balanced score bands,
+  independent dual review, reviewer exclusion, agreement measurement, and
+  third-reviewer adjudication before labels enter threshold calibration.
 - Added a two-person calibration and promotion gate for theory alignment
   thresholds, requiring 30 labeled reviewer outcomes, observed and benchmark
   quality floors, immutable version snapshots, restart-safe activation, and

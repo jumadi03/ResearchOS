@@ -85,6 +85,18 @@ class AlignmentCalibrationRollbackRequest(BaseModel):
     occurred_at: str = Field(min_length=1)
 
 
+class CalibrationQueueRefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    created_at: str = Field(min_length=1)
+
+
+class CalibrationCaseReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal["aligned", "keep_separate"]
+    rationale: str = Field(min_length=12)
+    reviewed_at: str = Field(min_length=1)
+
+
 class EvidenceReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     decision: str

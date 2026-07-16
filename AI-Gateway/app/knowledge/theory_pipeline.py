@@ -12,7 +12,8 @@ from app.knowledge.publication.models import PublicationKind
 from app.knowledge.publication.persistence import PublicationStore
 from app.knowledge.theory.builder import TheoryBuilder
 from app.knowledge.theory.calibration import (
-    AlignmentCalibration, AlignmentCalibrationStore,
+    AlignmentCalibration, AlignmentCalibrationStore, CalibrationCase,
+    CalibrationCaseStore, CalibrationReview,
 )
 from app.knowledge.theory.models import TheoryReviewState
 from app.knowledge.theory.persistence import TheoryBundleStore
@@ -35,6 +36,12 @@ class KnowledgeTheoryPipeline:
         self.calibration_store = AlignmentCalibrationStore(
             output_root / "alignment-calibrations"
         )
+        self.calibration_case_store = CalibrationCaseStore(
+            output_root / "alignment-calibration-cases"
+        )
+        self.calibration_cases = {
+            item.case_id: item for item in self.calibration_case_store.load_all()
+        }
         self.calibrations = list(self.calibration_store.load_all())
         approved_calibrations = [
             item for item in self.calibrations if item.status == "approved"
@@ -169,6 +176,7 @@ class KnowledgeTheoryPipeline:
     def alignment_calibration_summary(self):
         observations = self._calibration_observations()
         recommendation = self._recommended_threshold(observations)
+        cases = tuple(self.calibration_cases.values())
         return {
             "method": self.theory_builder.candidate_method,
             "production_threshold": self.theory_builder.candidate_threshold,
@@ -176,8 +184,180 @@ class KnowledgeTheoryPipeline:
             "reviewed_outcomes": len(observations),
             "eligible_to_propose": len(observations) >= 30,
             "recommendation": recommendation,
+            "queue": {
+                "total": len(cases),
+                "awaiting_first_review": sum(
+                    item.status == "awaiting_first_review" for item in cases
+                ),
+                "awaiting_second_review": sum(
+                    item.status == "awaiting_second_review" for item in cases
+                ),
+                "disputed": sum(item.status == "disputed" for item in cases),
+                "finalized": sum(item.status == "finalized" for item in cases),
+                "agreement_rate": self._calibration_agreement_rate(cases),
+                "by_stratum": tuple({
+                    "stratum": stratum,
+                    "count": sum(item.stratum == stratum for item in cases),
+                    "finalized": sum(
+                        item.stratum == stratum and item.status == "finalized"
+                        for item in cases
+                    ),
+                } for stratum in ("0.00-0.19", "0.20-0.39", "0.40-0.59", "0.60-0.79", "0.80-1.00")),
+            },
             "proposals": tuple(asdict(item) for item in self.calibrations),
         }
+
+    def refresh_calibration_queue(self, *, created_at):
+        existing = {
+            (item.bundle_id, item.theory_ids)
+            for item in self.calibration_cases.values()
+        }
+        available = {key: [] for key in (
+            "0.00-0.19", "0.20-0.39", "0.40-0.59", "0.60-0.79", "0.80-1.00",
+        )}
+        for bundle in self.bundles.values():
+            accepted = tuple(sorted(
+                (item for item in bundle.proposals
+                 if item.review_state is TheoryReviewState.ACCEPTED),
+                key=lambda item: item.theory_id,
+            ))
+            for index, left in enumerate(accepted):
+                for right in accepted[index + 1:]:
+                    theory_ids = (left.theory_id, right.theory_id)
+                    if (bundle.bundle_id, theory_ids) in existing:
+                        continue
+                    signals = self.theory_builder.candidate_signals(
+                        left.statement, right.statement, threshold=0.0,
+                    )
+                    graph_ids = tuple(sorted({
+                        evidence.graph_id
+                        for proposal in (left, right)
+                        for evidence in proposal.evidence
+                    }))
+                    if (
+                        len(signals["shared_terms"]) < 2
+                        or not signals["polarity_match"]
+                        or len(graph_ids) < 2
+                    ):
+                        continue
+                    score = signals["score"]
+                    stratum = self._score_stratum(score)
+                    available[stratum].append((
+                        bundle, left, right, theory_ids, graph_ids, score,
+                    ))
+        created = []
+        target_per_stratum = 6
+        for stratum, candidates in available.items():
+            current = sum(
+                item.stratum == stratum for item in self.calibration_cases.values()
+            )
+            for bundle, left, right, theory_ids, graph_ids, score in sorted(
+                candidates,
+                key=lambda entry: sha256(
+                    f"{entry[0].bundle_id}:{':'.join(entry[3])}".encode()
+                ).hexdigest(),
+            )[:max(0, target_per_stratum - current)]:
+                identity = f"{bundle.bundle_id}:{':'.join(theory_ids)}:{self.theory_builder.candidate_method}"
+                case = CalibrationCase(
+                    case_id=f"calibration-case-{sha256(identity.encode()).hexdigest()[:24]}",
+                    bundle_id=bundle.bundle_id, theory_ids=theory_ids,
+                    statements=(left.statement, right.statement),
+                    graph_ids=graph_ids,
+                    evidence_by_theory=(
+                        tuple(asdict(item) for item in left.evidence),
+                        tuple(asdict(item) for item in right.evidence),
+                    ),
+                    method=self.theory_builder.candidate_method,
+                    score=score, stratum=stratum, created_at=created_at,
+                ).finalized()
+                self.calibration_cases[case.case_id] = case
+                self.calibration_case_store.save(case)
+                created.append(case)
+        return {
+            "created": len(created),
+            "queue": self.alignment_calibration_summary()["queue"],
+        }
+
+    def next_calibration_case(self, *, reviewer):
+        eligible = tuple(sorted(
+            (
+                item for item in self.calibration_cases.values()
+                if item.status in {"awaiting_first_review", "awaiting_second_review"}
+                and reviewer not in {review.reviewer for review in item.reviews}
+            ),
+            key=lambda item: (
+                item.status != "awaiting_second_review",
+                len(item.reviews), item.created_at, item.case_id,
+            ),
+        ))
+        return self._blind_calibration_case(eligible[0]) if eligible else None
+
+    def review_calibration_case(
+        self, case_id, *, reviewer, decision, rationale, reviewed_at,
+    ):
+        case = self._calibration_case(case_id)
+        if case.status not in {"awaiting_first_review", "awaiting_second_review"}:
+            raise ValueError("Calibration case is not awaiting an independent review")
+        if reviewer in {item.reviewer for item in case.reviews}:
+            raise ValueError("A reviewer cannot review the same calibration case twice")
+        if decision not in {"aligned", "keep_separate"}:
+            raise ValueError("Calibration decision must be aligned or keep_separate")
+        if not rationale.strip():
+            raise ValueError("Calibration review rationale is required")
+        reviews = case.reviews + (
+            CalibrationReview(
+                reviewer, decision, rationale.strip(), reviewed_at,
+            ),
+        )
+        if len(reviews) == 1:
+            status, outcome, finalized_at = "awaiting_second_review", None, None
+        elif reviews[0].decision == reviews[1].decision:
+            status, outcome, finalized_at = "finalized", decision, reviewed_at
+        else:
+            status, outcome, finalized_at = "disputed", None, None
+        reviewed = replace(
+            case, reviews=reviews, status=status, final_outcome=outcome,
+            finalized_at=finalized_at, content_hash="",
+        ).finalized()
+        self.calibration_cases[case_id] = reviewed
+        return self._blind_calibration_case(reviewed), self.calibration_case_store.save(reviewed)
+
+    def calibration_disputes(self, *, reviewer):
+        return tuple(
+            self._blind_calibration_case(item)
+            for item in sorted(
+                self.calibration_cases.values(),
+                key=lambda entry: (entry.created_at, entry.case_id),
+            )
+            if item.status == "disputed"
+            and reviewer not in {review.reviewer for review in item.reviews}
+        )
+
+    def adjudicate_calibration_case(
+        self, case_id, *, reviewer, decision, rationale, reviewed_at,
+    ):
+        case = self._calibration_case(case_id)
+        if case.status != "disputed":
+            raise ValueError("Calibration case is not awaiting adjudication")
+        if reviewer in {item.reviewer for item in case.reviews}:
+            raise ValueError("Adjudication requires a third reviewer")
+        if decision not in {"aligned", "keep_separate"}:
+            raise ValueError("Calibration decision must be aligned or keep_separate")
+        if not rationale.strip():
+            raise ValueError("Adjudication rationale is required")
+        reviews = case.reviews + (
+            CalibrationReview(
+                reviewer, decision, rationale.strip(), reviewed_at,
+                role="adjudicator",
+            ),
+        )
+        adjudicated = replace(
+            case, reviews=reviews, status="finalized",
+            final_outcome=decision, finalized_at=reviewed_at,
+            content_hash="",
+        ).finalized()
+        self.calibration_cases[case_id] = adjudicated
+        return self._blind_calibration_case(adjudicated), self.calibration_case_store.save(adjudicated)
 
     def propose_alignment_calibration(
         self, *, threshold, proposer, rationale, proposed_at,
@@ -275,7 +455,12 @@ class KnowledgeTheoryPipeline:
         return rollback, self.calibration_store.save(rollback)
 
     def _calibration_observations(self):
-        return tuple(
+        governed = tuple(
+            (item.final_outcome == "aligned", item.score)
+            for item in self.calibration_cases.values()
+            if item.status == "finalized" and item.final_outcome is not None
+        )
+        return governed + tuple(
             (True, item.candidate_score)
             for bundle in self.bundles.values() for item in bundle.alignments
             if item.candidate_method and item.candidate_score is not None
@@ -284,6 +469,49 @@ class KnowledgeTheoryPipeline:
             for bundle in self.bundles.values() for item in bundle.alignment_decisions
             if item.candidate_method and item.candidate_score is not None
         )
+
+    @staticmethod
+    def _score_stratum(score):
+        if score < 0.2:
+            return "0.00-0.19"
+        if score < 0.4:
+            return "0.20-0.39"
+        if score < 0.6:
+            return "0.40-0.59"
+        if score < 0.8:
+            return "0.60-0.79"
+        return "0.80-1.00"
+
+    @staticmethod
+    def _calibration_agreement_rate(cases):
+        double_reviewed = [
+            item for item in cases if len(item.reviews) >= 2
+        ]
+        if not double_reviewed:
+            return None
+        agreements = sum(
+            item.reviews[0].decision == item.reviews[1].decision
+            for item in double_reviewed
+        )
+        return round(agreements / len(double_reviewed), 4)
+
+    @staticmethod
+    def _blind_calibration_case(case):
+        return {
+            "case_id": case.case_id, "bundle_id": case.bundle_id,
+            "theory_ids": case.theory_ids, "statements": case.statements,
+            "graph_ids": case.graph_ids,
+            "evidence_by_theory": case.evidence_by_theory,
+            "status": case.status, "review_count": len(case.reviews),
+            "final_outcome": case.final_outcome,
+            "created_at": case.created_at,
+        }
+
+    def _calibration_case(self, case_id):
+        case = self.calibration_cases.get(case_id)
+        if case is None:
+            raise KeyError(f"Unknown calibration case: {case_id}")
+        return case
 
     @staticmethod
     def _threshold_metrics(observations, threshold):

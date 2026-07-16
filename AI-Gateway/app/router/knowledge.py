@@ -10,6 +10,7 @@ from app.knowledge.models import ScientificQuestion, SearchPlan
 from app.models.knowledge import (
     AlignmentCalibrationApprovalRequest, AlignmentCalibrationProposalRequest,
     AlignmentCalibrationRollbackRequest,
+    CalibrationCaseReviewRequest, CalibrationQueueRefreshRequest,
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
     ArtifactTransitionRequest, EvidenceReviewRequest, PublicationPreviewRequest,
     PublicationRequest,
@@ -300,6 +301,86 @@ def alignment_calibration_summary(
 ):
     authorize(request, credentials, KnowledgeRole.REVIEWER)
     return request.app.state.knowledge_service.alignment_calibration_summary()
+
+
+@router.post("/theory-alignment/calibration-cases/refresh", status_code=201)
+def refresh_calibration_queue(
+    req: CalibrationQueueRefreshRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    return request.app.state.knowledge_service.refresh_calibration_queue(
+        created_at=req.created_at
+    )
+
+
+@router.get("/theory-alignment/calibration-cases/next")
+def next_calibration_case(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    return {
+        "blind": True,
+        "item": request.app.state.knowledge_service.next_calibration_case(
+            reviewer=principal.actor_id
+        ),
+    }
+
+
+@router.post(
+    "/theory-alignment/calibration-cases/{case_id}/reviews", status_code=201,
+)
+def review_calibration_case(
+    case_id: str, req: CalibrationCaseReviewRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        item, snapshot = request.app.state.knowledge_service.review_calibration_case(
+            case_id, reviewer=principal.actor_id, decision=req.decision,
+            rationale=req.rationale, reviewed_at=req.reviewed_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {**item, "snapshot": snapshot.name, "blind": True}
+
+
+@router.get("/theory-alignment/calibration-disputes")
+def calibration_disputes(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    return {
+        "blind": True,
+        "items": request.app.state.knowledge_service.calibration_disputes(
+            reviewer=principal.actor_id
+        ),
+    }
+
+
+@router.post(
+    "/theory-alignment/calibration-cases/{case_id}/adjudication",
+    status_code=201,
+)
+def adjudicate_calibration_case(
+    case_id: str, req: CalibrationCaseReviewRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        item, snapshot = request.app.state.knowledge_service.adjudicate_calibration_case(
+            case_id, reviewer=principal.actor_id, decision=req.decision,
+            rationale=req.rationale, reviewed_at=req.reviewed_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {**item, "snapshot": snapshot.name, "blind": True}
 
 
 @router.post("/theory-alignment/calibrations", status_code=201)

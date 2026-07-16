@@ -321,6 +321,68 @@ def test_calibration_requires_evidence_separate_approval_and_supports_rollback(
     assert restored.theory_builder.candidate_threshold == 0.2
 
 
+def test_stratified_calibration_queue_is_blind_independent_and_adjudicated(
+    tmp_path: Path,
+) -> None:
+    builder = TheoryBuilder()
+    bundle = builder.build((
+        graph("blind-one", "Open science practices improve reproducibility"),
+        graph("blind-two", "Open research practices support reproducibility"),
+    ), created_at="time")
+    for proposal in bundle.proposals:
+        bundle = builder.review(
+            bundle, theory_id=proposal.theory_id,
+            decision=TheoryReviewState.ACCEPTED, reviewer="source-reviewer",
+            rationale="Eligible for calibration sampling",
+            occurred_at=proposal.theory_id,
+        )
+    pipeline = KnowledgeTheoryPipeline(tmp_path, {})
+    pipeline.bundles[bundle.bundle_id] = bundle
+
+    refreshed = pipeline.refresh_calibration_queue(
+        created_at="2026-07-16T07:00:00Z"
+    )
+    assert refreshed["created"] == 1
+    assert refreshed["queue"]["by_stratum"][1]["count"] == 1
+    first = pipeline.next_calibration_case(reviewer="reviewer-one")
+    assert first is not None
+    assert "score" not in first
+    assert "method" not in first
+    assert "stratum" not in first
+    reviewed, _ = pipeline.review_calibration_case(
+        first["case_id"], reviewer="reviewer-one", decision="aligned",
+        rationale="Constructs and outcomes appear equivalent",
+        reviewed_at="2026-07-16T07:01:00Z",
+    )
+    assert reviewed["status"] == "awaiting_second_review"
+    assert pipeline.next_calibration_case(reviewer="reviewer-one") is None
+    second = pipeline.next_calibration_case(reviewer="reviewer-two")
+    assert second["case_id"] == first["case_id"]
+    disputed, _ = pipeline.review_calibration_case(
+        first["case_id"], reviewer="reviewer-two",
+        decision="keep_separate",
+        rationale="Operational definitions remain materially different",
+        reviewed_at="2026-07-16T07:02:00Z",
+    )
+    assert disputed["status"] == "disputed"
+    assert pipeline.calibration_disputes(reviewer="reviewer-one") == ()
+    disputes = pipeline.calibration_disputes(reviewer="reviewer-three")
+    assert disputes[0]["case_id"] == first["case_id"]
+    final, _ = pipeline.adjudicate_calibration_case(
+        first["case_id"], reviewer="reviewer-three",
+        decision="keep_separate",
+        rationale="Differences outweigh surface lexical similarity",
+        reviewed_at="2026-07-16T07:03:00Z",
+    )
+    assert final["status"] == "finalized"
+    assert final["final_outcome"] == "keep_separate"
+    summary = pipeline.alignment_calibration_summary()
+    assert summary["queue"]["finalized"] == 1
+    assert summary["queue"]["agreement_rate"] == 0.0
+    restored = KnowledgeTheoryPipeline(tmp_path, {})
+    assert restored.alignment_calibration_summary()["queue"]["finalized"] == 1
+
+
 def test_theory_review_is_attributable_and_requires_rationale() -> None:
     import pytest
     builder = TheoryBuilder()
