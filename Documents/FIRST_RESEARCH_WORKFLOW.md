@@ -77,7 +77,10 @@ underlying source observations.
 ## 4. Create the metadata snapshot
 
 Select **Collect metadata** once. A successful run changes the button to a
-versioned confirmation such as `Metadata v1.0 collected`.
+versioned confirmation with the provider-observation count, such as
+`Metadata v1.0 · 2 observations`. The confirmation message also reports
+citation edges; an empty result is identified explicitly instead of appearing
+as an ordinary enrichment success.
 
 This step preserves normalized observations, citations, metadata conflicts,
 and correction or retraction signals separately from the original discovery

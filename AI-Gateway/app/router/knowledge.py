@@ -73,6 +73,13 @@ def collect_metadata(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     result = asdict(run)
     result["snapshot"] = snapshot.name
+    result["summary"] = {
+        "status": "enriched" if run.records else "empty",
+        "record_count": len(run.records),
+        "observation_count": sum(len(record.observations) for record in run.records),
+        "citation_edge_count": len(run.citation_edges),
+        "conflict_count": sum(len(record.conflicts) for record in run.records),
+    }
     return result
 
 

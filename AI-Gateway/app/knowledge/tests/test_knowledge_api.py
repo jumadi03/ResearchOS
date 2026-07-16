@@ -238,6 +238,10 @@ def test_discovery_and_metadata_use_repository_port(tmp_path: Path) -> None:
     discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
     metadata = api.post(f"/knowledge/discovery/runs/{discovered['run_id']}/metadata")
     assert metadata.status_code == 201
+    assert metadata.json()["summary"] == {
+        "status": "enriched", "record_count": 1, "observation_count": 1,
+        "citation_edge_count": 0, "conflict_count": 0,
+    }
     assert repository.discovery_runs[0].run_id == discovered["run_id"]
     assert repository.metadata_runs[0].discovery_run_id == discovered["run_id"]
 

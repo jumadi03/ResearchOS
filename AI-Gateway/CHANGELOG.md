@@ -9,6 +9,8 @@ follows Semantic Versioning.
 
 - Restricted theory review, theory validation, and knowledge publication to
   authenticated reviewer principals.
+- Added explicit metadata enrichment status and counts for records,
+  observations, citation edges, and conflicts to API and workspace results.
 
 ### Fixed
 

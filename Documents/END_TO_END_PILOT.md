@@ -26,7 +26,7 @@ before acquisition; it did not bypass access controls.
 | --- | --- |
 | API health | Passed |
 | OpenAlex discovery | 1 record, 0 provider failures |
-| Metadata collection | Passed; 0 additional observations for this provider response |
+| Metadata collection | 1 provider observation and 20 citation edges |
 | PDF acquisition | 651,962 bytes; checksum and object read-back verified |
 | Deterministic extraction | 7 traceable provisional objects |
 | Human evidence review | 7 objects accepted by the reviewer principal |
@@ -79,8 +79,7 @@ remains a literature-review artifact requiring qualified human interpretation.
 
 - Explain allowed risk-of-bias values (`low`, `some_concerns`, `high`, and
   `unknown`) in user-facing validation documentation.
-- Investigate why this OpenAlex metadata pass produced no additional metadata
-  observations despite a successful canonical discovery record.
+- Keep metadata observation, citation-edge, and conflict counts visible in the
+  API and browser workspace so successful enrichment cannot be misread as empty.
 - Repeat the pilot with multiple independent studies before evaluating a
   validation `pass` scenario.
-
