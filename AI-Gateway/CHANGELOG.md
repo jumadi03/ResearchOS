@@ -28,6 +28,8 @@ follows Semantic Versioning.
   acceptance, multi-graph evidence, rationale, attribution, and immutable audit events.
 - Expose a reviewer-only, advisory alignment-candidate queue using transparent
   normalized-token overlap without automatically changing theory bundles.
+- Add a Theory Alignment reviewer workspace for inspecting advisory candidates,
+  recording scoped statements and rationales, and confirming provenance review.
 
 ## [0.4.0] - 2026-07-16
 

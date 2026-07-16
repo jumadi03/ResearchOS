@@ -593,6 +593,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert response.status_code == 200
     assert "ResearchOS Workspace" in response.text
     assert "cookie HttpOnly" in response.text
+    assert "Theory Alignment" in response.text
+    assert "/workspace-assets/theory.js" in response.text
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:

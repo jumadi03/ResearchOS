@@ -11,13 +11,14 @@
   <link rel="stylesheet" href="/workspace-assets/admin.css">
   <link rel="stylesheet" href="/workspace-assets/intelligence.css">
   <link rel="stylesheet" href="/workspace-assets/intelligence-history.css">
+  <link rel="stylesheet" href="/workspace-assets/theory.css">
 </head>
 <body>
   <div class="shell">
     <header class="topbar">
       <a class="brand" href="/workspace" aria-label="ResearchOS home"><span class="brand-mark">R</span><span>ResearchOS</span></a>
       <div class="project-switcher"><span class="eyebrow">PROJECT</span><select id="projectSelect" aria-label="Pilih project"></select></div>
-      <div class="top-actions"><span class="status-dot" id="connectionDot"></span><span id="connectionLabel">Belum terhubung</span><button class="ghost" id="authButton">Hubungkan</button></div>
+      <div class="top-actions"><span class="status-dot" id="connectionDot"></span><span id="connectionLabel">Belum terhubung</span><button class="ghost mobile-theory" id="mobileTheoryButton">Theory</button><button class="ghost" id="authButton">Hubungkan</button></div>
     </header>
 
     <aside class="rail" aria-label="Navigasi utama">
@@ -25,6 +26,7 @@
       <button class="rail-item active" title="Objects"><span>◫</span><small>Objects</small></button>
       <button class="rail-item" id="discoveryButton" title="Discovery"><span>⌕</span><small>Discover</small></button>
       <button class="rail-item" id="graphButton" title="Graph"><span>⌘</span><small>Graph</small></button>
+      <button class="rail-item" id="theoryButton" title="Theory Review"><span>T</span><small>Theory</small></button>
       <button class="rail-item" id="adminButton" title="Administration" hidden><span>A</span><small>Admin</small></button>
       <div class="rail-spacer"></div>
       <button class="rail-item" id="helpButton" title="Bantuan"><span>?</span><small>Help</small></button>
@@ -83,6 +85,13 @@
           <section class="admin-panel audit-panel"><div class="panel-head"><h2>Security audit</h2><span>Latest events</span></div><div id="auditEvents"></div></section>
         </div>
       </section>
+      <section class="theory-view" id="theoryView" hidden>
+        <div class="theory-head"><div><span class="eyebrow">REVIEWER-GOVERNED SYNTHESIS</span><h1>Theory Alignment</h1><p>Kandidat bersifat advisory. Hanya reviewer yang dapat menetapkan kesetaraan semantik.</p></div></div>
+        <form class="bundle-loader" id="bundleLoader"><label>Theory bundle ID<input id="theoryBundleInput" required placeholder="theory-bundle-…" autocomplete="off"></label><button type="submit">Muat kandidat</button></form>
+        <div class="theory-notice">Skor hanya menunjukkan kata yang tumpang tindih. Periksa pernyataan dan provenance setiap grafik sebelum mengambil keputusan.</div>
+        <div class="candidate-summary" id="candidateSummary"></div>
+        <div class="candidate-list" id="candidateList"><div class="empty-panel">Masukkan theory bundle untuk membuka antrean reviewer.</div></div>
+      </section>
     </main>
   </div>
 
@@ -90,6 +99,7 @@
   <dialog id="decisionDialog"><form id="decisionForm"><input type="hidden" id="decisionObject"><input type="hidden" id="decisionKind"><div class="dialog-mark">R</div><h2 id="decisionTitle">Record decision</h2><p id="decisionSummary"></p><label>Decision<select id="decisionChoice"></select></label><label>Rationale<textarea id="decisionRationale" rows="4" minlength="8" required placeholder="Jelaskan dasar keputusan ini…"></textarea></label><label class="confirm-row"><input type="checkbox" id="decisionConfirm" required><span>Saya memahami keputusan ini akan dicatat dalam provenance.</span></label><div class="dialog-actions"><button type="button" id="cancelDecision" class="ghost">Batal</button><button type="submit">Simpan keputusan</button></div><p class="error" id="decisionError"></p></form></dialog>
   <dialog id="acquireDialog"><form id="acquireForm"><input type="hidden" id="acquireRecord"><div class="dialog-mark">R</div><h2>Acquire document</h2><p id="acquireTitle"></p><label>Document URL<input id="acquireUrl" type="url" required placeholder="https://…/paper.pdf"></label><label>Access status<select id="accessStatus"><option value="open">Open</option><option value="restricted">Restricted</option><option value="unavailable">Unavailable</option></select></label><label>License<input id="documentLicense" placeholder="e.g. CC-BY-4.0"></label><div class="dialog-actions"><button type="button" id="cancelAcquire" class="ghost">Batal</button><button type="submit">Acquire & verify</button></div><p class="error" id="acquireError"></p></form></dialog>
   <dialog id="intelligenceDialog" class="intelligence-dialog"><form id="intelligenceForm"><div class="ai-heading"><div class="dialog-mark">AI</div><div><span class="eyebrow">SCIENTIFIC INTELLIGENCE</span><h2 id="intelligenceTitle">Analyze object</h2></div></div><p>Analisis mengikuti objek aktif. Semua hasil bersifat advisory dan memerlukan review manusia.</p><div class="ai-actions" id="intelligenceActions"></div><label>Additional instruction<textarea id="intelligenceInstruction" rows="3" placeholder="Optional focus or question…"></textarea></label><div class="ai-result" id="intelligenceResult" hidden></div><section class="ai-history"><h3>Analysis history</h3><div id="intelligenceHistory"></div></section><div class="dialog-actions"><button type="button" id="closeIntelligence" class="ghost">Tutup</button><button type="submit" id="runIntelligence">Run analysis</button></div><p class="error" id="intelligenceError"></p></form></dialog>
+  <dialog id="alignmentDialog"><form id="alignmentForm"><input type="hidden" id="alignmentBundle"><input type="hidden" id="alignmentTheoryIds"><div class="dialog-mark">T</div><h2>Align reviewed theories</h2><p id="alignmentSources"></p><label>Scoped combined statement<textarea id="alignmentStatement" rows="3" minlength="8" required></textarea></label><label>Reviewer rationale<textarea id="alignmentRationale" rows="4" minlength="12" required placeholder="Jelaskan kesetaraan konstruk, arah, populasi, dan outcome…"></textarea></label><label class="confirm-row"><input type="checkbox" id="alignmentConfirm" required><span>Saya telah memeriksa pernyataan sumber dan provenance grafik. Saya memahami alignment akan membatalkan validasi aktif bundle ini.</span></label><div class="dialog-actions"><button type="button" id="cancelAlignment" class="ghost">Batal</button><button type="submit">Catat alignment</button></div><p class="error" id="alignmentError"></p></form></dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="/workspace-assets/workspace.js" defer></script>
   <script src="/workspace-assets/graph.js" defer></script>
@@ -97,5 +107,6 @@
   <script src="/workspace-assets/admin.js" defer></script>
   <script src="/workspace-assets/intelligence.js" defer></script>
   <script src="/workspace-assets/session.js" defer></script>
+  <script src="/workspace-assets/theory.js" defer></script>
 </body>
 </html>
