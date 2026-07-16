@@ -176,6 +176,13 @@ jobs:
         run: |
           docker compose --env-file stack.env -f compose.yaml cp verify/representation_repository.py api:/tmp/representation_repository.py
           docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/representation_repository.py
+      - name: Verify evidence admission and canonical graph safety
+        working-directory: deploy
+        run: |
+          docker compose --env-file stack.env -f compose.yaml cp verify/canonical_evidence.py api:/tmp/canonical_evidence.py
+          docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/canonical_evidence.py
+          docker compose --env-file stack.env -f compose.yaml cp verify/canonical_graph.py api:/tmp/canonical_graph.py
+          docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/canonical_graph.py
       - name: Verify worker lease recovery and dead-letter lifecycle
         working-directory: deploy
         run: |

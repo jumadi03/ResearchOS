@@ -33,6 +33,13 @@ class EvidenceReviewEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class EvidenceAdmission:
+    evidence_object_id: str
+    review_state: ExtractionReviewState | None
+    review_event: EvidenceReviewEvent | None
+
+
+@dataclass(frozen=True, slots=True)
 class DocumentCoordinates:
     page: int
     start_char: int

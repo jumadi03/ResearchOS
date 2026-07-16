@@ -118,8 +118,15 @@ class KnowledgeIngestionPipeline:
         manifest = self.extractions.get(extraction_id)
         if manifest is None:
             raise KeyError(f"Unknown extraction manifest: {extraction_id}")
-        graph = self.graph_builder.build(manifest)
-        if self.data_repository is not None and self.object_store is not None:
+        if self.data_repository is None:
+            raise ValueError(
+                "Canonical repository is required for evidence admission"
+            )
+        admissions = self.data_repository.resolve_evidence_admissions(
+            tuple(item.object_id for item in manifest.objects)
+        )
+        graph = self.graph_builder.build(manifest, admissions)
+        if self.data_repository is not None:
             self.data_repository.persist_graph(graph, occurred_at=manifest.created_at)
         self.graphs[graph.graph_id] = graph
         return graph, self.graph_store.save(graph)

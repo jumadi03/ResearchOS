@@ -6,7 +6,9 @@ from app.knowledge.models import DiscoveryRun, LiteratureRecord
 from app.knowledge.ingestion.models import AcquisitionResult
 from app.knowledge.retrieval.models import MetadataRun
 from app.knowledge.repositories.models import StoredRepresentation
-from app.knowledge.extraction.models import EvidenceReviewEvent, ExtractionManifest
+from app.knowledge.extraction.models import (
+    EvidenceAdmission, EvidenceReviewEvent, ExtractionManifest,
+)
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
@@ -36,6 +38,10 @@ class ScientificDataRepository(Protocol):
         self, evidence_object_id: str, *, decision: str, reviewer: str,
         rationale: str, occurred_at: str,
     ) -> EvidenceReviewEvent: ...
+
+    def resolve_evidence_admissions(
+        self, evidence_object_ids: tuple[str, ...],
+    ) -> tuple[EvidenceAdmission, ...]: ...
 
     def persist_graph(
         self, graph: ScientificKnowledgeGraph, *, occurred_at: str,

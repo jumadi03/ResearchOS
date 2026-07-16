@@ -3,6 +3,7 @@
 from hashlib import sha256
 
 from app.knowledge.extraction.models import ExtractionManifest, ScientificObjectType
+from app.knowledge.modeling.admission import EvidenceAdmissionGate
 from app.knowledge.modeling.models import (
     GraphProvenance, KnowledgeEdge, KnowledgeEdgeType, KnowledgeNode,
     KnowledgeNodeType, ScientificKnowledgeGraph,
@@ -10,7 +11,11 @@ from app.knowledge.modeling.models import (
 
 
 class ScientificKnowledgeGraphBuilder:
-    def build(self, manifest: ExtractionManifest) -> ScientificKnowledgeGraph:
+    def __init__(self, admission_gate: EvidenceAdmissionGate | None = None) -> None:
+        self.admission_gate = admission_gate or EvidenceAdmissionGate()
+
+    def build(self, manifest: ExtractionManifest, admissions=None) -> ScientificKnowledgeGraph:
+        accepted = self.admission_gate.admit(manifest, admissions)
         document_node = KnowledgeNode(
             f"node:{manifest.document_id}", KnowledgeNodeType.SOURCE_DOCUMENT,
             manifest.document_id,
@@ -24,7 +29,8 @@ class ScientificKnowledgeGraphBuilder:
             provenance = GraphProvenance(
                 manifest.extraction_id, manifest.document_id, item.object_id,
                 item.coordinates.page, item.coordinates.quote_hash,
-                item.confidence, item.review_state,
+                item.confidence, accepted[item.object_id].decision,
+                accepted[item.object_id],
             )
             node = KnowledgeNode(
                 f"node:{item.object_id}", KnowledgeNodeType(item.object_type.value),
@@ -51,6 +57,7 @@ class ScientificKnowledgeGraphBuilder:
             tuple(sorted(nodes, key=lambda node: node.node_id)),
             tuple(sorted(edges, key=lambda edge: edge.edge_id)),
         )
+        graph.validate_evidence_admission()
         return graph.finalized()
 
     @staticmethod

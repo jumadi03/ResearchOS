@@ -5,7 +5,9 @@ import json
 
 import pytest
 
-from app.knowledge.extraction.models import ExtractionReviewState
+from app.knowledge.extraction.models import (
+    EvidenceAdmission, EvidenceReviewEvent, ExtractionReviewState,
+)
 from app.knowledge.modeling.models import (
     GraphProvenance, KnowledgeEdge, KnowledgeEdgeType, KnowledgeNode,
     KnowledgeNodeType, ScientificKnowledgeGraph,
@@ -21,12 +23,43 @@ from app.knowledge.validation.engine import ValidationEngine
 from app.knowledge.validation.models import RiskOfBias, ValidationStatus
 
 
-def graph(identifier, conclusion):
-    provenance = GraphProvenance("extraction", "document", f"object-{identifier}", 1, f"quote-{identifier}", 0.7, ExtractionReviewState.PROVISIONAL)
+def graph(identifier, conclusion, state=ExtractionReviewState.ACCEPTED, *, event=True):
+    object_id = f"object-{identifier}"
+    review = (
+        EvidenceReviewEvent(
+            f"review-{identifier}", object_id, state, "reviewer@example",
+            "Scientific evidence reviewed", "review-time",
+            f"provenance-{identifier}", "pending",
+        )
+        if event and state is not None else None
+    )
+    provenance = GraphProvenance(
+        "extraction", "document", object_id, 1, f"quote-{identifier}",
+        0.7, state, review,
+    )
     result = KnowledgeNode(f"result-{identifier}", KnowledgeNodeType.RESULT, "Result", provenance)
     theory = KnowledgeNode(f"conclusion-{identifier}", KnowledgeNodeType.CONCLUSION, conclusion, provenance)
     edge = KnowledgeEdge(f"edge-{identifier}", result.node_id, theory.node_id, KnowledgeEdgeType.SUPPORTS, True, provenance)
     return ScientificKnowledgeGraph(f"graph-{identifier}", f"extraction-{identifier}", (result, theory), (edge,)).finalized()
+
+
+class AdmissionRepository:
+    def __init__(self, admissions):
+        self.admissions = {
+            item.evidence_object_id: item for item in admissions
+        }
+        self.artifacts = []
+
+    def resolve_evidence_admissions(self, evidence_object_ids):
+        return tuple(
+            self.admissions.get(
+                object_id, EvidenceAdmission(object_id, None, None)
+            )
+            for object_id in evidence_object_ids
+        )
+
+    def persist_artifact(self, **values):
+        self.artifacts.append(values)
 
 
 def test_theory_builder_aggregates_support_and_represents_competition(tmp_path: Path) -> None:
@@ -39,6 +72,92 @@ def test_theory_builder_aggregates_support_and_represents_competition(tmp_path: 
     assert all(item.support_count == 1 for item in bundle.proposals)
     assert len(bundle.competing) == 1
     assert TheoryBundleStore(tmp_path).save(bundle).exists()
+
+
+def test_theory_builder_rejects_provisional_rejected_and_mixed_graphs() -> None:
+    import pytest
+    builder = TheoryBuilder()
+    for state, reason in (
+        (ExtractionReviewState.PROVISIONAL, "not accepted"),
+        (ExtractionReviewState.REJECTED, "contains rejected evidence"),
+    ):
+        with pytest.raises(ValueError, match=reason):
+            builder.build((
+                graph("unsafe", "Unsafe conclusion", state),
+            ), created_at="time")
+    with pytest.raises(ValueError, match="contains rejected evidence"):
+        builder.build((
+            graph("accepted", "Accepted conclusion"),
+            graph(
+                "rejected", "Rejected conclusion",
+                ExtractionReviewState.REJECTED,
+            ),
+        ), created_at="time")
+
+
+def test_theory_builder_rejects_missing_status_and_review_provenance() -> None:
+    import pytest
+    builder = TheoryBuilder()
+    with pytest.raises(ValueError, match="status is missing"):
+        builder.build((
+            graph("missing-status", "Unsafe conclusion", None, event=False),
+        ), created_at="time")
+    with pytest.raises(ValueError, match="provenance is incomplete"):
+        builder.build((
+            graph("missing-event", "Unsafe conclusion", event=False),
+        ), created_at="time")
+
+
+def test_theory_pipeline_revalidates_live_evidence_after_graph_snapshot(
+    tmp_path: Path,
+) -> None:
+    import pytest
+    safe_graph = graph("live", "Reviewed evidence supports a theory")
+    event = next(
+        node.provenance.review_event for node in safe_graph.nodes
+        if node.provenance is not None
+    )
+    repository = AdmissionRepository((
+        EvidenceAdmission(
+            event.evidence_object_id, ExtractionReviewState.ACCEPTED, event,
+        ),
+    ))
+    pipeline = KnowledgeTheoryPipeline(
+        tmp_path, {safe_graph.graph_id: safe_graph},
+        data_repository=repository,
+    )
+    bundle, _ = pipeline.build_theories(
+        (safe_graph.graph_id,), generated_by="researcher@example",
+    )
+    assert bundle.verify()
+    rejected = EvidenceReviewEvent(
+        "review-rejected", event.evidence_object_id,
+        ExtractionReviewState.REJECTED, "reviewer@example",
+        "Evidence was revoked after graph admission", "later",
+        "provenance-rejected", "accepted",
+    )
+    repository.admissions[event.evidence_object_id] = EvidenceAdmission(
+        event.evidence_object_id, ExtractionReviewState.REJECTED, rejected,
+    )
+    with pytest.raises(ValueError, match="contains rejected evidence"):
+        pipeline.build_theories(
+            (safe_graph.graph_id,), generated_by="researcher@example",
+        )
+
+
+def test_theory_pipeline_cannot_bypass_canonical_admission_authority(
+    tmp_path: Path,
+) -> None:
+    import pytest
+    safe_graph = graph("no-repository", "Reviewed evidence supports theory")
+    pipeline = KnowledgeTheoryPipeline(
+        tmp_path, {safe_graph.graph_id: safe_graph},
+    )
+
+    with pytest.raises(ValueError, match="Canonical repository is required"):
+        pipeline.build_theories(
+            (safe_graph.graph_id,), generated_by="researcher@example",
+        )
 
 
 def test_equivalent_claims_consolidate_across_graphs_without_losing_provenance() -> None:

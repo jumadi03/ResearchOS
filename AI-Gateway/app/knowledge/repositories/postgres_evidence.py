@@ -5,7 +5,8 @@ import json
 
 from app.knowledge.discovery.normalization import canonical_json
 from app.knowledge.extraction.models import (
-    EvidenceReviewEvent, ExtractionManifest, ExtractionReviewState,
+    EvidenceAdmission, EvidenceReviewEvent, ExtractionManifest,
+    ExtractionReviewState,
 )
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
 from app.knowledge.models import LiteratureRecord
@@ -164,9 +165,54 @@ class PostgresEvidenceRepositoryMixin:
             rationale.strip(), occurred_at, str(provenance_id), previous_state,
         )
 
+    def resolve_evidence_admissions(
+        self, evidence_object_ids: tuple[str, ...],
+    ) -> tuple[EvidenceAdmission, ...]:
+        status_map = {
+            "pending": ExtractionReviewState.PROVISIONAL,
+            "accepted": ExtractionReviewState.ACCEPTED,
+            "rejected": ExtractionReviewState.REJECTED,
+        }
+        admissions = []
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                for object_id in evidence_object_ids:
+                    cursor.execute("""
+                        SELECT e.human_review_status,
+                               v.review_id, v.decision, v.reviewer_id,
+                               v.rationale, v.occurred_at, v.provenance_id,
+                               v.from_status
+                        FROM canonical_objects c
+                        JOIN evidence_objects e ON e.evidence_id=c.object_id
+                        LEFT JOIN LATERAL (
+                            SELECT review_id, decision, reviewer_id, rationale,
+                                   occurred_at, provenance_id, from_status
+                            FROM evidence_review_events
+                            WHERE evidence_id=e.evidence_id
+                            ORDER BY occurred_at DESC, created_at DESC LIMIT 1
+                        ) v ON true
+                        WHERE c.stable_key=%s
+                    """, (f"evidence:{object_id}",))
+                    row = cursor.fetchone()
+                    if row is None:
+                        admissions.append(EvidenceAdmission(object_id, None, None))
+                        continue
+                    status = status_map.get(row[0])
+                    event = None
+                    if row[1] is not None:
+                        event = EvidenceReviewEvent(
+                            str(row[1]), object_id,
+                            ExtractionReviewState(row[2]), row[3], row[4],
+                            row[5].isoformat().replace("+00:00", "Z"),
+                            str(row[6]), row[7],
+                        )
+                    admissions.append(EvidenceAdmission(object_id, status, event))
+        return tuple(admissions)
+
     def persist_graph(
         self, graph: ScientificKnowledgeGraph, *, occurred_at: str,
     ) -> tuple[str, ...]:
+        graph.validate_evidence_admission()
         if not graph.verify():
             raise ValueError("Scientific Knowledge Graph integrity verification failed")
         if any(not edge.assertion for edge in graph.edges):
@@ -183,12 +229,16 @@ class PostgresEvidenceRepositoryMixin:
                     cursor.execute("""
                         SELECT e.evidence_id, e.document_id, e.evidence_type,
                                e.statement, e.content_hash, e.human_review_status,
-                               v.reviewer_id, v.provenance_id
+                               v.review_id, v.decision, v.reviewer_id,
+                               v.rationale, v.occurred_at, v.provenance_id,
+                               v.from_status
                         FROM canonical_objects c
                         JOIN evidence_objects e ON e.evidence_id=c.object_id
                         LEFT JOIN LATERAL (
-                            SELECT reviewer_id, provenance_id FROM evidence_review_events
-                            WHERE evidence_id=e.evidence_id AND decision='accepted'
+                            SELECT review_id, decision, reviewer_id, rationale,
+                                   occurred_at, provenance_id, from_status
+                            FROM evidence_review_events
+                            WHERE evidence_id=e.evidence_id
                             ORDER BY occurred_at DESC, created_at DESC LIMIT 1
                         ) v ON true
                         WHERE c.stable_key=%s
@@ -197,9 +247,30 @@ class PostgresEvidenceRepositoryMixin:
                     row = cursor.fetchone()
                     if row is None:
                         raise KeyError(f"Canonical evidence missing: {node.provenance.object_id}")
-                    evidence_id, document_id, evidence_type, statement, content_hash, status, reviewer, review_provenance_id = row
-                    if status != "accepted" or reviewer is None:
+                    (
+                        evidence_id, document_id, evidence_type, statement,
+                        content_hash, status, review_id, decision, reviewer,
+                        rationale, reviewed_at, review_provenance_id,
+                        previous_state,
+                    ) = row
+                    if status != "accepted" or decision != "accepted" or reviewer is None:
                         raise ValueError(f"Evidence is not accepted: {node.provenance.object_id}")
+                    event = node.provenance.review_event
+                    if (
+                        event is None
+                        or event.review_id != str(review_id)
+                        or event.decision is not ExtractionReviewState.ACCEPTED
+                        or event.reviewer != reviewer
+                        or event.rationale != rationale
+                        or event.occurred_at
+                        != reviewed_at.isoformat().replace("+00:00", "Z")
+                        or event.provenance_id != str(review_provenance_id)
+                        or event.previous_state != previous_state
+                    ):
+                        raise ValueError(
+                            "Evidence review provenance is incomplete: "
+                            f"{node.provenance.object_id}"
+                        )
                     if evidence_type != node.node_type.value or statement != node.label:
                         raise ValueError(f"Graph node does not match canonical evidence: {node.node_id}")
                     if content_hash != node.provenance.quote_hash:
@@ -309,5 +380,3 @@ class PostgresEvidenceRepositoryMixin:
                         edge_id = persisted[0]
                     edge_ids.append(str(edge_id))
                 return tuple(edge_ids)
-
-

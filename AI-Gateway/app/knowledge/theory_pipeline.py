@@ -7,6 +7,7 @@ from pathlib import Path
 from app.knowledge.gaps.detector import ResearchGapDetector
 from app.knowledge.gaps.persistence import GapAnalysisStore
 from app.knowledge.models import DiscoveryRun
+from app.knowledge.modeling.admission import EvidenceAdmissionGate
 from app.knowledge.publication.engine import PublicationEngine
 from app.knowledge.publication.models import PublicationKind
 from app.knowledge.publication.persistence import PublicationStore
@@ -35,6 +36,7 @@ class KnowledgeTheoryPipeline:
         self.data_repository = data_repository
         self.object_store = object_store
         self.theory_builder = TheoryBuilder()
+        self.evidence_admission_gate = EvidenceAdmissionGate()
         self.alignment_quality_evaluator = AlignmentQualityEvaluator()
         self.calibration_store = AlignmentCalibrationStore(
             output_root / "alignment-calibrations"
@@ -81,8 +83,22 @@ class KnowledgeTheoryPipeline:
         missing = [item for item in graph_ids if item not in self.graphs]
         if missing:
             raise KeyError(f"Unknown knowledge graph: {missing[0]}")
+        if self.data_repository is None:
+            raise ValueError(
+                "Canonical repository is required for evidence admission"
+            )
+        graphs = tuple(self.graphs[item] for item in graph_ids)
+        for graph in graphs:
+            object_ids = tuple(sorted({
+                node.provenance.object_id
+                for node in graph.nodes if node.provenance is not None
+            }))
+            admissions = self.data_repository.resolve_evidence_admissions(
+                object_ids
+            )
+            self.evidence_admission_gate.revalidate(graph, admissions)
         bundle = self.theory_builder.build(
-            tuple(self.graphs[item] for item in graph_ids),
+            graphs,
             created_at=DiscoveryRun.timestamp(),
         )
         self.bundles[bundle.bundle_id] = bundle

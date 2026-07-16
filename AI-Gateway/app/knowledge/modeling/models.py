@@ -7,7 +7,9 @@ from enum import StrEnum
 from hashlib import sha256
 import json
 
-from app.knowledge.extraction.models import ExtractionReviewState
+from app.knowledge.extraction.models import (
+    EvidenceReviewEvent, ExtractionReviewState,
+)
 
 
 class KnowledgeNodeType(StrEnum):
@@ -35,7 +37,8 @@ class GraphProvenance:
     page: int
     quote_hash: str
     confidence: float
-    review_state: ExtractionReviewState
+    review_state: ExtractionReviewState | None
+    review_event: EvidenceReviewEvent | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,3 +75,49 @@ class ScientificKnowledgeGraph:
 
     def verify(self) -> bool:
         return bool(self.content_hash) and self.finalized().content_hash == self.content_hash
+
+    def validate_evidence_admission(self) -> None:
+        evidence_nodes = [
+            node for node in self.nodes
+            if node.node_type is not KnowledgeNodeType.SOURCE_DOCUMENT
+        ]
+        if not evidence_nodes:
+            raise ValueError("Canonical knowledge graph requires accepted evidence")
+        for node in evidence_nodes:
+            if node.provenance is None:
+                raise ValueError(
+                    f"Evidence review status is missing: {node.node_id}"
+                )
+            self._validate_provenance(node.provenance)
+        for edge in self.edges:
+            self._validate_provenance(edge.provenance)
+
+    @staticmethod
+    def _validate_provenance(provenance: GraphProvenance) -> None:
+        object_id = provenance.object_id
+        if provenance.review_state is None:
+            raise ValueError(f"Evidence review status is missing: {object_id}")
+        if provenance.review_state is ExtractionReviewState.REJECTED:
+            raise ValueError(
+                f"Knowledge graph contains rejected evidence: {object_id}"
+            )
+        if provenance.review_state is not ExtractionReviewState.ACCEPTED:
+            raise ValueError(
+                f"Evidence is not accepted: {object_id} "
+                f"(status={provenance.review_state.value})"
+            )
+        event = provenance.review_event
+        if (
+            event is None
+            or event.evidence_object_id != object_id
+            or event.decision is not ExtractionReviewState.ACCEPTED
+            or not event.review_id.strip()
+            or not event.reviewer.strip()
+            or not event.rationale.strip()
+            or not event.occurred_at.strip()
+            or not event.provenance_id.strip()
+            or not event.previous_state.strip()
+        ):
+            raise ValueError(
+                f"Evidence review provenance is incomplete: {object_id}"
+            )

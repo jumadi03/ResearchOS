@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 import os
+from pathlib import Path
 
+from app.knowledge.extraction.models import (
+    EvidenceAdmission, ExtractionReviewState,
+)
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
+from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
 from canonical_evidence import manifest
 from canonical_repository import discovery_run
 from representation_repository import result
@@ -23,7 +29,33 @@ def main() -> None:
         b"%PDF-1.7\nResearchOS representation v2\n", "2026-07-15T13:05:00Z"
     )
     extraction = manifest(source_representation.content_hash)
-    graph = ScientificKnowledgeGraphBuilder().build(extraction)
+    builder = ScientificKnowledgeGraphBuilder()
+    pending_admissions = repository.resolve_evidence_admissions(
+        tuple(item.object_id for item in extraction.objects)
+    )
+    pending_extraction = replace(extraction, objects=(extraction.objects[2],))
+    try:
+        builder.build(pending_extraction, (pending_admissions[2],))
+    except ValueError as exc:
+        assert "status=provisional" in str(exc)
+    else:
+        raise AssertionError("Graph builder accepted pending evidence")
+
+    graph_extraction = replace(extraction, objects=extraction.objects[:2])
+    incomplete = tuple(
+        EvidenceAdmission(
+            admission.evidence_object_id,
+            ExtractionReviewState.ACCEPTED,
+            None,
+        )
+        for admission in pending_admissions[:2]
+    )
+    try:
+        builder.build(graph_extraction, incomplete)
+    except ValueError as exc:
+        assert "provenance is incomplete" in str(exc)
+    else:
+        raise AssertionError("Graph builder accepted missing review provenance")
     now = datetime.now(timezone.utc)
     method_review = repository.review_evidence(
         "healthcheck-method", decision="accepted", reviewer="graph-reviewer@researchos.local",
@@ -33,6 +65,28 @@ def main() -> None:
         "healthcheck-limitation", decision="accepted", reviewer="graph-reviewer@researchos.local",
         rationale=f"Accepted for graph healthcheck {timestamp(now)}.",
         occurred_at=timestamp(now + timedelta(seconds=1)),
+    )
+    accepted_admissions = repository.resolve_evidence_admissions(
+        tuple(item.object_id for item in graph_extraction.objects)
+    )
+    missing_status = (
+        EvidenceAdmission(
+            graph_extraction.objects[0].object_id, None, None,
+        ),
+        accepted_admissions[1],
+    )
+    try:
+        builder.build(graph_extraction, missing_status)
+    except ValueError as exc:
+        assert "status is missing" in str(exc)
+    else:
+        raise AssertionError("Graph builder accepted missing review status")
+    graph = builder.build(graph_extraction, accepted_admissions)
+    assert all(
+        node.provenance is None
+        or node.provenance.review_event.provenance_id
+        in {method_review.provenance_id, limitation_review.provenance_id}
+        for node in graph.nodes
     )
     first = repository.persist_graph(graph, occurred_at=extraction.created_at)
     assert repository.persist_graph(graph, occurred_at=extraction.created_at) == first
@@ -61,18 +115,42 @@ def main() -> None:
             """, review_ids)
             assert cursor.fetchone() == (2, 2, True, True)
 
+    theory_pipeline = KnowledgeTheoryPipeline(
+        Path("/tmp/p0-theory"),
+        {graph.graph_id: graph}, data_repository=repository,
+    )
+    theory_pipeline.build_theories(
+        (graph.graph_id,), generated_by="graph-reviewer@researchos.local",
+    )
     repository.review_evidence(
         "healthcheck-limitation", decision="rejected",
         reviewer="graph-reviewer@researchos.local",
         rationale=f"Revoked after graph healthcheck {timestamp(now)}.",
         occurred_at=timestamp(now + timedelta(seconds=2)),
     )
+    mixed_admissions = repository.resolve_evidence_admissions(
+        tuple(item.object_id for item in graph_extraction.objects)
+    )
+    try:
+        builder.build(graph_extraction, mixed_admissions)
+    except ValueError as exc:
+        assert "not accepted" in str(exc)
+    else:
+        raise AssertionError("Graph builder accepted mixed review states")
     try:
         repository.persist_graph(graph, occurred_at=extraction.created_at)
     except ValueError as exc:
         assert "not accepted" in str(exc)
     else:
         raise AssertionError("Graph persistence accepted rejected evidence")
+    try:
+        theory_pipeline.build_theories(
+            (graph.graph_id,), generated_by="graph-reviewer@researchos.local",
+        )
+    except ValueError as exc:
+        assert "contains rejected evidence" in str(exc)
+    else:
+        raise AssertionError("Theory construction accepted stale graph evidence")
     with repository._connect() as connection:
         with connection.cursor() as cursor:
             cursor.execute("""

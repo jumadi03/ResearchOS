@@ -23,8 +23,14 @@ class TheoryBuilder:
     })
 
     def build(self, graphs: tuple[ScientificKnowledgeGraph, ...], *, created_at: str) -> TheoryBundle:
-        if not graphs or any(not graph.verify() for graph in graphs):
+        if not graphs:
             raise ValueError("Theory construction requires verified knowledge graphs")
+        for graph in graphs:
+            graph.validate_evidence_admission()
+            if not graph.verify():
+                raise ValueError(
+                    "Theory construction requires verified knowledge graphs"
+                )
         claims: dict[str, list[tuple[str, tuple[TheoryEvidence, ...]]]] = {}
         for graph in graphs:
             for node in graph.nodes:

@@ -9,7 +9,9 @@ from app.knowledge.discovery.providers import ProviderPage
 from app.knowledge.service import KnowledgeDiscoveryService
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.repositories.models import StoredRepresentation
-from app.knowledge.extraction.models import EvidenceReviewEvent, ExtractionReviewState
+from app.knowledge.extraction.models import (
+    EvidenceAdmission, EvidenceReviewEvent, ExtractionReviewState,
+)
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
 from app.knowledge.repositories.read_models import ObjectPage, ObjectSummary, ProjectSummary
@@ -39,6 +41,7 @@ class RecordingRepository:
         self.publication_representations = []
         self.semantic_jobs = []
         self.object_title = "Governance matters"
+        self.admission_states = {}
 
     def persist_discovery(self, run): self.discovery_runs.append(run)
     def persist_metadata(self, run): self.metadata_runs.append(run)
@@ -59,12 +62,34 @@ class RecordingRepository:
         return tuple(f"evidence-{index}" for index, _ in enumerate(manifest.objects, 1))
     def review_evidence(self, evidence_object_id, **values):
         self.evidence_reviews.append((evidence_object_id, values))
-        return EvidenceReviewEvent(
+        event = EvidenceReviewEvent(
             "review-1", evidence_object_id,
             ExtractionReviewState(values["decision"]), values["reviewer"],
             values["rationale"], values["occurred_at"], "provenance-1", "pending",
         )
+        self.admission_states[evidence_object_id] = EvidenceAdmission(
+            evidence_object_id, event.decision, event,
+        )
+        return event
+    def resolve_evidence_admissions(self, evidence_object_ids):
+        resolved = []
+        for evidence_object_id in evidence_object_ids:
+            existing = self.admission_states.get(evidence_object_id)
+            if existing is not None:
+                resolved.append(existing)
+                continue
+            event = EvidenceReviewEvent(
+                f"review-{evidence_object_id}", evidence_object_id,
+                ExtractionReviewState.ACCEPTED, "reviewer@example",
+                "Canonical evidence reviewed", "2026-07-16T00:00:00Z",
+                f"provenance-{evidence_object_id}", "pending",
+            )
+            resolved.append(EvidenceAdmission(
+                evidence_object_id, ExtractionReviewState.ACCEPTED, event,
+            ))
+        return tuple(resolved)
     def persist_graph(self, graph, *, occurred_at):
+        graph.validate_evidence_admission()
         self.graphs.append((graph, occurred_at))
         return tuple(f"edge-{index}" for index, _ in enumerate(graph.edges, 1))
     def persist_artifact(self, **values):
@@ -450,7 +475,10 @@ def test_metadata_api_is_bound_to_discovery_run_and_versioned(tmp_path: Path) ->
 
 
 def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: Path) -> None:
-    api = client(tmp_path)
+    api = client(
+        tmp_path, repository=RecordingRepository(),
+        object_store=RecordingObjectStore(),
+    )
     discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
     record = discovered["records"][0]
     source = record["source_records"][0]
@@ -737,6 +765,37 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     assert package.json()["package_content_hash"] == publication.json()["package_content_hash"]
     request["source_response_hash"] = "invented"
     assert api.post(f"/knowledge/discovery/runs/{discovered['run_id']}/documents", json=request).status_code == 422
+
+
+def test_direct_service_cannot_build_canonical_graph_without_admission_authority(
+    tmp_path: Path,
+) -> None:
+    api = client(tmp_path)
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    record = discovered["records"][0]
+    source = record["source_records"][0]
+    document = api.post(
+        f"/knowledge/discovery/runs/{discovered['run_id']}/documents",
+        json={
+            "record_id": record["record_id"],
+            "url": "https://example.test/paper.pdf",
+            "access_status": "open", "license": "CC-BY-4.0",
+            "source_provider": source["provider"],
+            "source_response_hash": source["response_hash"],
+        },
+    ).json()
+    extraction = api.post(
+        f"/knowledge/documents/{document['document_id']}/extractions"
+    ).json()
+
+    response = api.post(
+        f"/knowledge/extractions/{extraction['extraction_id']}/graph"
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Canonical repository is required for evidence admission"
+    )
 
 
 def test_discovery_api_fails_closed_and_enforces_role(tmp_path: Path) -> None:

@@ -31,6 +31,12 @@ def manifest(content_hash: str) -> ExtractionManifest:
             DocumentCoordinates(1, 70, 123, "b" * 64), 0.90,
             ExtractionReviewState.PROVISIONAL, "healthcheck-parser", "1.0.0",
         ),
+        ExtractedScientificObject(
+            "healthcheck-pending", ScientificObjectType.RESULT,
+            "This object remains pending for admission rejection testing.",
+            DocumentCoordinates(1, 130, 191, "c" * 64), 0.85,
+            ExtractionReviewState.PROVISIONAL, "healthcheck-parser", "1.0.0",
+        ),
     )
     return ExtractionManifest(
         "evidence-healthcheck", "source-document-healthcheck", content_hash,
@@ -47,7 +53,7 @@ def main() -> None:
     extraction = manifest(source_representation.content_hash)
     first = repository.persist_evidence(record, extraction)
     assert repository.persist_evidence(record, extraction) == first
-    assert len(first) == 2
+    assert len(first) == 3
 
     conflicting_object = replace(
         extraction.objects[0],
@@ -55,7 +61,13 @@ def main() -> None:
     )
     try:
         repository.persist_evidence(
-            record, replace(extraction, objects=(conflicting_object, extraction.objects[1])),
+            record, replace(
+                extraction,
+                objects=(
+                    conflicting_object, extraction.objects[1],
+                    extraction.objects[2],
+                ),
+            ),
         )
     except RuntimeError:
         pass
@@ -72,13 +84,14 @@ def main() -> None:
                 JOIN canonical_objects c ON c.object_id=e.evidence_id
                 JOIN scientific_representations r ON r.representation_id=e.representation_id
                 WHERE c.stable_key IN (
-                    'evidence:healthcheck-method', 'evidence:healthcheck-limitation'
+                    'evidence:healthcheck-method', 'evidence:healthcheck-limitation',
+                    'evidence:healthcheck-pending'
                 )
                 ORDER BY e.evidence_type
             """)
             rows = cursor.fetchall()
-    assert len(rows) == 2, rows
-    assert {row[0] for row in rows} == {"method", "limitation"}
+    assert len(rows) == 3, rows
+    assert {row[0] for row in rows} == {"method", "limitation", "result"}
     assert all(row[4] in {"pending", "accepted", "rejected"} for row in rows)
     assert all(row[5] == "healthcheck-parser@1.0.0" for row in rows)
     assert all(row[6] == source_representation.content_hash for row in rows)

@@ -13,6 +13,7 @@ class KnowledgeGraphStore:
         self.root = root
 
     def save(self, graph: ScientificKnowledgeGraph) -> Path:
+        graph.validate_evidence_admission()
         if not graph.verify():
             raise ValueError("Scientific Knowledge Graph integrity verification failed")
         payload = json.dumps(asdict(graph), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()

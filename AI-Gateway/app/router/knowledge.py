@@ -147,6 +147,8 @@ def build_knowledge_graph(
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     result = asdict(graph)
     result["snapshot"] = snapshot.name
     result["integrity_verified"] = graph.verify()
@@ -182,6 +184,8 @@ def build_theories(req: TheoryBuildRequest, request: Request, credentials: HTTPA
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     result = asdict(bundle); result["snapshot"] = snapshot.name
     return result
 
