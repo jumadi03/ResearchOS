@@ -1,21 +1,55 @@
 # Changelog
 
-## v0.3
+All notable changes to ResearchOS are documented in this file. The project
+follows Semantic Versioning.
+
+## [Unreleased]
+
+## [0.4.0] - 2026-07-16
 
 ### Added
 
-- Modular Architecture
-- Settings (.env)
-- Router Layer
-- Service Layer
-- Model Layer
+- Deterministic architecture graph, law, compliance, review, ARC generation,
+  and immutable HTML/PDF publication pipeline.
+- Scientific discovery, metadata collection, document acquisition, evidence
+  extraction and review, knowledge graph, theory, gap, validation, semantic
+  retrieval, and publication subsystems.
+- Canonical PostgreSQL/pgvector and MinIO persistence with versioned migrations
+  and storage compliance checks.
+- Resilient background jobs with leases, retries, dead-letter state, hard
+  execution timeouts, graceful shutdown, metrics, and alerts.
+- Browser workspace, role-separated accounts, administration controls,
+  session security, readiness endpoints, and structured audit logging.
+- Consistent PostgreSQL, MinIO, and knowledge backups with verified restore
+  evidence.
+- Secure idempotent local bootstrap, open-source governance files, Dependabot,
+  secret scanning, push protection, and protected quality gates.
+- Reproducible release bundle with wheel, source archive, CycloneDX SBOM,
+  checksums, provenance metadata, and GitHub attestation.
+
+### Changed
+
+- Split knowledge workspace routing, repository access, ingestion, and theory
+  orchestration into explicit service boundaries.
+- Consolidated runtime configuration and canonical ownership contracts.
+
+### Security
+
+- Added fail-closed authentication and authorization, CSRF validation,
+  restrictive browser headers, credential rotation, dependency auditing, and
+  private vulnerability reporting.
 
 ### Fixed
 
-- Import Error
-- Router Error
-- Startup Error
+- Bootstrap canonical MinIO buckets before API, worker, and backup startup.
+- Stabilized test temporary directories and isolated CI deployment contracts.
 
-### Improved
+## [0.3.0] - 2026-07-14
 
-- Configuration moved to .env
+### Added
+
+- Initial modular FastAPI baseline with settings, routers, services, models,
+  and architecture test foundations.
+
+[Unreleased]: https://github.com/jumadi03/ResearchOS/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jumadi03/ResearchOS/releases/tag/v0.4.0
