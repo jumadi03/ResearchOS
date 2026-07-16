@@ -26,6 +26,13 @@ def result(content: bytes, acquired_at: str) -> AcquisitionResult:
         byte_size=len(content),
         reason=None,
         content=content,
+        final_url="https://example.test/researchos-healthcheck.pdf",
+        http_status=200,
+        redirect_chain=(),
+        declared_content_length=len(content),
+        retrieval_method="https_pdf",
+        source_definition_id="source-openalex",
+        query_family_id="repository-healthcheck-query-family",
     )
 
 

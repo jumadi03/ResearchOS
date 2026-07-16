@@ -34,7 +34,10 @@ class DocumentRegistry:
             version, result.status, result.acquired_at, result.source_url,
             result.source_provider, result.source_response_hash, result.license,
             result.media_type, result.content_hash, result.byte_size, blob_path,
-            result.reason,
+            result.reason, result.final_url, result.http_status,
+            result.redirect_chain, result.declared_content_length,
+            result.retrieval_method, result.source_definition_id,
+            result.query_family_id,
         )
         path = self.root / "records" / result.record_id / f"v{version:05d}.json"
         payload = json.dumps(asdict(document), ensure_ascii=False, sort_keys=True, separators=(",", ":"))

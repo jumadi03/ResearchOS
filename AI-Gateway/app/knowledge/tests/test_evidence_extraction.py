@@ -30,7 +30,10 @@ class Response:
 
 def document(tmp_path: Path):
     content = pdf_bytes()
-    candidate = DocumentCandidate("record", "https://example.test/a.pdf", AccessStatus.OPEN, "CC-BY", "openalex", "source-hash")
+    candidate = DocumentCandidate(
+        "record", "https://example.test/a.pdf", AccessStatus.OPEN, "CC-BY",
+        "openalex", "source-hash", "source-openalex", "query-family-1",
+    )
     result = DocumentAcquirer(transport=lambda *a, **k: Response(content)).acquire(candidate, acquired_at="time")
     registry = DocumentRegistry(tmp_path / "documents")
     return registry.register(result)[0], registry, content

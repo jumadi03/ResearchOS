@@ -9,7 +9,9 @@ from app.knowledge.discovery.providers import LiteratureProvider
 from app.knowledge.discovery.source_registry import CanonicalSourceRegistry
 from app.knowledge.extraction.engine import EvidenceExtractionEngine
 from app.knowledge.extraction.persistence import ExtractionManifestStore
-from app.knowledge.ingestion.acquisition import DocumentAcquirer
+from app.knowledge.ingestion.acquisition import (
+    DocumentAcquirer, bind_candidate_to_source,
+)
 from app.knowledge.ingestion.models import DocumentCandidate
 from app.knowledge.ingestion.registry import DocumentRegistry
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
@@ -79,12 +81,14 @@ class KnowledgeIngestionPipeline:
         )
         if record is None:
             raise ValueError("record_id does not belong to discovery run")
-        if not any(
-            source.provider == candidate.source_provider
+        source = next((
+            source for source in record.source_records
+            if source.provider == candidate.source_provider
             and source.response_hash == candidate.source_response_hash
-            for source in record.source_records
-        ):
+        ), None)
+        if source is None:
             raise ValueError("Document candidate provenance does not match discovery run")
+        candidate = bind_candidate_to_source(candidate, source)
         result = self.document_acquirer.acquire(
             candidate, acquired_at=DiscoveryRun.timestamp()
         )

@@ -24,9 +24,13 @@ content = output.getvalue()
 root = Path(os.environ["KNOWLEDGE_OUTPUT_ROOT"])
 result = AcquisitionResult(
     "worker-health-record", AcquisitionStatus.ACQUIRED, "health-check",
-    "https://localhost/worker-health.pdf", "health-check", "health-source",
+    "https://example.test/worker-health.pdf", "health-check", "health-source",
     "internal-test", "application/pdf", __import__("hashlib").sha256(content).hexdigest(),
     len(content), None, content,
+    final_url="https://example.test/worker-health.pdf", http_status=200,
+    declared_content_length=len(content), retrieval_method="https_pdf",
+    source_definition_id="source-healthcheck",
+    query_family_id="query-family-healthcheck",
 )
 document, _ = DocumentRegistry(root / "documents").register(result)
 with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as connection:

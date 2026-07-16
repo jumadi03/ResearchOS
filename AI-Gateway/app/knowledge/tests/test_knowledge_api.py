@@ -25,7 +25,14 @@ class Provider:
     name = "openalex"
 
     def search(self, plan):
-        return (ProviderPage(({"id": "W1", "title": "Result"},), "https://example.test"),)
+        return (ProviderPage(({
+            "id": "W1", "title": "Result",
+            "open_access": {
+                "is_oa": True,
+                "oa_url": "https://example.test/paper.pdf",
+            },
+            "license": "CC-BY-4.0",
+        },), "https://example.test"),)
 
 
 class RecordingRepository:
@@ -376,6 +383,42 @@ def test_discovery_and_metadata_use_repository_port(tmp_path: Path) -> None:
     }
     assert repository.discovery_runs[0].run_id == discovered["run_id"]
     assert repository.metadata_runs[0].discovery_run_id == discovered["run_id"]
+
+
+def test_acquisition_policy_cannot_be_replaced_by_client(
+    tmp_path: Path,
+) -> None:
+    api = client(tmp_path)
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    record = discovered["records"][0]
+    source = record["source_records"][0]
+    request = {
+        "record_id": record["record_id"],
+        "url": "https://attacker.example/arbitrary.pdf",
+        "access_status": "open",
+        "license": "CC-BY-4.0",
+        "source_provider": source["provider"],
+        "source_response_hash": source["response_hash"],
+    }
+    response = api.post(
+        f"/knowledge/discovery/runs/{discovered['run_id']}/documents",
+        json=request,
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Document URL does not match enumerated source metadata"
+    )
+
+    request["url"] = "https://example.test/paper.pdf"
+    request["license"] = "invented-license"
+    response = api.post(
+        f"/knowledge/discovery/runs/{discovered['run_id']}/documents",
+        json=request,
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Document license does not match enumerated source metadata"
+    )
 
 
 def test_acquired_document_uses_object_and_representation_ports(tmp_path: Path) -> None:

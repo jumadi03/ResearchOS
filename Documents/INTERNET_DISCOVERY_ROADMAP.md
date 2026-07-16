@@ -15,7 +15,8 @@
 - Completed: SCAN-001B Canonical Source Registry
 - Completed: SCAN-001C Scientific Query Planner
 - Completed: SCAN-001D Source Enumerator Hardening
-- Next deliverable: SCAN-001E Controlled Web Acquisition
+- Completed: SCAN-001E Controlled Web Acquisition
+- Next deliverable: SCAN-001F Raw Capture and Integrity Store
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,

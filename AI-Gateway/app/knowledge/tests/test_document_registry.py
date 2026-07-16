@@ -10,6 +10,9 @@ from app.knowledge.ingestion.registry import DocumentRegistry
 class Response:
     headers = {"Content-Type": "application/pdf; charset=binary"}
     content = b"%PDF-1.7\nvalid"
+    url = "https://example.test/paper.pdf"
+    status_code = 200
+    history = ()
 
     def raise_for_status(self):
         return None
@@ -20,6 +23,8 @@ def candidate(**changes):
         record_id="record", url="https://example.test/paper.pdf",
         access_status=AccessStatus.OPEN, license="CC-BY-4.0",
         source_provider="openalex", source_response_hash="hash",
+        source_definition_id="source-openalex",
+        query_family_id="query-family-1",
     )
     values.update(changes)
     return DocumentCandidate(**values)
@@ -61,3 +66,45 @@ def test_invalid_pdf_is_failed_and_not_stored(tmp_path: Path) -> None:
     document, _ = DocumentRegistry(tmp_path).register(result)
     assert document.status is AcquisitionStatus.FAILED
     assert not (tmp_path / "blobs").exists()
+
+
+def test_declared_oversize_is_rejected_before_content_is_read() -> None:
+    class Oversized(Response):
+        headers = {
+            "Content-Type": "application/pdf",
+            "Content-Length": "1000",
+        }
+
+        @property
+        def content(self):
+            raise AssertionError("Oversized body must not be read")
+
+    result = DocumentAcquirer(
+        transport=lambda *args, **kwargs: Oversized(), max_bytes=100,
+    ).acquire(candidate(), acquired_at="time")
+
+    assert result.status is AcquisitionStatus.FAILED
+    assert result.reason == "Declared content length exceeds size limit"
+    assert result.declared_content_length == 1000
+
+
+def test_redirect_to_unsafe_url_is_rejected_and_recorded() -> None:
+    class UnsafeRedirect(Response):
+        headers = {"Location": "http://127.0.0.1/private.pdf"}
+        status_code = 302
+
+    requested = []
+    result = DocumentAcquirer(
+        transport=lambda url, **kwargs: (
+            requested.append((url, kwargs)) or UnsafeRedirect()
+        ),
+    ).acquire(candidate(), acquired_at="time")
+
+    assert result.status is AcquisitionStatus.FAILED
+    assert result.reason == "Redirect or final URL is not a safe HTTPS URL"
+    assert result.redirect_chain == ("https://example.test/paper.pdf",)
+    assert result.final_url == "http://127.0.0.1/private.pdf"
+    assert requested == [(
+        "https://example.test/paper.pdf",
+        {"timeout": 30.0, "allow_redirects": False},
+    )]
