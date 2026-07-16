@@ -37,6 +37,7 @@ class RecordingRepository:
         self.artifact_transitions = []
         self.publication_representations = []
         self.semantic_jobs = []
+        self.object_title = "Governance matters"
 
     def persist_discovery(self, run): self.discovery_runs.append(run)
     def persist_metadata(self, run): self.metadata_runs.append(run)
@@ -101,13 +102,13 @@ class RecordingRepository:
         return (ProjectSummary("researchos-default", "ResearchOS", "Default project", "active", 2),)
     def list_objects(self, project_id, **values):
         items = (
-            ObjectSummary("object-1", "evidence:object-1", "evidence", "active", 1, "Governance matters", "2026-07-16T00:00:00+00:00"),
+            ObjectSummary("object-1", "evidence:object-1", "evidence", "active", 1, self.object_title, "2026-07-16T00:00:00+00:00"),
         )
         return ObjectPage(items, "evidence:object-1" if values["limit"] == 1 else None)
     def get_object_read_model(self, object_ref, project_id):
         return {
             "identity": {"object_id": "object-1", "stable_key": "evidence:object-1", "object_type": "evidence", "deep_link": f"/knowledge/projects/{project_id}/objects/object-1"},
-            "summary": {"title": "Governance matters"},
+            "summary": {"title": self.object_title},
             "document": None,
             "evidence": {"review_status": "pending", "confidence": 0.95},
             "artifact": None,
@@ -874,7 +875,8 @@ def test_project_graph_is_authenticated_filterable_and_provenance_bearing(tmp_pa
 def test_scientific_object_translation_is_source_bound_and_reviewable(
     tmp_path: Path,
 ) -> None:
-    api = client(tmp_path, "review", repository=RecordingRepository())
+    repository = RecordingRepository()
+    api = client(tmp_path, "review", repository=repository)
     created = api.post(
         "/knowledge/projects/researchos-default/object-translations",
         json={
@@ -904,6 +906,10 @@ def test_scientific_object_translation_is_source_bound_and_reviewable(
     assert reviewed.status_code == 201
     assert reviewed.json()["status"] == "reviewed"
     assert reviewed.json()["translated_text"] == "Tata kelola berperan penting"
+    repository.object_title = "Governance may matter"
+    stale = api.get("/knowledge/projects/researchos-default/object-translations")
+    assert stale.status_code == 200
+    assert stale.json()["items"] == []
 
 
 def test_discovery_capabilities_drive_workspace_without_client_guesses(tmp_path: Path) -> None:
