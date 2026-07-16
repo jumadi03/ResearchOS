@@ -15,7 +15,7 @@ from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
 from canonical_evidence import manifest
 from canonical_repository import discovery_run
-from representation_repository import result
+from representation_repository import SECOND_CONTENT, result
 
 
 def timestamp(value: datetime) -> str:
@@ -26,7 +26,7 @@ def main() -> None:
     repository = PostgresScientificDataRepository(os.environ["DATABASE_URL"])
     record = discovery_run().records[0]
     source_representation = result(
-        b"%PDF-1.7\nResearchOS representation v2\n", "2026-07-15T13:05:00Z"
+        SECOND_CONTENT, "2026-07-15T13:05:00Z"
     )
     extraction = manifest(source_representation.content_hash)
     builder = ScientificKnowledgeGraphBuilder()

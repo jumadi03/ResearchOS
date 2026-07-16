@@ -12,6 +12,10 @@ from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from canonical_repository import discovery_run
 
 
+FIRST_CONTENT = b"%PDF-1.7\nResearchOS SCAN-001F header capture v1\n"
+SECOND_CONTENT = b"%PDF-1.7\nResearchOS SCAN-001F header capture v2\n"
+
+
 def result(content: bytes, acquired_at: str) -> AcquisitionResult:
     return AcquisitionResult(
         record_id="repository-healthcheck",
@@ -53,7 +57,7 @@ def main() -> None:
     source = record.source_records[0]
     first = replace(
         result(
-            b"%PDF-1.7\nResearchOS SCAN-001F header capture v1\n",
+            FIRST_CONTENT,
             "2026-07-15T13:00:00Z",
         ),
         source_definition_id=source.source_definition_id,
@@ -62,7 +66,7 @@ def main() -> None:
     )
     second = replace(
         result(
-            b"%PDF-1.7\nResearchOS SCAN-001F header capture v2\n",
+            SECOND_CONTENT,
             "2026-07-15T13:05:00Z",
         ),
         source_definition_id=source.source_definition_id,
