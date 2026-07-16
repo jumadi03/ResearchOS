@@ -8,6 +8,21 @@ from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.models import StoredRepresentation
 
 
+def artifact_integrity_matches(
+    existing: tuple, *, project_id: str, artifact_type: str, title: str,
+    metadata: dict, metadata_hash: str,
+) -> bool:
+    """Compare JSON metadata by canonical value, not Python container type."""
+    existing_project, existing_type, existing_title, existing_metadata, existing_hash = existing
+    return (
+        existing_project == project_id
+        and existing_type == artifact_type
+        and existing_title == title
+        and existing_hash == metadata_hash
+        and canonical_json(existing_metadata) == canonical_json(metadata)
+    )
+
+
 class PostgresArtifactRepositoryMixin:
     """Research artifact lifecycle and immutable publication behavior."""
 
@@ -80,7 +95,10 @@ class PostgresArtifactRepositoryMixin:
                     FROM research_artifacts WHERE artifact_id=%s
                 """, (canonical_id,))
                 existing = cursor.fetchone()
-                if existing != (project_id, artifact_type, title, metadata, metadata_hash):
+                if not artifact_integrity_matches(
+                    existing, project_id=project_id, artifact_type=artifact_type,
+                    title=title, metadata=metadata, metadata_hash=metadata_hash,
+                ):
                     raise RuntimeError(f"Artifact integrity conflict: {artifact_id}")
                 cursor.execute("""
                     INSERT INTO artifact_lifecycle_events(
@@ -264,5 +282,4 @@ class PostgresArtifactRepositoryMixin:
             str(representation_id), str(artifact_id), representation_type,
             storage_uri, media_type, checksum_sha256, file_size, version,
         )
-
 

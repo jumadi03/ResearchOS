@@ -5,6 +5,16 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Restricted theory review, theory validation, and knowledge publication to
+  authenticated reviewer principals.
+
+### Fixed
+
+- Compare PostgreSQL artifact metadata by canonical JSON value so nested tuple
+  metadata remains idempotent after JSON storage normalization.
+
 ## [0.4.0] - 2026-07-16
 
 ### Added

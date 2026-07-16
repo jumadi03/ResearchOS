@@ -174,7 +174,7 @@ def build_theories(req: TheoryBuildRequest, request: Request, credentials: HTTPA
 
 @router.post("/theories/{bundle_id}/reviews")
 def review_theory(bundle_id: str, req: TheoryReviewRequest, request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
-    principal = authorize(request, credentials)
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
     try:
         bundle, snapshot = request.app.state.knowledge_service.review_theory(
             bundle_id, theory_id=req.theory_id, decision=req.decision,
@@ -255,7 +255,7 @@ def semantic_search(
 
 @router.post("/theories/{bundle_id}/validations", status_code=201)
 def validate_theories(bundle_id: str, req: TheoryValidationRequest, request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
-    principal = authorize(request, credentials)
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
     try:
         report, snapshot = request.app.state.knowledge_service.validate_theories(
             bundle_id, assessed_at=req.assessed_at,
@@ -272,7 +272,7 @@ def validate_theories(bundle_id: str, req: TheoryValidationRequest, request: Req
 
 @router.post("/theories/{bundle_id}/publications", status_code=201)
 def publish(bundle_id: str, req: PublicationRequest, request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
-    principal = authorize(request, credentials)
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
     try:
         package, location = request.app.state.knowledge_service.publish(
             bundle_id, validation_report_id=req.validation_report_id,

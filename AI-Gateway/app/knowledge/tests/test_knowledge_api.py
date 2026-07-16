@@ -305,6 +305,7 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
             "max_age_days": 180,
             "risk_of_bias_by_theory": {proposal["theory_id"]: "low"},
         },
+        headers={"Authorization": "Bearer review"},
     )
     assert validation.status_code == 201
     publication = api.post(
@@ -313,6 +314,7 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
             "validation_report_id": validation.json()["report_id"],
             "kind": "literature_review", "generated_at": "2026-07-16T00:05:00Z",
         },
+        headers={"Authorization": "Bearer review"},
     )
     assert publication.status_code == 201
     assert [item["artifact_type"] for item in repository.artifacts] == [
@@ -321,7 +323,9 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
     assert [item["status"] for item in repository.artifacts] == [
         "draft", "draft", "validated", "published",
     ]
-    assert all(item["actor_id"] == "researcher@example" for item in repository.artifacts)
+    assert [item["actor_id"] for item in repository.artifacts] == [
+        "researcher@example", "researcher@example", "reviewer@example", "reviewer@example",
+    ]
     assert len(object_store.byte_objects) == 1
     publication_id, representation = repository.publication_representations[0]
     assert publication_id == publication.json()["publication_id"]
@@ -461,12 +465,18 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     theories = api.post("/knowledge/theories", json={"graph_ids": [graph.json()["graph_id"]]})
     assert theories.status_code == 201
     proposal = theories.json()["proposals"][0]
-    review = api.post(
+    forbidden_review = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/reviews",
         json={"theory_id": proposal["theory_id"], "decision": "accepted", "rationale": "Reviewed source", "occurred_at": "2026-07-15T00:00:00Z"},
     )
+    assert forbidden_review.status_code == 403
+    review = api.post(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/reviews",
+        json={"theory_id": proposal["theory_id"], "decision": "accepted", "rationale": "Reviewed source", "occurred_at": "2026-07-15T00:00:00Z"},
+        headers={"Authorization": "Bearer review"},
+    )
     assert review.status_code == 200
-    assert review.json()["reviews"][0]["reviewer"] == "researcher@example"
+    assert review.json()["reviews"][0]["reviewer"] == "reviewer@example"
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
     assert gaps.status_code == 201
     assert gaps.json()["gaps"][0]["gap_type"] == "limited_coverage"
@@ -474,17 +484,19 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     validation = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/validations",
         json={"assessed_at": "2026-07-15T00:00:00Z", "search_completed_at": "2026-07-01T00:00:00Z", "max_age_days": 180, "risk_of_bias_by_theory": {proposal["theory_id"]: "low"}},
+        headers={"Authorization": "Bearer review"},
     )
     assert validation.status_code == 201
     assert validation.json()["status"] == "incomplete"
-    assert validation.json()["reviewer"] == "researcher@example"
+    assert validation.json()["reviewer"] == "reviewer@example"
     publication = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/publications",
         json={"validation_report_id": validation.json()["report_id"], "kind": "literature_review", "generated_at": "2026-07-15T00:00:00Z"},
+        headers={"Authorization": "Bearer review"},
     )
     assert publication.status_code == 201
     assert publication.json()["integrity_verified"] is True
-    assert publication.json()["generated_by"] == "researcher@example"
+    assert publication.json()["generated_by"] == "reviewer@example"
     request["source_response_hash"] = "invented"
     assert api.post(f"/knowledge/discovery/runs/{discovered['run_id']}/documents", json=request).status_code == 422
 
