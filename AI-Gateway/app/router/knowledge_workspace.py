@@ -1,8 +1,9 @@
 """Object workspace, graph, work queue, and intelligence HTTP boundary."""
 
 from dataclasses import asdict
+from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Query, Request, Security
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, ConfigDict
 
@@ -55,6 +56,65 @@ class ObjectTranslationReviewRequest(BaseModel):
 class BulkObjectTranslationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     generated_at: str
+
+
+def _translation_jobs(app):
+    if not hasattr(app.state, "object_translation_jobs"):
+        app.state.object_translation_jobs = {}
+    return app.state.object_translation_jobs
+
+
+def _run_object_translation_job(app, job_id, project_id, generated_at, principal):
+    job = _translation_jobs(app)[job_id]
+    try:
+        page = app.state.knowledge_service.list_objects(
+            project_id, limit=100, cursor=None, query=None, object_types=(),
+        )
+        current = {
+            item["object_id"]: item
+            for item in app.state.knowledge_service.list_object_translations(
+                project_id, principal
+            )
+        }
+        pending = [obj for obj in page.items if obj.object_id not in current]
+        job.update(status="running", total=len(page.items), remaining=len(pending))
+        for obj in pending:
+            try:
+                source = app.state.knowledge_service.object_translation_source(
+                    project_id, obj.object_id, principal
+                )
+                answer = app.state.ai_router.execute(RuntimeRequest(
+                    prompt=(
+                        "Translate this scientific object title or evidence text into "
+                        "clear, precise Bahasa Indonesia. Preserve claims, quantities, "
+                        "uncertainty, citations, and journal names. Do not summarize or "
+                        "add claims. Return only the translation.\n\nSOURCE:\n"
+                        + source["source_text"]
+                    ),
+                    stream=False,
+                    metadata={
+                        "project_id": project_id, "object_id": obj.object_id,
+                        "source_hash": source["source_hash"],
+                        "actor_id": principal.actor_id,
+                        "action": "bulk_translate_scientific_object",
+                    },
+                ))
+                translated, _ = app.state.knowledge_service.record_object_translation(
+                    project_id, obj.object_id, translated_text=answer.text,
+                    provider=answer.provider, model=answer.model,
+                    generated_by=principal.actor_id, generated_at=generated_at,
+                    principal=principal,
+                )
+                job["created_object_ids"].append(translated.object_id)
+            except Exception as exc:
+                job["failures"].append({
+                    "object_id": obj.object_id, "error": type(exc).__name__,
+                })
+            job["completed"] += 1
+            job["remaining"] = max(0, len(pending) - job["completed"])
+        job["status"] = "completed"
+    except Exception as exc:
+        job.update(status="failed", error=type(exc).__name__)
 
 
 def _object(request: Request, project_id: str, object_ref: str, principal):
@@ -223,6 +283,50 @@ def generate_missing_object_translations(
         "remaining": max(0, len(page.items) - len(current) - len(created)),
         "source_preserved": True,
     }
+
+
+@router.post(
+    "/projects/{project_id}/object-translation-jobs",
+    status_code=202,
+)
+def start_object_translation_job(
+    project_id: str, body: BulkObjectTranslationRequest, request: Request,
+    background_tasks: BackgroundTasks,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    jobs = _translation_jobs(request.app)
+    active = next((
+        job for job in jobs.values()
+        if job["project_id"] == project_id
+        and job["status"] in {"queued", "running"}
+    ), None)
+    if active:
+        return active
+    job_id = str(uuid4())
+    job = {
+        "job_id": job_id, "project_id": project_id, "status": "queued",
+        "total": 0, "completed": 0, "remaining": 0,
+        "created_object_ids": [], "failures": [], "source_preserved": True,
+    }
+    jobs[job_id] = job
+    background_tasks.add_task(
+        _run_object_translation_job, request.app, job_id, project_id,
+        body.generated_at, principal,
+    )
+    return job
+
+
+@router.get("/projects/{project_id}/object-translation-jobs/{job_id}")
+def get_object_translation_job(
+    project_id: str, job_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    job = _translation_jobs(request.app).get(job_id)
+    if not job or job["project_id"] != project_id:
+        raise HTTPException(404, "Object translation job not found")
+    return job
 
 
 @router.post("/object-translations/{translation_id}/reviews", status_code=201)

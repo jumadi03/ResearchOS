@@ -823,10 +823,14 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
 def test_workspace_i18n_defaults_to_indonesian_and_covers_every_product_area() -> None:
     static = Path(__file__).resolve().parents[2] / "product" / "static"
     catalog = (static / "i18n.js").read_text(encoding="utf-8")
+    workspace = (static / "workspace.js").read_text(encoding="utf-8")
 
     assert "researchos-ui-language')||'id'" in catalog
     assert "MutationObserver" in catalog
     assert ".candidate-claim>strong" in catalog
+    assert "monitorTranslationJob" in workspace
+    assert "object-translation-jobs" in workspace
+    assert "dari ${total} selesai" in workspace
     for source, indonesian in {
         "SCIENTIFIC LIBRARY": "PERPUSTAKAAN ILMIAH",
         "OPERATIONAL WORKFLOW": "ALUR KERJA OPERASIONAL",
@@ -942,6 +946,35 @@ def test_bulk_object_translation_generates_all_missing_project_titles(
         "/knowledge/projects/researchos-default/object-translations"
     ).json()
     assert listed["items"][0]["translated_text"] == "Tata kelola itu penting"
+
+
+def test_object_translation_job_survives_the_start_request(
+    tmp_path: Path,
+) -> None:
+    api = client(tmp_path, "review", repository=RecordingRepository())
+
+    class TranslationRouter:
+        def execute(self, request):
+            return RuntimeResponse(
+                provider="test", model="translation-v1",
+                text="Tata kelola itu penting",
+            )
+
+    api.app.state.ai_router = TranslationRouter()
+    started = api.post(
+        "/knowledge/projects/researchos-default/object-translation-jobs",
+        json={"generated_at": "2026-07-16T10:00:00Z"},
+    )
+
+    assert started.status_code == 202
+    job = api.get(
+        "/knowledge/projects/researchos-default/object-translation-jobs/"
+        + started.json()["job_id"]
+    )
+    assert job.status_code == 200
+    assert job.json()["status"] == "completed"
+    assert job.json()["completed"] == 1
+    assert job.json()["remaining"] == 0
 
 
 def test_discovery_capabilities_drive_workspace_without_client_guesses(tmp_path: Path) -> None:
