@@ -169,6 +169,30 @@ def test_alignment_candidates_are_advisory_ranked_and_accepted_only(tmp_path: Pa
     assert history["items"][0]["decision"] == "keep_separate"
     assert set(history["items"][0]["theory_ids"]) == related_ids
     assert history["items"][0]["evidence_by_theory"][0][0]["object_id"]
+    report, _ = pipeline.validate_theories(
+        decided.bundle_id, assessed_at="2026-07-15T00:00:00Z",
+        search_completed_at="2026-07-01T00:00:00Z", max_age_days=180,
+        risk_of_bias_by_theory={
+            item.theory_id: "low" for item in decided.proposals
+        }, reviewer="reviewer@example",
+        triggered_by_decision_id=decided.alignment_decisions[0].decision_id,
+    )
+    assert report.triggered_by_decision_id == decided.alignment_decisions[0].decision_id
+    assert pipeline.alignment_history(decided.bundle_id)["validation_state"]["active"]
+    third = next(item for item in decided.proposals if item.theory_id not in related_ids)
+    pipeline.review_theory(
+        decided.bundle_id, theory_id=third.theory_id, decision="rejected",
+        reviewer="reviewer@example", rationale="Unrelated scope",
+        occurred_at="later-review",
+    )
+    stale_history = pipeline.alignment_history(decided.bundle_id)
+    assert stale_history["validation_state"] == {
+        "active": False,
+        "reason": "theory_bundle_changed_after_reviewer_decision",
+    }
+    assert pipeline.validation_history(decided.bundle_id)[0][
+        "active_for_current_bundle"
+    ] is False
 
 
 def test_theory_review_is_attributable_and_requires_rationale() -> None:

@@ -85,6 +85,9 @@ class KnowledgeDiscoveryService:
     def validate_theories(self, bundle_id, **options):
         return self.theory_pipeline.validate_theories(bundle_id, **options)
 
+    def validation_history(self, bundle_id):
+        return self.theory_pipeline.validation_history(bundle_id)
+
     def publish(self, bundle_id, **options):
         return self.theory_pipeline.publish(bundle_id, **options)
 

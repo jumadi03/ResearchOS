@@ -73,10 +73,6 @@ class KnowledgeTheoryPipeline:
         bundle = self._bundle(bundle_id)
         aligned = self.theory_builder.align(bundle, **options)
         self.bundles[bundle_id] = aligned
-        self.validation_reports = {
-            key: report for key, report in self.validation_reports.items()
-            if report.theory_bundle_id != bundle_id
-        }
         return aligned, self.theory_store.save(aligned)
 
     def alignment_candidates(self, bundle_id):
@@ -126,11 +122,21 @@ class KnowledgeTheoryPipeline:
                     if item else () for item in sources
                 ),
             })
-        reports = sorted(
+        all_reports = sorted(
             (item for item in self.validation_reports.values()
              if item.theory_bundle_id == bundle_id),
             key=lambda item: (item.assessed_at, item.report_id), reverse=True,
         )
+        reports = tuple(
+            item for item in all_reports
+            if item.theory_bundle_hash == bundle.content_hash
+        )
+        invalidation_reason = None
+        if not reports:
+            invalidation_reason = (
+                "theory_bundle_changed_after_reviewer_decision"
+                if all_reports else "never_validated"
+            )
         return {
             "bundle_id": bundle_id,
             "latest_validation": ({
@@ -138,6 +144,15 @@ class KnowledgeTheoryPipeline:
                 "status": reports[0].status.value,
                 "assessed_at": reports[0].assessed_at,
             } if reports else None),
+            "validation_state": {
+                "active": bool(reports),
+                "reason": invalidation_reason,
+            },
+            "active_theories": tuple({
+                "theory_id": item.theory_id,
+                "statement": item.statement,
+                "review_state": item.review_state.value,
+            } for item in bundle.proposals),
             "items": tuple(sorted(
                 entries,
                 key=lambda item: (item["occurred_at"], item["decision_id"]),
@@ -150,7 +165,8 @@ class KnowledgeTheoryPipeline:
         for bundle in self.bundles.values():
             reports = sorted(
                 (item for item in self.validation_reports.values()
-                 if item.theory_bundle_id == bundle.bundle_id),
+                 if item.theory_bundle_id == bundle.bundle_id
+                 and item.theory_bundle_hash == bundle.content_hash),
                 key=lambda item: (item.assessed_at, item.report_id), reverse=True,
             )
             candidates = self.theory_builder.alignment_candidates(bundle)
@@ -200,6 +216,15 @@ class KnowledgeTheoryPipeline:
     def validate_theories(self, bundle_id, **options):
         bundle = self._bundle(bundle_id)
         risk = options.pop("risk_of_bias_by_theory")
+        trigger = options.get("triggered_by_decision_id")
+        if trigger:
+            decision_ids = {
+                item.alignment_id for item in bundle.alignments
+            } | {
+                item.decision_id for item in bundle.alignment_decisions
+            }
+            if trigger not in decision_ids:
+                raise ValueError("Validation trigger is not a decision in this bundle")
         report = self.validation_engine.validate(
             bundle,
             bias_by_theory={key: RiskOfBias(value) for key, value in risk.items()},
@@ -214,6 +239,18 @@ class KnowledgeTheoryPipeline:
                 actor_id=options["reviewer"], occurred_at=report.assessed_at,
             )
         return report, self.validation_store.save(report)
+
+    def validation_history(self, bundle_id):
+        bundle = self._bundle(bundle_id)
+        reports = sorted(
+            (item for item in self.validation_reports.values()
+             if item.theory_bundle_id == bundle_id),
+            key=lambda item: (item.assessed_at, item.report_id), reverse=True,
+        )
+        return tuple({
+            **asdict(item),
+            "active_for_current_bundle": item.theory_bundle_hash == bundle.content_hash,
+        } for item in reports)
 
     def publish(self, bundle_id, *, validation_report_id, kind, generated_at, generated_by):
         bundle = self._bundle(bundle_id)

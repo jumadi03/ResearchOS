@@ -128,6 +128,21 @@ A status is the output of the recorded assessment method and its version. It
 must not be presented as universal confirmation or rejection of a scientific
 claim.
 
+### Decision-triggered revalidation
+
+Every validation report is bound to both the theory bundle ID and its exact
+content hash. A reviewer decision or later review that changes bundle content
+makes earlier reports historical and inactive; those reports remain available
+from `GET /knowledge/theories/{bundle_id}/validation-history` but cannot be used
+to publish the current bundle.
+
+The reviewer workspace exposes `Revalidate bundle`, requires a risk-of-bias
+assessment for every active theory, records literature-search completion and
+maximum age, and displays every theory-level gate reason. When revalidation is
+opened from the decision ledger, `triggered_by_decision_id` links the immutable
+report to its initiating alignment or `keep_separate` event. Publication fails
+closed if the selected report hash does not match current bundle content.
+
 The [end-to-end pilot](END_TO_END_PILOT.md) intentionally produced
 `incomplete`: one open-access paper was traceable and reviewable, but one source
 was insufficient for a stronger conclusion.

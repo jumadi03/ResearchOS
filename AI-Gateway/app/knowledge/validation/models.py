@@ -53,8 +53,10 @@ class ValidationReport:
     method: AssessmentMethod
     assessments: tuple[TheoryAssessment, ...]
     status: ValidationStatus
+    theory_bundle_hash: str = ""
+    triggered_by_decision_id: str | None = None
     content_hash: str = ""
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
 
     def finalized(self):
         payload = asdict(replace(self, content_hash=""))

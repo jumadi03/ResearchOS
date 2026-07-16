@@ -18,10 +18,12 @@ class ValidationEngine:
         0.25,
     )
 
-    def validate(self, bundle: TheoryBundle, *, assessed_at: str, search_completed_at: str, max_age_days: int, bias_by_theory: dict[str, RiskOfBias], reviewer: str) -> ValidationReport:
+    def validate(self, bundle: TheoryBundle, *, assessed_at: str, search_completed_at: str, max_age_days: int, bias_by_theory: dict[str, RiskOfBias], reviewer: str, triggered_by_decision_id: str | None = None) -> ValidationReport:
         if not bundle.verify(): raise ValueError("Validation requires a verified theory bundle")
         if max_age_days < 1: raise ValueError("max_age_days must be positive")
         age_days = (self._date(assessed_at) - self._date(search_completed_at)).days
+        if age_days < 0:
+            raise ValueError("search_completed_at cannot be after assessed_at")
         stale = age_days > max_age_days
         factors = dict(self.method.bias_factors)
         assessments = []
@@ -54,7 +56,8 @@ class ValidationEngine:
         return ValidationReport(
             f"validation-{sha256(identity.encode()).hexdigest()[:24]}", bundle.bundle_id,
             assessed_at, search_completed_at, max_age_days, reviewer, self.method,
-            tuple(assessments), overall,
+            tuple(assessments), overall, bundle.content_hash,
+            triggered_by_decision_id,
         ).finalized()
 
     @staticmethod

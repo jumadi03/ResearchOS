@@ -542,10 +542,16 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
         headers={"Authorization": "Bearer review"},
     )
     assert history.status_code == 200
-    assert history.json() == {
-        "bundle_id": theories.json()["bundle_id"],
-        "latest_validation": None, "items": [],
+    assert history.json()["bundle_id"] == theories.json()["bundle_id"]
+    assert history.json()["latest_validation"] is None
+    assert history.json()["validation_state"] == {
+        "active": False, "reason": "never_validated",
     }
+    assert history.json()["active_theories"][0]["theory_id"] == proposal["theory_id"]
+    assert history.json()["items"] == []
+    assert api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/validation-history"
+    ).status_code == 403
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
     assert gaps.status_code == 201
     assert gaps.json()["gaps"][0]["gap_type"] == "limited_coverage"
@@ -565,6 +571,13 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     assert validation.status_code == 201
     assert validation.json()["status"] == "incomplete"
     assert validation.json()["reviewer"] == "reviewer@example"
+    assert validation.json()["theory_bundle_hash"] == review.json()["content_hash"]
+    validation_history = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/validation-history",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert validation_history.status_code == 200
+    assert validation_history.json()["items"][0]["active_for_current_bundle"] is True
     publication = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/publications",
         json={"validation_report_id": validation.json()["report_id"], "kind": "literature_review", "generated_at": "2026-07-15T00:00:00Z"},
@@ -635,6 +648,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "Simpan sebagai terpisah" in response.text
     assert 'id="decisionHistory"' in response.text
     assert "Decision History" in response.text
+    assert 'id="revalidationDialog"' in response.text
+    assert 'id="validationHistory"' in response.text
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:

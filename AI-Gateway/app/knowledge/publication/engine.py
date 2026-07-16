@@ -18,6 +18,8 @@ class PublicationEngine:
             raise ValueError("Publication requires verified theory and validation inputs")
         if report.theory_bundle_id != bundle.bundle_id:
             raise ValueError("Validation report does not belong to theory bundle")
+        if report.theory_bundle_hash != bundle.content_hash:
+            raise ValueError("Validation report is stale for current theory bundle content")
         if kind is PublicationKind.SYSTEMATIC_REVIEW_SUPPORT and report.status is not ValidationStatus.PASS:
             raise ValueError("Systematic review support requires PASS validation")
         available = tuple(sorted({item.edge_id for proposal in bundle.proposals for item in proposal.evidence}))

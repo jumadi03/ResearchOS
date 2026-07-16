@@ -347,12 +347,26 @@ def validate_theories(bundle_id: str, req: TheoryValidationRequest, request: Req
             search_completed_at=req.search_completed_at,
             max_age_days=req.max_age_days,
             risk_of_bias_by_theory=req.risk_of_bias_by_theory,
+            triggered_by_decision_id=req.triggered_by_decision_id,
             reviewer=principal.actor_id,
         )
     except KeyError as exc: raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
     result = asdict(report); result["snapshot"] = snapshot.name
     return result
+
+
+@router.get("/theories/{bundle_id}/validation-history")
+def validation_history(
+    bundle_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        items = request.app.state.knowledge_service.validation_history(bundle_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"bundle_id": bundle_id, "items": items}
 
 
 @router.post("/theories/{bundle_id}/publications", status_code=201)

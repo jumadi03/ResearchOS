@@ -103,6 +103,7 @@ class TheoryValidationRequest(BaseModel):
     assessed_at: str = Field(min_length=1)
     search_completed_at: str = Field(min_length=1)
     max_age_days: int = Field(default=180, ge=1)
+    triggered_by_decision_id: str | None = Field(default=None, min_length=1)
     risk_of_bias_by_theory: dict[
         str, Literal["low", "some_concerns", "high", "unknown"]
     ] = Field(

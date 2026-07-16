@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import replace
 
 from app.knowledge.publication.engine import PublicationEngine
 from app.knowledge.publication.models import PublicationKind
@@ -32,6 +33,17 @@ def test_systematic_review_gate_rejects_non_pass_validation() -> None:
     bundle, report = inputs(1)
     with pytest.raises(ValueError, match="requires PASS"):
         PublicationEngine().publish(bundle, report, kind=PublicationKind.SYSTEMATIC_REVIEW_SUPPORT, generated_at="time", generated_by="publisher")
+
+
+def test_publication_rejects_validation_for_stale_bundle_content() -> None:
+    import pytest
+    bundle, report = inputs()
+    stale = replace(report, theory_bundle_hash="older-content", content_hash="").finalized()
+    with pytest.raises(ValueError, match="stale"):
+        PublicationEngine().publish(
+            bundle, stale, kind=PublicationKind.LITERATURE_REVIEW,
+            generated_at="time", generated_by="publisher",
+        )
 
 
 def test_citation_verifier_detects_unresolved_reference() -> None:

@@ -38,6 +38,9 @@ follows Semantic Versioning.
   keep semantically distinct theory pairs separate and suppress repeat prompts.
 - Add a filterable theory-alignment decision ledger with reviewer attribution,
   evidence links, validation status, and permanent audit deep-links.
+- Bind validation reports to exact theory-bundle content, retain inactive
+  history, link revalidation to reviewer decisions, expose transparent gate
+  results, and reject publication with stale validation.
 
 ## [0.4.0] - 2026-07-16
 
