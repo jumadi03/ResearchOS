@@ -17,6 +17,21 @@ host. Port 9101 is used because Windows reserves port 9001.
 
 ## Operations
 
+For a new checkout, run the secure idempotent bootstrap from the repository
+root:
+
+```powershell
+py -3.13 Scripts\bootstrap_local.py
+```
+
+The command generates the three ignored credential files, starts the stack,
+creates the `discoverer`, `auditor`, `reviewer`, `indexer`, and `admin` browser
+accounts, and verifies both account login and canonical MinIO buckets. Complete
+existing configuration is reused. A partial configuration fails closed instead
+of guessing or overwriting credentials. Existing ResearchOS volumes without
+their ignored credential files are also rejected; restore the credential files
+rather than generating incompatible passwords for persisted data.
+
 Run commands from `deploy` and always supply the untracked local environment:
 
 ```powershell

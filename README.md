@@ -39,26 +39,22 @@ Requirements:
 - Git
 - Python 3.13 for local development
 
-Clone and prepare the local deployment:
+Clone and bootstrap the local deployment:
 
 ```powershell
 git clone https://github.com/jumadi03/ResearchOS.git
 Set-Location ResearchOS
-Copy-Item deploy\stack.env.example deploy\stack.env
+py -3.13 Scripts\bootstrap_local.py
 ```
 
-Replace every placeholder password in `deploy/stack.env` with a unique random
-value. Configure role principals before enabling authenticated API workflows.
-Never commit `deploy/stack.env`, `deploy/local-access.env`, `.env`, or monitoring
-tokens.
+The bootstrap command generates unique credentials, starts the canonical stack,
+creates five role-separated accounts, verifies login and MinIO access, and
+stores the credentials only in ignored local files. It can be run again safely:
+existing complete credentials are reused rather than silently rotated.
 
-Start the canonical stack:
-
-```powershell
-Set-Location deploy
-docker compose --env-file stack.env -f compose.yaml up --build --detach
-docker compose --env-file stack.env -f compose.yaml ps
-```
+Never commit `deploy/stack.env`, `deploy/local-access.env`, `.env`, or
+monitoring tokens. To create configuration without starting Docker, add
+`--configuration-only`.
 
 Local endpoints:
 
