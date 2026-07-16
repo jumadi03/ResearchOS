@@ -84,7 +84,11 @@ class TheoryAlignmentCandidate:
     graph_ids: tuple[str, ...]
     evidence_by_theory: tuple[tuple[TheoryEvidence, ...], tuple[TheoryEvidence, ...]]
     lexical_overlap_score: float
-    method: str = "normalized-token-jaccard-v1"
+    shared_terms: tuple[str, ...] = ()
+    shared_bigrams: tuple[str, ...] = ()
+    score_components: tuple[tuple[str, float], ...] = ()
+    explanation: str = ""
+    method: str = "explainable-lexical-v2"
     advisory: bool = True
 
 

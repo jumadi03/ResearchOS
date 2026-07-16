@@ -82,6 +82,18 @@ class KnowledgeTheoryPipeline:
     def alignment_candidates(self, bundle_id):
         return self.theory_builder.alignment_candidates(self._bundle(bundle_id))
 
+    def alignment_candidate_metadata(self):
+        return {
+            "method": self.theory_builder.candidate_method,
+            "threshold": self.theory_builder.candidate_threshold,
+            "scoring": {
+                "content_term_jaccard_weight": 0.85,
+                "content_bigram_jaccard_weight": 0.15,
+                "minimum_shared_content_terms": 2,
+                "opposing_polarity_excluded": True,
+            },
+        }
+
     def keep_theories_separate(self, bundle_id, **options):
         bundle = self._bundle(bundle_id)
         decided = self.theory_builder.keep_separate(bundle, **options)

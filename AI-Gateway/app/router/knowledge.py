@@ -235,9 +235,10 @@ def alignment_candidates(
         candidates = request.app.state.knowledge_service.alignment_candidates(bundle_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    metadata = request.app.state.knowledge_service.alignment_candidate_metadata()
     return {
         "bundle_id": bundle_id,
-        "method": "normalized-token-jaccard-v1",
+        **metadata,
         "advisory": True,
         "items": [asdict(item) for item in candidates],
     }

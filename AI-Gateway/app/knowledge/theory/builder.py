@@ -14,6 +14,14 @@ from app.knowledge.theory.models import (
 
 
 class TheoryBuilder:
+    candidate_method = "explainable-lexical-v2"
+    candidate_threshold = 0.20
+    _stopwords = frozenset({
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+        "in", "is", "it", "of", "on", "or", "that", "the", "to", "with",
+        "dan", "dari", "di", "dengan", "ke", "pada", "untuk", "yang",
+    })
+
     def build(self, graphs: tuple[ScientificKnowledgeGraph, ...], *, created_at: str) -> TheoryBundle:
         if not graphs or any(not graph.verify() for graph in graphs):
             raise ValueError("Theory construction requires verified knowledge graphs")
@@ -131,21 +139,41 @@ class TheoryBuilder:
                 pair = (left.theory_id, right.theory_id)
                 if pair in decided_pairs:
                     continue
-                left_tokens = set(self._claim_key(left.statement).split())
-                right_tokens = set(self._claim_key(right.statement).split())
+                left_sequence = self._candidate_tokens(left.statement)
+                right_sequence = self._candidate_tokens(right.statement)
+                left_tokens = set(left_sequence)
+                right_tokens = set(right_sequence)
                 shared = left_tokens & right_tokens
                 union = left_tokens | right_tokens
                 graph_ids = tuple(sorted({
                     item.graph_id for proposal in (left, right) for item in proposal.evidence
                 }))
-                if len(shared) < 2 or len(graph_ids) < 2:
+                if (
+                    len(shared) < 2 or len(graph_ids) < 2 or not union
+                    or self._polarity(left.statement) != self._polarity(right.statement)
+                ):
                     continue
-                score = round(len(shared) / len(union), 4) if union else 0.0
-                identity = f"{left.theory_id}:{right.theory_id}:normalized-token-jaccard-v1"
+                token_score = len(shared) / len(union)
+                left_bigrams = self._bigrams(left_sequence)
+                right_bigrams = self._bigrams(right_sequence)
+                shared_bigrams = left_bigrams & right_bigrams
+                bigram_union = left_bigrams | right_bigrams
+                bigram_score = (
+                    len(shared_bigrams) / len(bigram_union) if bigram_union else 0.0
+                )
+                score = round(0.85 * token_score + 0.15 * bigram_score, 4)
+                if score < self.candidate_threshold:
+                    continue
+                identity = f"{left.theory_id}:{right.theory_id}:{self.candidate_method}"
+                terms = tuple(sorted(shared))
+                phrases = tuple(sorted(" ".join(item) for item in shared_bigrams))
                 candidates.append(TheoryAlignmentCandidate(
                     f"alignment-candidate-{sha256(identity.encode()).hexdigest()[:24]}",
                     pair, (left.statement, right.statement), graph_ids,
-                    (left.evidence, right.evidence), score,
+                    (left.evidence, right.evidence), score, terms, phrases,
+                    (("content_term_jaccard", round(token_score, 4)),
+                     ("content_bigram_jaccard", round(bigram_score, 4))),
+                    f"Shared {len(terms)} content terms and {len(phrases)} content phrases; score must be at least {self.candidate_threshold:.2f}.",
                 ))
         return tuple(sorted(
             candidates, key=lambda item: (-item.lexical_overlap_score, item.candidate_id)
@@ -177,6 +205,26 @@ class TheoryBuilder:
     def _claim_key(statement: str) -> str:
         normalized = unicodedata.normalize("NFKC", statement).casefold()
         return " ".join(re.findall(r"[^\W_]+", normalized, flags=re.UNICODE))
+
+    @classmethod
+    def _candidate_tokens(cls, statement: str) -> tuple[str, ...]:
+        return tuple(
+            item for item in cls._claim_key(statement).split()
+            if len(item) > 1 and item not in cls._stopwords
+        )
+
+    @staticmethod
+    def _bigrams(tokens: tuple[str, ...]) -> set[tuple[str, str]]:
+        return set(zip(tokens, tokens[1:]))
+
+    @staticmethod
+    def _polarity(statement: str) -> str:
+        negations = {"not", "no", "without", "fails", "doesn", "cannot"}
+        return (
+            "negative"
+            if set(re.findall(r"[a-z]+", statement.casefold())) & negations
+            else "affirmative"
+        )
 
     @staticmethod
     def _statement_rank(statement: str) -> tuple:

@@ -85,9 +85,12 @@ validation before publication.
 
 Reviewers can retrieve a prioritized advisory queue from
 `GET /knowledge/theories/{bundle_id}/alignment-candidates`. The current
-`normalized-token-jaccard-v1` method compares normalized word sets, requires at
-least two shared words and evidence spanning at least two graphs, and returns a
-transparent overlap score. Only accepted theories are considered.
+`explainable-lexical-v2` method removes common English and Indonesian stopwords,
+requires at least two shared content terms and evidence spanning at least two
+graphs, and combines content-term Jaccard (85%) with adjacent content-bigram
+Jaccard (15%). Pairs below 0.20 or with opposing polarity are excluded. Every
+candidate exposes shared terms, phrases, score components, threshold, and a
+plain-language explanation. Only accepted theories are considered.
 
 A candidate is not evidence of semantic equivalence. It is a navigation aid;
 the reviewer must still inspect source statements and evidence provenance,

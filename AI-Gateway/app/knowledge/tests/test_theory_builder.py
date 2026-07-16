@@ -148,7 +148,15 @@ def test_alignment_candidates_are_advisory_ranked_and_accepted_only(tmp_path: Pa
     assert len(candidates) == 1
     assert set(candidates[0].theory_ids) == related_ids
     assert candidates[0].graph_ids == ("graph-one", "graph-two")
-    assert candidates[0].lexical_overlap_score == 0.4286
+    assert candidates[0].lexical_overlap_score == 0.3643
+    assert candidates[0].method == "explainable-lexical-v2"
+    assert candidates[0].shared_terms == ("open", "practices", "reproducibility")
+    assert candidates[0].shared_bigrams == ()
+    assert candidates[0].score_components == (
+        ("content_term_jaccard", 0.4286),
+        ("content_bigram_jaccard", 0.0),
+    )
+    assert "score must be at least 0.20" in candidates[0].explanation
     assert candidates[0].advisory is True
     assert candidates[0].evidence_by_theory[0][0].object_id
     assert candidates[0].evidence_by_theory[0][0].document_id == "document"
@@ -193,6 +201,24 @@ def test_alignment_candidates_are_advisory_ranked_and_accepted_only(tmp_path: Pa
     assert pipeline.validation_history(decided.bundle_id)[0][
         "active_for_current_bundle"
     ] is False
+
+
+def test_alignment_candidates_exclude_stopword_and_opposing_polarity_noise() -> None:
+    builder = TheoryBuilder()
+    bundle = builder.build((
+        graph("positive", "Open governance improves reproducibility outcomes"),
+        graph("negative", "Open governance does not improve reproducibility outcomes"),
+        graph("generic-one", "Evidence in the system"),
+        graph("generic-two", "Policy in the system"),
+    ), created_at="time")
+    for proposal in bundle.proposals:
+        bundle = builder.review(
+            bundle, theory_id=proposal.theory_id,
+            decision=TheoryReviewState.ACCEPTED, reviewer="reviewer@example",
+            rationale="Candidate benchmark review", occurred_at=proposal.theory_id,
+        )
+
+    assert builder.alignment_candidates(bundle) == ()
 
 
 def test_theory_review_is_attributable_and_requires_rationale() -> None:

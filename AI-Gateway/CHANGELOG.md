@@ -44,6 +44,9 @@ follows Semantic Versioning.
 - Add a fail-closed Publication Readiness workspace with policy checklists,
   non-mutating Markdown preview, evidence briefs, reviewer confirmation, and
   restart-safe immutable package history.
+- Upgrade advisory theory candidates to an explainable lexical v2 method with
+  stopword filtering, term and phrase components, explicit threshold, and
+  opposing-polarity exclusion.
 
 ## [0.4.0] - 2026-07-16
 

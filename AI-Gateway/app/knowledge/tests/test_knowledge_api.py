@@ -531,7 +531,14 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     )
     assert candidates.status_code == 200
     assert candidates.json()["advisory"] is True
-    assert candidates.json()["method"] == "normalized-token-jaccard-v1"
+    assert candidates.json()["method"] == "explainable-lexical-v2"
+    assert candidates.json()["threshold"] == 0.2
+    assert candidates.json()["scoring"] == {
+        "content_term_jaccard_weight": 0.85,
+        "content_bigram_jaccard_weight": 0.15,
+        "minimum_shared_content_terms": 2,
+        "opposing_polarity_excluded": True,
+    }
     assert candidates.json()["items"] == []
     invalid_keep_separate = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-decisions",
