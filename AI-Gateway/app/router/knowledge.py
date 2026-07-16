@@ -153,6 +153,27 @@ def acquire_document(
     return result
 
 
+@router.post("/documents/{document_id}/inspections", status_code=201)
+def inspect_document(
+    document_id: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials)
+    try:
+        inspection, snapshot = (
+            request.app.state.knowledge_service.inspect_document(document_id)
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(inspection)
+    result["snapshot"] = snapshot.name
+    result["integrity_verified"] = inspection.verify()
+    return result
+
+
 @router.post("/documents/{document_id}/extractions", status_code=201)
 def extract_document(
     document_id: str,

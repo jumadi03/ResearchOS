@@ -4,6 +4,7 @@ from typing import Protocol
 
 from app.knowledge.models import DiscoveryRun, LiteratureRecord
 from app.knowledge.ingestion.models import AcquisitionResult
+from app.knowledge.inspection.models import SourceInspection
 from app.knowledge.retrieval.models import MetadataRun
 from app.knowledge.repositories.models import StoredRepresentation
 from app.knowledge.extraction.models import (
@@ -29,6 +30,10 @@ class ScientificDataRepository(Protocol):
     def get_representation(
         self, record: LiteratureRecord, checksum_sha256: str,
     ) -> StoredRepresentation: ...
+
+    def persist_source_inspection(
+        self, record: LiteratureRecord, inspection: SourceInspection,
+    ) -> str: ...
 
     def persist_evidence(
         self, record: LiteratureRecord, manifest: ExtractionManifest,

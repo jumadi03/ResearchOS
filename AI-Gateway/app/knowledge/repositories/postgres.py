@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from hashlib import sha256
 import json
 from urllib.parse import urlparse
 
 from app.knowledge.discovery.normalization import canonical_json
 from app.knowledge.ingestion.models import AcquisitionResult, AcquisitionStatus
+from app.knowledge.inspection.models import SourceInspection
 from app.knowledge.models import DiscoveryRun, LiteratureRecord, SourceRecord
 from app.knowledge.retrieval.models import MetadataRun
 from app.knowledge.repositories.models import StoredRepresentation
@@ -366,6 +368,71 @@ class _PostgresRepositoryCore:
             source_definition_id=row[17], query_family_id=row[18],
             capture_manifest_hash=row[19],
         )
+
+    def persist_source_inspection(
+        self, record: LiteratureRecord, inspection: SourceInspection,
+    ) -> str:
+        if not inspection.verify():
+            raise ValueError("Source inspection integrity verification failed")
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT r.representation_id,r.capture_manifest_hash
+                    FROM scientific_representations r
+                    JOIN canonical_objects c ON c.object_id=r.object_id
+                    WHERE c.stable_key=%s AND r.checksum_sha256=%s
+                    ORDER BY r.document_version DESC LIMIT 1
+                """, (
+                    self._stable_key(record),
+                    inspection.document_content_hash,
+                ))
+                row = cursor.fetchone()
+                if row is None:
+                    raise KeyError(
+                        "Canonical representation missing for inspection: "
+                        f"{inspection.inspection_id}"
+                    )
+                if row[1] != inspection.raw_capture_manifest_hash:
+                    raise ValueError(
+                        "Inspection raw-capture provenance does not match representation"
+                    )
+                cursor.execute("""
+                    INSERT INTO source_inspections(
+                        inspection_key,representation_id,document_id,
+                        document_content_hash,raw_capture_manifest_hash,
+                        inspected_at,inspector_name,inspector_version,
+                        media_type,pdf_version,encrypted,page_count,
+                        document_metadata,pages,diagnostics,complete,manifest_hash
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s
+                    )
+                    ON CONFLICT(inspection_key) DO NOTHING
+                    RETURNING inspection_id
+                """, (
+                    inspection.inspection_id, row[0], inspection.document_id,
+                    inspection.document_content_hash,
+                    inspection.raw_capture_manifest_hash,
+                    inspection.inspected_at, inspection.inspector_name,
+                    inspection.inspector_version, inspection.media_type,
+                    inspection.pdf_version, inspection.encrypted,
+                    inspection.page_count,
+                    json.dumps(dict(inspection.document_metadata)),
+                    json.dumps([asdict(page) for page in inspection.pages]),
+                    json.dumps(inspection.diagnostics), inspection.complete,
+                    inspection.manifest_hash,
+                ))
+                inserted = cursor.fetchone()
+                if inserted:
+                    return str(inserted[0])
+                cursor.execute("""
+                    SELECT inspection_id,manifest_hash
+                    FROM source_inspections WHERE inspection_key=%s
+                """, (inspection.inspection_id,))
+                existing = cursor.fetchone()
+                if existing[1] != inspection.manifest_hash:
+                    raise RuntimeError("Source inspection integrity conflict")
+                return str(existing[0])
 
 
 class PostgresScientificDataRepository(

@@ -41,6 +41,7 @@ class RecordingRepository:
         self.discovery_runs = []
         self.metadata_runs = []
         self.representations = []
+        self.inspections = []
         self.evidence_manifests = []
         self.evidence_reviews = []
         self.graphs = []
@@ -65,6 +66,10 @@ class RecordingRepository:
             "representation-1", "object-1", "pdf", uri, result.media_type,
             result.content_hash, result.byte_size, 1,
         )
+    def persist_source_inspection(self, record, inspection):
+        assert inspection.verify()
+        self.inspections.append((record, inspection))
+        return "inspection-row-1"
     def persist_evidence(self, record, manifest):
         self.evidence_manifests.append((record, manifest))
         return tuple(f"evidence-{index}" for index, _ in enumerate(manifest.objects, 1))
@@ -503,6 +508,7 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
     extraction = api.post(f"/knowledge/documents/{acquired['document_id']}/extractions")
     assert extraction.status_code == 201
     assert object_store.reads[0].checksum_sha256 == acquired["content_hash"]
+    assert repository.inspections[0][1].document_content_hash == acquired["content_hash"]
     assert repository.evidence_manifests[0][0].record_id == record["record_id"]
     assert repository.evidence_manifests[0][1].extraction_id == extraction.json()["extraction_id"]
     graph = api.post(f"/knowledge/extractions/{extraction.json()['extraction_id']}/graph")

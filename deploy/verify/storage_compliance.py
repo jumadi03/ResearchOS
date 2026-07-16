@@ -12,7 +12,8 @@ import psycopg
 REQUIRED_RESOURCES = {
     "canonical_objects", "scientific_sources", "scientific_documents",
     "document_source_references", "metadata_observations",
-    "scientific_representations", "evidence_objects", "evidence_review_events",
+    "scientific_representations", "source_inspections",
+    "evidence_objects", "evidence_review_events",
     "provenance_events", "knowledge_nodes", "knowledge_edges",
     "research_artifacts", "artifact_lifecycle_events",
     "publication_representations", "embedding_index", "background_jobs",
@@ -54,6 +55,7 @@ def main() -> None:
                 "provenance_events_immutable", "evidence_review_events_immutable",
                 "artifact_lifecycle_events_immutable",
                 "scientific_representations_immutable",
+                "source_inspections_immutable",
                 "publication_representations_immutable",
             }
             cursor.execute("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")

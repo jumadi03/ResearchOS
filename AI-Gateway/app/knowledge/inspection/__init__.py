@@ -1,0 +1,1 @@
+"""Factual source inspection capability."""

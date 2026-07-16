@@ -208,12 +208,18 @@ def execute(connection, job_type, payload):
         from app.knowledge.extraction.engine import EvidenceExtractionEngine
         from app.knowledge.extraction.persistence import ExtractionManifestStore
         from app.knowledge.ingestion.registry import DocumentRegistry
+        from app.knowledge.inspection.engine import SourceInspectionEngine
+        from app.knowledge.inspection.persistence import SourceInspectionStore
         document_id = payload.get("document_id")
         if not document_id:
             raise ValueError("parse_document requires document_id")
         registry = DocumentRegistry(KNOWLEDGE_ROOT / "documents")
         document = registry.get(document_id)
         content = registry.read_verified_content(document)
+        inspection = SourceInspectionEngine().inspect(
+            document, content, inspected_at=payload.get("created_at", "worker"),
+        )
+        SourceInspectionStore(KNOWLEDGE_ROOT / "inspections").save(inspection)
         manifest = EvidenceExtractionEngine().extract(
             document, content, created_at=payload.get("created_at", "worker"),
         )

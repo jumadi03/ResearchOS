@@ -131,6 +131,9 @@ class KnowledgeDiscoveryService:
     def acquire_document(self, run_id: str, candidate: DocumentCandidate):
         return self.ingestion_pipeline.acquire_document(run_id, candidate)
 
+    def inspect_document(self, document_id: str):
+        return self.ingestion_pipeline.inspect_document(document_id)
+
     def extract_document(self, document_id: str):
         return self.ingestion_pipeline.extract_document(document_id)
 

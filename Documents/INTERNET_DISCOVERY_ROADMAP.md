@@ -17,7 +17,8 @@
 - Completed: SCAN-001D Source Enumerator Hardening
 - Completed: SCAN-001E Controlled Web Acquisition
 - Completed: SCAN-001F Raw Capture and Integrity Store
-- Next deliverable: SCAN-001G Source Inspection
+- Completed: SCAN-001G Source Inspection
+- Next deliverable: SCAN-001H Identity Resolution
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,

@@ -14,6 +14,8 @@ from app.knowledge.ingestion.acquisition import (
 )
 from app.knowledge.ingestion.models import DocumentCandidate
 from app.knowledge.ingestion.registry import DocumentRegistry
+from app.knowledge.inspection.engine import SourceInspectionEngine
+from app.knowledge.inspection.persistence import SourceInspectionStore
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
 from app.knowledge.modeling.persistence import KnowledgeGraphStore
 from app.knowledge.models import (
@@ -43,12 +45,15 @@ class KnowledgeIngestionPipeline:
         self.object_store = object_store
         self.document_acquirer = document_acquirer or DocumentAcquirer()
         self.document_registry = DocumentRegistry(output_root / "documents")
+        self.inspection_engine = SourceInspectionEngine()
+        self.inspection_store = SourceInspectionStore(output_root / "inspections")
         self.extraction_engine = EvidenceExtractionEngine()
         self.extraction_store = ExtractionManifestStore(output_root / "extractions")
         self.graph_builder = ScientificKnowledgeGraphBuilder()
         self.graph_store = KnowledgeGraphStore(output_root / "graphs")
         self.runs: dict[str, DiscoveryRun] = {}
         self.extractions = {}
+        self.inspections = {}
         self.graphs = {}
 
     def discover(
@@ -101,7 +106,7 @@ class KnowledgeIngestionPipeline:
             self.data_repository.persist_representation(record, result, storage_uri)
         return self.document_registry.register(result, storage_uri=storage_uri)
 
-    def extract_document(self, document_id: str):
+    def _verified_document_content(self, document_id: str):
         document = self.document_registry.get(document_id)
         record = None
         if self.object_store is not None:
@@ -119,6 +124,32 @@ class KnowledgeIngestionPipeline:
             content = self.object_store.read_verified(representation)
         else:
             content = self.document_registry.read_verified_content(document)
+        return document, record, content
+
+    def inspect_document(self, document_id: str):
+        document, record, content = self._verified_document_content(document_id)
+        existing = self.inspection_store.find(
+            document.document_id, document.content_hash or "",
+            self.inspection_engine.inspector_name,
+            self.inspection_engine.inspector_version,
+        )
+        if existing is not None:
+            self.inspections[existing.inspection_id] = existing
+            return existing, self.inspection_store.save(existing)
+        inspection = self.inspection_engine.inspect(
+            document, content, inspected_at=DiscoveryRun.timestamp(),
+        )
+        if self.data_repository is not None and self.object_store is not None:
+            self.data_repository.persist_source_inspection(record, inspection)
+        self.inspections[inspection.inspection_id] = inspection
+        return inspection, self.inspection_store.save(inspection)
+
+    def extract_document(self, document_id: str):
+        if not any(
+            item.document_id == document_id for item in self.inspections.values()
+        ):
+            self.inspect_document(document_id)
+        document, record, content = self._verified_document_content(document_id)
         manifest = self.extraction_engine.extract(
             document, content, created_at=DiscoveryRun.timestamp()
         )
