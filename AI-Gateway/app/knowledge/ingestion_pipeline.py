@@ -6,6 +6,7 @@ from app.knowledge.discovery.cache import CachedProvider
 from app.knowledge.discovery.engine import LiteratureDiscoveryEngine
 from app.knowledge.discovery.persistence import DiscoverySnapshotStore, RawPageStore
 from app.knowledge.discovery.providers import LiteratureProvider
+from app.knowledge.discovery.source_registry import CanonicalSourceRegistry
 from app.knowledge.extraction.engine import EvidenceExtractionEngine
 from app.knowledge.extraction.persistence import ExtractionManifestStore
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
@@ -25,11 +26,13 @@ class KnowledgeIngestionPipeline:
         self, providers: tuple[LiteratureProvider, ...], output_root: Path,
         *, document_acquirer=None, data_repository=None, object_store=None,
     ) -> None:
+        source_registry = CanonicalSourceRegistry.for_providers(providers)
         cached = tuple(
             CachedProvider(provider, output_root / "cache") for provider in providers
         )
         self.engine = LiteratureDiscoveryEngine(
-            cached, raw_page_store=RawPageStore(output_root / "runs")
+            cached, raw_page_store=RawPageStore(output_root / "runs"),
+            source_registry=source_registry,
         )
         self.snapshots = DiscoverySnapshotStore(output_root / "runs")
         self.metadata_snapshots = MetadataSnapshotStore(output_root / "runs")

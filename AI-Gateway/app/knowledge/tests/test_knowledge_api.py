@@ -306,6 +306,18 @@ def test_discovery_capabilities_expose_required_contract_bounds(
 ) -> None:
     response = client(tmp_path).get("/knowledge/discovery/capabilities")
     assert response.status_code == 200
+    assert response.json()["providers"] == [
+        "openalex", "crossref", "semantic_scholar",
+    ]
+    assert {
+        item["name"] for item in response.json()["source_definitions"]
+    } == {"openalex", "crossref", "semantic_scholar"}
+    assert all(
+        item["status"] == "active"
+        and item["authority_level"] == "A2"
+        and item["access_method"] == "official_api"
+        for item in response.json()["source_definitions"]
+    )
     assert response.json()["discovery_contract"] == {
         "required": True,
         "maximum_depth": {"minimum": 1, "maximum": 10},

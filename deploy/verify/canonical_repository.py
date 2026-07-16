@@ -13,6 +13,9 @@ from app.knowledge.models import (
     SearchPlan,
     SourceRecord,
 )
+from app.knowledge.discovery.source_registry import (
+    CANONICAL_SOURCE_DEFINITIONS,
+)
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.retrieval.models import (
     EnrichedMetadata,
@@ -62,6 +65,10 @@ def discovery_run() -> DiscoveryRun:
             ("journal_article",), ("reported_result",), 1, 25,
             "metadata_only", "human_review_required",
             ("healthcheck complete",),
+        ),
+        source_definitions=tuple(
+            item for item in CANONICAL_SOURCE_DEFINITIONS
+            if item.name == "openalex"
         ),
         search_plan=SearchPlan("repository-healthcheck", "healthcheck", ("openalex",)),
         started_at="2026-07-15T12:00:00Z",

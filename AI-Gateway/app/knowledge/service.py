@@ -116,6 +116,9 @@ class KnowledgeDiscoveryService:
     ):
         return self.ingestion_pipeline.discover(question, contract, plan)
 
+    def discovery_source_definitions(self):
+        return self.ingestion_pipeline.engine.source_definitions
+
     def collect_metadata(self, run_id: str):
         return self.ingestion_pipeline.collect_metadata(run_id)
 

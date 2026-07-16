@@ -28,7 +28,6 @@ from app.router.knowledge_workspace import router as workspace_router
 
 router = APIRouter(prefix="/knowledge", tags=["scientific-knowledge"])
 router.include_router(workspace_router)
-DISCOVERY_PROVIDERS = ("openalex", "crossref", "semantic_scholar")
 
 @router.get("/discovery/capabilities")
 def discovery_capabilities(
@@ -36,8 +35,12 @@ def discovery_capabilities(
     credentials: HTTPAuthorizationCredentials | None = Security(bearer),
 ):
     authorize(request, credentials, None)
+    source_definitions = (
+        request.app.state.knowledge_service.discovery_source_definitions()
+    )
     return {
-        "providers": list(DISCOVERY_PROVIDERS),
+        "providers": [item.name for item in source_definitions],
+        "source_definitions": [asdict(item) for item in source_definitions],
         "limit_per_provider": {"default": 25, "minimum": 1, "maximum": 1000},
         "discovery_contract": {
             "required": True,

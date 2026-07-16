@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import replace
 
 from app.knowledge.discovery.engine import LiteratureDiscoveryEngine
 from app.knowledge.discovery.cache import CachedProvider
@@ -7,6 +8,9 @@ from app.knowledge.discovery.persistence import (
 )
 from app.knowledge.discovery.providers import (
     CrossrefProvider, OpenAlexProvider, ProviderError, ProviderPage,
+)
+from app.knowledge.discovery.source_registry import (
+    CANONICAL_SOURCE_DEFINITIONS, CanonicalSourceRegistry,
 )
 from app.knowledge.models import (
     DiscoveryContract, MatchKind, ScientificQuestion, SearchPlan,
@@ -110,6 +114,7 @@ def test_snapshot_is_byte_stable_and_content_addressed(tmp_path: Path) -> None:
     first_path = store.save(first)
     assert store.save(second) == first_path
     assert first_path.read_bytes() == serialize_run(first)
+    assert tuple(item.name for item in first.source_definitions) == ("openalex",)
 
 
 class FakeResponse:
@@ -219,3 +224,63 @@ def test_discovery_contract_is_bound_and_budgeted_before_provider_call() -> None
         engine.discover(
             question(), contract(budget=1), plan("openalex", "crossref"),
         )
+
+
+def test_canonical_source_registry_rejects_unknown_inactive_and_wrong_category() -> None:
+    import pytest
+
+    registry = CanonicalSourceRegistry(CANONICAL_SOURCE_DEFINITIONS)
+    with pytest.raises(ValueError, match="not registered"):
+        registry.resolve(plan("unknown"), contract())
+
+    openalex = next(
+        item for item in CANONICAL_SOURCE_DEFINITIONS
+        if item.name == "openalex"
+    )
+    inactive = CanonicalSourceRegistry((replace(openalex, status="inactive"),))
+    with pytest.raises(ValueError, match="not active"):
+        inactive.resolve(plan("openalex"), contract())
+
+    with pytest.raises(ValueError, match="category is not permitted"):
+        registry.resolve(
+            plan("openalex"),
+            replace(contract(), source_categories=("general_web",)),
+        )
+
+
+def test_canonical_source_registry_rejects_duplicate_and_mismatched_provider() -> None:
+    import pytest
+
+    openalex = next(
+        item for item in CANONICAL_SOURCE_DEFINITIONS
+        if item.name == "openalex"
+    )
+    with pytest.raises(ValueError, match="name must be unique"):
+        CanonicalSourceRegistry((openalex, replace(
+            openalex, source_id="other-source",
+        )))
+
+    class MismatchedProvider:
+        name = "openalex"
+        base_url = "https://example.test/works"
+
+    with pytest.raises(ValueError, match="base URL"):
+        CanonicalSourceRegistry(
+            CANONICAL_SOURCE_DEFINITIONS, (MismatchedProvider(),),
+        )
+
+
+def test_discovery_run_preserves_complete_source_policy() -> None:
+    provider = StubProvider("openalex", ({"id": "W1", "title": "Result"},))
+    run = LiteratureDiscoveryEngine(
+        (provider,), clock=lambda: "now", run_id_factory=lambda: "run",
+    ).discover(question(), contract(), plan("openalex"))
+
+    definition = run.source_definitions[0]
+    assert definition.name == "openalex"
+    assert definition.authority_level == "A2"
+    assert definition.access_method == "official_api"
+    assert definition.rate_limit_policy
+    assert definition.robots_policy
+    assert definition.license_policy
+    assert definition.trust_profile

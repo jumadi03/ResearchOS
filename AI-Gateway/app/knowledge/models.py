@@ -24,6 +24,52 @@ class MatchKind(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class SourceDefinition:
+    source_id: str
+    name: str
+    source_type: str
+    base_url: str
+    access_method: str
+    authority_level: str
+    disciplines: tuple[str, ...]
+    authentication: str
+    rate_limit_policy: str
+    robots_policy: str
+    license_policy: str
+    content_types: tuple[str, ...]
+    trust_profile: str
+    status: str
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "source_id", "name", "source_type", "base_url",
+            "access_method", "authority_level", "authentication",
+            "rate_limit_policy", "robots_policy", "license_policy",
+            "trust_profile", "status",
+        ):
+            object.__setattr__(
+                self, field_name,
+                _required(getattr(self, field_name), field_name),
+            )
+        normalized_name = self.name.casefold()
+        object.__setattr__(self, "name", normalized_name)
+        if not self.base_url.startswith("https://"):
+            raise ValueError("base_url must use HTTPS")
+        if self.authority_level not in {"A1", "A2", "B1", "B2", "C1", "C2"}:
+            raise ValueError("authority_level is not recognized")
+        if self.status not in {"active", "inactive"}:
+            raise ValueError("source status is not recognized")
+        for field_name in ("disciplines", "content_types"):
+            values = tuple(dict.fromkeys(
+                item.strip().casefold()
+                for item in getattr(self, field_name) if item.strip()
+            ))
+            if not values:
+                raise ValueError(f"{field_name} must not be empty")
+            object.__setattr__(self, field_name, values)
+
+
+@dataclass(frozen=True, slots=True)
 class ScientificQuestion:
     question_id: str
     text: str
@@ -165,6 +211,7 @@ class DiscoveryRun:
     run_id: str
     question: ScientificQuestion
     discovery_contract: DiscoveryContract
+    source_definitions: tuple[SourceDefinition, ...]
     search_plan: SearchPlan
     started_at: str
     records: tuple[LiteratureRecord, ...]
