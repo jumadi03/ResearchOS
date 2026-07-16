@@ -38,6 +38,20 @@ class IntelligenceReviewRequest(BaseModel):
     rationale: str
 
 
+class ObjectTranslationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    object_id: str
+    generated_at: str
+    translated_text: str | None = None
+
+
+class ObjectTranslationReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    corrected_text: str
+    rationale: str
+    reviewed_at: str
+
+
 def _object(request: Request, project_id: str, object_ref: str, principal):
     try:
         return request.app.state.knowledge_service.get_object_read_model(
@@ -49,7 +63,7 @@ def _object(request: Request, project_id: str, object_ref: str, principal):
 
 @router.get("/projects")
 def list_projects(request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
-    authorize(request, credentials, None)
+    principal = authorize(request, credentials, None)
     projects = request.app.state.knowledge_service.list_projects()
     return {"items": [asdict(project) for project in projects], "count": len(projects)}
 
@@ -79,6 +93,90 @@ def get_project_object(
 ):
     principal = authorize(request, credentials, None)
     return _object(request, project_id, object_ref, principal)
+
+
+@router.get("/projects/{project_id}/object-translations")
+def list_object_translations(
+    project_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, None)
+    return {
+        "project_id": project_id, "target_language": "id",
+        "source_preserved": True,
+        "items": request.app.state.knowledge_service.list_object_translations(
+            project_id, principal
+        ),
+    }
+
+
+@router.post("/projects/{project_id}/object-translations", status_code=201)
+def create_object_translation(
+    project_id: str, body: ObjectTranslationRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        source = request.app.state.knowledge_service.object_translation_source(
+            project_id, body.object_id, principal
+        )
+        if body.translated_text:
+            translated, provider, model = (
+                body.translated_text, "human", "reviewer-translation-v1",
+            )
+        else:
+            prompt = (
+                "Translate this scientific object title or evidence text into clear, "
+                "precise Bahasa Indonesia. Preserve meaning, claims, quantities, "
+                "uncertainty, journal names, and citations. Do not summarize or add "
+                "claims. Return only the translation.\n\nSOURCE:\n"
+                + source["source_text"]
+            )
+            answer = request.app.state.ai_router.execute(RuntimeRequest(
+                prompt=prompt, stream=False,
+                metadata={
+                    "project_id": project_id, "object_id": body.object_id,
+                    "source_hash": source["source_hash"],
+                    "actor_id": principal.actor_id,
+                    "action": "translate_scientific_object",
+                },
+            ))
+            translated, provider, model = answer.text, answer.provider, answer.model
+        item, snapshot = request.app.state.knowledge_service.record_object_translation(
+            project_id, body.object_id, translated_text=translated,
+            provider=provider, model=model, generated_by=principal.actor_id,
+            generated_at=body.generated_at, principal=principal,
+        )
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            503, f"Object translation provider unavailable: {type(exc).__name__}"
+        ) from exc
+    result = asdict(item); result["snapshot"] = snapshot.name
+    return result
+
+
+@router.post("/object-translations/{translation_id}/reviews", status_code=201)
+def review_object_translation(
+    translation_id: str, body: ObjectTranslationReviewRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        item, snapshot = request.app.state.knowledge_service.review_object_translation(
+            translation_id, reviewer=principal.actor_id,
+            rationale=body.rationale, reviewed_at=body.reviewed_at,
+            corrected_text=body.corrected_text, principal=principal,
+        )
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    result = asdict(item); result["snapshot"] = snapshot.name
+    return result
 
 
 @router.get("/projects/{project_id}/objects/{object_ref}/intelligence")

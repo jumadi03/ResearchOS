@@ -795,6 +795,7 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "/workspace-assets/i18n.css" in response.text
     assert 'id="uiLanguage"' in response.text
     assert "Bahasa Sumber / English" in response.text
+    assert 'id="translateObject"' in response.text
     assert 'id="qualityThreshold"' in response.text
     assert 'id="qualityMetrics"' in response.text
     assert 'id="calibrationForm"' in response.text
@@ -868,6 +869,41 @@ def test_project_graph_is_authenticated_filterable_and_provenance_bearing(tmp_pa
     assert len(response.json()["nodes"]) == 2
     assert response.json()["edges"][0]["provenance_id"] == "provenance-1"
     assert "embedding" not in response.text
+
+
+def test_scientific_object_translation_is_source_bound_and_reviewable(
+    tmp_path: Path,
+) -> None:
+    api = client(tmp_path, "review", repository=RecordingRepository())
+    created = api.post(
+        "/knowledge/projects/researchos-default/object-translations",
+        json={
+            "object_id": "object-1",
+            "generated_at": "2026-07-16T09:00:00Z",
+            "translated_text": "Tata kelola itu penting",
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["source_text"] == "Governance matters"
+    assert created.json()["source_hash"]
+    assert created.json()["status"] == "advisory"
+    listed = api.get(
+        "/knowledge/projects/researchos-default/object-translations"
+    )
+    assert listed.status_code == 200
+    assert listed.json()["source_preserved"] is True
+    assert listed.json()["items"][0]["translated_text"] == "Tata kelola itu penting"
+    reviewed = api.post(
+        f"/knowledge/object-translations/{created.json()['translation_id']}/reviews",
+        json={
+            "corrected_text": "Tata kelola berperan penting",
+            "rationale": "Makna ilmiah telah dibandingkan dengan sumber",
+            "reviewed_at": "2026-07-16T09:01:00Z",
+        },
+    )
+    assert reviewed.status_code == 201
+    assert reviewed.json()["status"] == "reviewed"
+    assert reviewed.json()["translated_text"] == "Tata kelola berperan penting"
 
 
 def test_discovery_capabilities_drive_workspace_without_client_guesses(tmp_path: Path) -> None:

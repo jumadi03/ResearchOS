@@ -8,6 +8,9 @@ from app.knowledge.ingestion.models import DocumentCandidate
 from app.knowledge.repository_service import KnowledgeRepositoryService
 from app.knowledge.ingestion_pipeline import KnowledgeIngestionPipeline
 from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
+from app.knowledge.object_translation import ObjectTranslation, ObjectTranslationStore
+from dataclasses import asdict, replace
+from hashlib import sha256
 
 
 class KnowledgeDiscoveryService:
@@ -29,6 +32,76 @@ class KnowledgeDiscoveryService:
             output_root, self._graphs, data_repository=data_repository,
             object_store=object_store,
         )
+        self.object_translation_store = ObjectTranslationStore(
+            output_root / "object-translations"
+        )
+        self.object_translations = {
+            item.translation_id: item
+            for item in self.object_translation_store.load_all()
+        }
+
+    def object_translation_source(self, project_id, object_id, principal):
+        obj = self.get_object_read_model(object_id, project_id, principal)
+        text = obj["summary"]["title"]
+        return {
+            "project_id": project_id, "object_id": obj["identity"]["object_id"],
+            "source_text": text,
+            "source_hash": ObjectTranslation.source_digest(text),
+        }
+
+    def record_object_translation(
+        self, project_id, object_id, *, translated_text, provider, model,
+        generated_by, generated_at, principal,
+    ):
+        source = self.object_translation_source(project_id, object_id, principal)
+        if not translated_text.strip():
+            raise ValueError("Translated object text is required")
+        identity = f"{project_id}:{source['object_id']}:id:{source['source_hash']}"
+        item = ObjectTranslation(
+            f"object-translation-{sha256(identity.encode()).hexdigest()[:24]}",
+            project_id, source["object_id"], source["source_text"],
+            source["source_hash"], translated_text.strip(), provider, model,
+            generated_by, generated_at,
+        ).finalized()
+        self.object_translations[item.translation_id] = item
+        return item, self.object_translation_store.save(item)
+
+    def list_object_translations(self, project_id, principal):
+        current = []
+        for item in self.object_translations.values():
+            if item.project_id != project_id:
+                continue
+            try:
+                source = self.object_translation_source(
+                    project_id, item.object_id, principal
+                )
+            except KeyError:
+                continue
+            if source["source_hash"] == item.source_hash:
+                current.append(asdict(item))
+        return tuple(current)
+
+    def review_object_translation(
+        self, translation_id, *, reviewer, rationale, reviewed_at,
+        corrected_text, principal,
+    ):
+        item = self.object_translations.get(translation_id)
+        if item is None:
+            raise KeyError(f"Unknown object translation: {translation_id}")
+        source = self.object_translation_source(
+            item.project_id, item.object_id, principal
+        )
+        if source["source_hash"] != item.source_hash:
+            raise ValueError("Object translation source has changed")
+        if not rationale.strip() or not corrected_text.strip():
+            raise ValueError("Reviewed translation and rationale are required")
+        reviewed = replace(
+            item, translated_text=corrected_text.strip(), status="reviewed",
+            reviewer=reviewer, rationale=rationale.strip(),
+            reviewed_at=reviewed_at, content_hash="",
+        ).finalized()
+        self.object_translations[translation_id] = reviewed
+        return reviewed, self.object_translation_store.save(reviewed)
 
     def discover(self, question: ScientificQuestion, plan: SearchPlan):
         return self.ingestion_pipeline.discover(question, plan)

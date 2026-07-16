@@ -7,6 +7,10 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Extended bilingual representations to scientific documents, evidence,
+  artifacts, library cards, inspector titles, and graph focus content using
+  object/source hashes, AI or manual translation, and immutable reviewer
+  correction while displaying source and Indonesian text together.
 - Added global bilingual UI localization with Bahasa Indonesia as the persisted
   default, source/English switching, dynamic DOM localization, translated
   placeholders and accessibility labels, and protection for scientific source

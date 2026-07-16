@@ -196,6 +196,14 @@ the separately governed translation representation described above. Selecting
 the global source language also switches translated theory statements back to
 their originals.
 
+Scientific objects use the same source-bound rule. Evidence, document, and
+artifact titles are translated into a separate object representation keyed by
+project ID, object ID, and source-text hash. When present, the Library,
+Inspector, and Knowledge Graph focus panel show the exact source text and
+Bahasa Indonesia together. Reviewers can generate a translation through the AI
+Router and correct it before marking it reviewed. A source-hash mismatch blocks
+review and prevents an outdated translation from replacing source content.
+
 ### Theory bundle registry
 
 The reviewer workspace loads `GET /knowledge/theories` to list available
