@@ -66,15 +66,21 @@ class TheoryBundleStore:
                     item["alignment_id"], tuple(item["source_theory_ids"]),
                     item["resulting_theory_id"], item["statement"], item["reviewer"],
                     item["rationale"], item["occurred_at"],
+                    item.get("candidate_id"), item.get("candidate_method"),
+                    item.get("candidate_score"), item.get("candidate_threshold"),
+                    tuple(item.get("candidate_shared_terms", ())),
                 ) for item in raw.get("alignments", ())),
                 alignment_decisions=tuple(TheoryAlignmentDecisionEvent(
                     item["decision_id"], tuple(item["theory_ids"]), item["decision"],
                     item["reviewer"], item["rationale"], item["occurred_at"],
+                    item.get("candidate_id"), item.get("candidate_method"),
+                    item.get("candidate_score"), item.get("candidate_threshold"),
+                    tuple(item.get("candidate_shared_terms", ())),
                 ) for item in raw.get("alignment_decisions", ())),
                 content_hash=raw["content_hash"],
                 schema_version=raw.get("schema_version", "1.0"),
             )
-            if raw.get("schema_version", "1.0") != "1.2":
+            if raw.get("schema_version", "1.0") != "1.3":
                 historical = dict(raw)
                 expected = historical.get("content_hash", "")
                 historical["content_hash"] = ""
@@ -87,7 +93,7 @@ class TheoryBundleStore:
                     bundle.bundle_id, bundle.graph_ids, bundle.created_at,
                     bundle.proposals, bundle.competing, bundle.reviews,
                     bundle.alignments, bundle.alignment_decisions,
-                    schema_version="1.2",
+                    schema_version="1.3",
                 ).finalized()
             elif not bundle.verify():
                 raise ValueError(f"Theory bundle snapshot integrity failed: {path.name}")

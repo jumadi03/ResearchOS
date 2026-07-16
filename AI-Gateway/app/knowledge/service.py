@@ -71,6 +71,11 @@ class KnowledgeDiscoveryService:
     def alignment_candidate_metadata(self):
         return self.theory_pipeline.alignment_candidate_metadata()
 
+    def alignment_quality(self, bundle_id, *, threshold=None):
+        return self.theory_pipeline.alignment_quality(
+            bundle_id, threshold=threshold
+        )
+
     def keep_theories_separate(self, bundle_id, **options):
         return self.theory_pipeline.keep_theories_separate(bundle_id, **options)
 

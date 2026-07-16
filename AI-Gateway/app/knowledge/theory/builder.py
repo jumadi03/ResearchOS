@@ -60,7 +60,7 @@ class TheoryBuilder:
                 if self._compete(left.statement, right.statement):
                     competing.append(CompetingTheory(left.theory_id, right.theory_id, "Shared subject with opposing polarity"))
         graph_ids = tuple(sorted(graph.graph_id for graph in graphs))
-        identity = f"{':'.join(graph_ids)}:{created_at}:1.2"
+        identity = f"{':'.join(graph_ids)}:{created_at}:1.3"
         return TheoryBundle(
             f"theory-bundle-{sha256(identity.encode()).hexdigest()[:24]}", graph_ids,
             created_at, tuple(sorted(proposals, key=lambda item: item.theory_id)),
@@ -89,6 +89,10 @@ class TheoryBuilder:
             raise ValueError("Theory alignment requires at least two distinct theories")
         if not statement.strip() or not rationale.strip():
             raise ValueError("Alignment statement and rationale are required")
+        candidate = next((
+            item for item in self.alignment_candidates(bundle)
+            if item.theory_ids == source_ids
+        ), None)
         by_id = {proposal.theory_id: proposal for proposal in bundle.proposals}
         missing = [theory_id for theory_id in source_ids if theory_id not in by_id]
         if missing:
@@ -119,6 +123,11 @@ class TheoryBuilder:
         event = TheoryAlignmentEvent(
             alignment_id, source_ids, resulting_id, statement.strip(), reviewer,
             rationale.strip(), occurred_at,
+            candidate_id=candidate.candidate_id if candidate else None,
+            candidate_method=candidate.method if candidate else None,
+            candidate_score=candidate.lexical_overlap_score if candidate else None,
+            candidate_threshold=self.candidate_threshold if candidate else None,
+            candidate_shared_terms=candidate.shared_terms if candidate else (),
         )
         return replace(
             bundle, proposals=proposals, competing=competing,
@@ -139,41 +148,19 @@ class TheoryBuilder:
                 pair = (left.theory_id, right.theory_id)
                 if pair in decided_pairs:
                     continue
-                left_sequence = self._candidate_tokens(left.statement)
-                right_sequence = self._candidate_tokens(right.statement)
-                left_tokens = set(left_sequence)
-                right_tokens = set(right_sequence)
-                shared = left_tokens & right_tokens
-                union = left_tokens | right_tokens
+                signals = self.candidate_signals(left.statement, right.statement)
                 graph_ids = tuple(sorted({
                     item.graph_id for proposal in (left, right) for item in proposal.evidence
                 }))
-                if (
-                    len(shared) < 2 or len(graph_ids) < 2 or not union
-                    or self._polarity(left.statement) != self._polarity(right.statement)
-                ):
-                    continue
-                token_score = len(shared) / len(union)
-                left_bigrams = self._bigrams(left_sequence)
-                right_bigrams = self._bigrams(right_sequence)
-                shared_bigrams = left_bigrams & right_bigrams
-                bigram_union = left_bigrams | right_bigrams
-                bigram_score = (
-                    len(shared_bigrams) / len(bigram_union) if bigram_union else 0.0
-                )
-                score = round(0.85 * token_score + 0.15 * bigram_score, 4)
-                if score < self.candidate_threshold:
+                if not signals["eligible"] or len(graph_ids) < 2:
                     continue
                 identity = f"{left.theory_id}:{right.theory_id}:{self.candidate_method}"
-                terms = tuple(sorted(shared))
-                phrases = tuple(sorted(" ".join(item) for item in shared_bigrams))
                 candidates.append(TheoryAlignmentCandidate(
                     f"alignment-candidate-{sha256(identity.encode()).hexdigest()[:24]}",
                     pair, (left.statement, right.statement), graph_ids,
-                    (left.evidence, right.evidence), score, terms, phrases,
-                    (("content_term_jaccard", round(token_score, 4)),
-                     ("content_bigram_jaccard", round(bigram_score, 4))),
-                    f"Shared {len(terms)} content terms and {len(phrases)} content phrases; score must be at least {self.candidate_threshold:.2f}.",
+                    (left.evidence, right.evidence), signals["score"],
+                    signals["shared_terms"], signals["shared_bigrams"],
+                    signals["score_components"], signals["explanation"],
                 ))
         return tuple(sorted(
             candidates, key=lambda item: (-item.lexical_overlap_score, item.candidate_id)
@@ -188,13 +175,21 @@ class TheoryBuilder:
             raise ValueError("Keep-separate decision requires two distinct theories")
         if not rationale.strip():
             raise ValueError("Keep-separate rationale is required")
-        candidates = {item.theory_ids for item in self.alignment_candidates(bundle)}
+        candidates = {
+            item.theory_ids: item for item in self.alignment_candidates(bundle)
+        }
         if source_ids not in candidates:
             raise ValueError("Theory pair is not an active alignment candidate")
+        candidate = candidates[source_ids]
         identity = f"keep-separate:{':'.join(source_ids)}:{reviewer}:{occurred_at}"
         event = TheoryAlignmentDecisionEvent(
             f"alignment-decision-{sha256(identity.encode()).hexdigest()[:24]}",
             source_ids, "keep_separate", reviewer, rationale.strip(), occurred_at,
+            candidate_id=candidate.candidate_id,
+            candidate_method=candidate.method,
+            candidate_score=candidate.lexical_overlap_score,
+            candidate_threshold=self.candidate_threshold,
+            candidate_shared_terms=candidate.shared_terms,
         )
         return replace(
             bundle, alignment_decisions=bundle.alignment_decisions + (event,),
@@ -212,6 +207,35 @@ class TheoryBuilder:
             item for item in cls._claim_key(statement).split()
             if len(item) > 1 and item not in cls._stopwords
         )
+
+    @classmethod
+    def candidate_signals(cls, left: str, right: str) -> dict:
+        left_sequence = cls._candidate_tokens(left)
+        right_sequence = cls._candidate_tokens(right)
+        left_tokens, right_tokens = set(left_sequence), set(right_sequence)
+        shared, union = left_tokens & right_tokens, left_tokens | right_tokens
+        token_score = len(shared) / len(union) if union else 0.0
+        left_bigrams, right_bigrams = cls._bigrams(left_sequence), cls._bigrams(right_sequence)
+        shared_bigrams = left_bigrams & right_bigrams
+        bigram_union = left_bigrams | right_bigrams
+        bigram_score = len(shared_bigrams) / len(bigram_union) if bigram_union else 0.0
+        score = round(0.85 * token_score + 0.15 * bigram_score, 4)
+        terms = tuple(sorted(shared))
+        phrases = tuple(sorted(" ".join(item) for item in shared_bigrams))
+        polarity_match = cls._polarity(left) == cls._polarity(right)
+        eligible = len(terms) >= 2 and polarity_match and score >= cls.candidate_threshold
+        return {
+            "eligible": eligible, "score": score, "shared_terms": terms,
+            "shared_bigrams": phrases, "polarity_match": polarity_match,
+            "score_components": (
+                ("content_term_jaccard", round(token_score, 4)),
+                ("content_bigram_jaccard", round(bigram_score, 4)),
+            ),
+            "explanation": (
+                f"Shared {len(terms)} content terms and {len(phrases)} content phrases; "
+                f"score must be at least {cls.candidate_threshold:.2f}."
+            ),
+        }
 
     @staticmethod
     def _bigrams(tokens: tuple[str, ...]) -> set[tuple[str, str]]:

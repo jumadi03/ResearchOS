@@ -3,6 +3,8 @@ from dataclasses import asdict
 from hashlib import sha256
 import json
 
+import pytest
+
 from app.knowledge.extraction.models import ExtractionReviewState
 from app.knowledge.modeling.models import (
     GraphProvenance, KnowledgeEdge, KnowledgeEdgeType, KnowledgeNode,
@@ -11,6 +13,7 @@ from app.knowledge.modeling.models import (
 from app.knowledge.theory.builder import TheoryBuilder
 from app.knowledge.theory.models import TheoryReviewState
 from app.knowledge.theory.persistence import TheoryBundleStore
+from app.knowledge.theory.quality import AlignmentQualityEvaluator
 from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
 from app.knowledge.validation.engine import ValidationEngine
 from app.knowledge.validation.models import RiskOfBias, ValidationStatus
@@ -169,6 +172,12 @@ def test_alignment_candidates_are_advisory_ranked_and_accepted_only(tmp_path: Pa
     )
     assert decided.alignment_decisions[0].decision == "keep_separate"
     assert decided.alignment_decisions[0].reviewer == "reviewer@example"
+    assert decided.alignment_decisions[0].candidate_method == "explainable-lexical-v2"
+    assert decided.alignment_decisions[0].candidate_score == 0.3643
+    assert decided.alignment_decisions[0].candidate_threshold == 0.2
+    assert decided.alignment_decisions[0].candidate_shared_terms == (
+        "open", "practices", "reproducibility",
+    )
     assert builder.alignment_candidates(decided) == ()
     pipeline = KnowledgeTheoryPipeline(tmp_path, {})
     pipeline.bundles[decided.bundle_id] = decided
@@ -177,6 +186,13 @@ def test_alignment_candidates_are_advisory_ranked_and_accepted_only(tmp_path: Pa
     assert history["items"][0]["decision"] == "keep_separate"
     assert set(history["items"][0]["theory_ids"]) == related_ids
     assert history["items"][0]["evidence_by_theory"][0][0]["object_id"]
+    assert history["items"][0]["candidate_score"] == 0.3643
+    quality = pipeline.alignment_quality(decided.bundle_id)
+    assert quality["simulation_only"] is True
+    assert quality["outcomes"]["reviewed"] == 1
+    assert quality["outcomes"]["keep_separate"] == 1
+    assert quality["outcomes"]["pending"] == 0
+    assert quality["benchmark"]["version"] == "1.0.0"
     report, _ = pipeline.validate_theories(
         decided.bundle_id, assessed_at="2026-07-15T00:00:00Z",
         search_completed_at="2026-07-01T00:00:00Z", max_age_days=180,
@@ -219,6 +235,19 @@ def test_alignment_candidates_exclude_stopword_and_opposing_polarity_noise() -> 
         )
 
     assert builder.alignment_candidates(bundle) == ()
+
+
+def test_alignment_quality_benchmark_is_versioned_and_threshold_is_simulated() -> None:
+    evaluator = AlignmentQualityEvaluator()
+    baseline = evaluator.benchmark(threshold=0.2)
+    stricter = evaluator.benchmark(threshold=0.5)
+
+    assert baseline["method"] == "explainable-lexical-v2"
+    assert baseline["version"] == "1.0.0"
+    assert len(baseline["cases"]) == 8
+    assert baseline["metrics"]["recall"] >= stricter["metrics"]["recall"]
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        evaluator.benchmark(threshold=1.1)
 
 
 def test_theory_review_is_attributable_and_requires_rationale() -> None:
@@ -280,7 +309,7 @@ def test_theory_store_verifies_and_migrates_legacy_snapshot(tmp_path: Path) -> N
 
     restored = TheoryBundleStore(tmp_path).load_all()
 
-    assert restored[0].schema_version == "1.2"
+    assert restored[0].schema_version == "1.3"
     assert restored[0].alignments == ()
     assert restored[0].alignment_decisions == ()
     assert restored[0].verify()

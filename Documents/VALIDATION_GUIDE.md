@@ -107,6 +107,21 @@ theory identifiers, preserved evidence provenance, and the latest active
 validation status. Workspace audit links can reopen a bundle and highlight one
 specific decision without changing the underlying event.
 
+### Candidate quality evaluation
+
+Every reviewer decision originating from an advisory candidate stores the
+candidate ID, method, score, production threshold, and shared terms in the
+immutable alignment event. Historical decisions without these fields remain
+valid and are reported separately rather than assigned reconstructed scores.
+
+Reviewers can inspect `GET /knowledge/theories/{bundle_id}/alignment-quality`.
+The response combines observed `aligned`, `keep_separate`, and pending outcomes
+with score distributions and the versioned `theory-alignment-benchmark` data
+set. An optional `threshold` query parameter recalculates benchmark precision
+and recall only. It never changes the production threshold, candidate queue,
+review events, bundle hash, or publication state. The workspace labels this
+operation as a simulation and shows both production and simulated thresholds.
+
 ### Theory bundle registry
 
 The reviewer workspace loads `GET /knowledge/theories` to list available

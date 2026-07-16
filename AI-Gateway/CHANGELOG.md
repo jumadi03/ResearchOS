@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added versioned theory-alignment quality evaluation with immutable candidate
+  score snapshots, observed reviewer outcomes, score distributions, benchmark
+  precision/recall, and non-mutating threshold simulation in the workspace.
 - Restricted theory review, theory validation, and knowledge publication to
   authenticated reviewer principals.
 - Added explicit metadata enrichment status and counts for records,

@@ -275,6 +275,22 @@ def alignment_history(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/theories/{bundle_id}/alignment-quality")
+def alignment_quality(
+    bundle_id: str, request: Request, threshold: float | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        return request.app.state.knowledge_service.alignment_quality(
+            bundle_id, threshold=threshold
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.post("/theories/{bundle_id}/gaps", status_code=201)
 def detect_research_gaps(bundle_id: str, request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
     principal = authorize(request, credentials)

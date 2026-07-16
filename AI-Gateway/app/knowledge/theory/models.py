@@ -64,6 +64,11 @@ class TheoryAlignmentEvent:
     reviewer: str
     rationale: str
     occurred_at: str
+    candidate_id: str | None = None
+    candidate_method: str | None = None
+    candidate_score: float | None = None
+    candidate_threshold: float | None = None
+    candidate_shared_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +79,11 @@ class TheoryAlignmentDecisionEvent:
     reviewer: str
     rationale: str
     occurred_at: str
+    candidate_id: str | None = None
+    candidate_method: str | None = None
+    candidate_score: float | None = None
+    candidate_threshold: float | None = None
+    candidate_shared_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +113,7 @@ class TheoryBundle:
     alignments: tuple[TheoryAlignmentEvent, ...] = ()
     alignment_decisions: tuple[TheoryAlignmentDecisionEvent, ...] = ()
     content_hash: str = ""
-    schema_version: str = "1.2"
+    schema_version: str = "1.3"
 
     def finalized(self):
         payload = asdict(replace(self, content_hash=""))

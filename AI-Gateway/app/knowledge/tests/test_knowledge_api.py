@@ -565,6 +565,20 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     }
     assert history.json()["active_theories"][0]["theory_id"] == proposal["theory_id"]
     assert history.json()["items"] == []
+    quality_path = f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-quality"
+    assert api.get(quality_path).status_code == 403
+    quality = api.get(
+        quality_path + "?threshold=0.5",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert quality.status_code == 200
+    assert quality.json()["simulation_only"] is True
+    assert quality.json()["simulated_threshold"] == 0.5
+    assert quality.json()["benchmark"]["version"] == "1.0.0"
+    assert api.get(
+        quality_path + "?threshold=1.1",
+        headers={"Authorization": "Bearer review"},
+    ).status_code == 422
     assert api.get(
         f"/knowledge/theories/{theories.json()['bundle_id']}/validation-history"
     ).status_code == 403
@@ -702,6 +716,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "cookie HttpOnly" in response.text
     assert "Theory Alignment" in response.text
     assert "/workspace-assets/theory.js" in response.text
+    assert 'id="qualityThreshold"' in response.text
+    assert 'id="qualityMetrics"' in response.text
     assert 'id="separateDialog"' in response.text
     assert "Simpan sebagai terpisah" in response.text
     assert 'id="decisionHistory"' in response.text

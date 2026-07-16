@@ -12,6 +12,7 @@ from app.knowledge.publication.persistence import PublicationStore
 from app.knowledge.theory.builder import TheoryBuilder
 from app.knowledge.theory.models import TheoryReviewState
 from app.knowledge.theory.persistence import TheoryBundleStore
+from app.knowledge.theory.quality import AlignmentQualityEvaluator
 from app.knowledge.validation.engine import ValidationEngine
 from app.knowledge.validation.models import RiskOfBias
 from app.knowledge.validation.persistence import ValidationReportStore
@@ -26,6 +27,7 @@ class KnowledgeTheoryPipeline:
         self.data_repository = data_repository
         self.object_store = object_store
         self.theory_builder = TheoryBuilder()
+        self.alignment_quality_evaluator = AlignmentQualityEvaluator()
         self.theory_store = TheoryBundleStore(output_root / "theories")
         self.gap_detector = ResearchGapDetector()
         self.gap_store = GapAnalysisStore(output_root / "gaps")
@@ -94,6 +96,61 @@ class KnowledgeTheoryPipeline:
             },
         }
 
+    def alignment_quality(self, bundle_id, *, threshold=None):
+        bundle = self._bundle(bundle_id)
+        simulated_threshold = (
+            self.theory_builder.candidate_threshold
+            if threshold is None else threshold
+        )
+        benchmark = self.alignment_quality_evaluator.benchmark(
+            threshold=simulated_threshold
+        )
+        observations = [
+            ("aligned", item.candidate_score)
+            for item in bundle.alignments if item.candidate_method
+        ] + [
+            ("keep_separate", item.candidate_score)
+            for item in bundle.alignment_decisions if item.candidate_method
+        ] + [
+            ("pending", item.lexical_overlap_score)
+            for item in self.theory_builder.alignment_candidates(bundle)
+        ]
+        ranges = ((0.0, 0.19), (0.2, 0.39), (0.4, 0.59), (0.6, 0.79), (0.8, 1.0))
+        distribution = []
+        for lower, upper in ranges:
+            counts = {"aligned": 0, "keep_separate": 0, "pending": 0}
+            for outcome, score in observations:
+                if score is not None and lower <= score <= upper:
+                    counts[outcome] += 1
+            distribution.append({
+                "range": f"{lower:.2f}-{upper:.2f}", **counts,
+            })
+        aligned = sum(1 for outcome, _ in observations if outcome == "aligned")
+        kept = sum(1 for outcome, _ in observations if outcome == "keep_separate")
+        reviewed = aligned + kept
+        historical = sum(
+            1 for item in bundle.alignments if not item.candidate_method
+        ) + sum(
+            1 for item in bundle.alignment_decisions if not item.candidate_method
+        )
+        return {
+            "bundle_id": bundle_id,
+            "method": self.theory_builder.candidate_method,
+            "production_threshold": self.theory_builder.candidate_threshold,
+            "simulated_threshold": simulated_threshold,
+            "simulation_only": True,
+            "outcomes": {
+                "reviewed": reviewed, "aligned": aligned,
+                "keep_separate": kept,
+                "pending": sum(1 for outcome, _ in observations if outcome == "pending"),
+                "unscored_historical": historical,
+                "alignment_acceptance_rate": round(aligned / reviewed, 4) if reviewed else None,
+                "keep_separate_rate": round(kept / reviewed, 4) if reviewed else None,
+            },
+            "score_distribution": tuple(distribution),
+            "benchmark": benchmark,
+        }
+
     def keep_theories_separate(self, bundle_id, **options):
         bundle = self._bundle(bundle_id)
         decided = self.theory_builder.keep_separate(bundle, **options)
@@ -115,6 +172,10 @@ class KnowledgeTheoryPipeline:
                 "reviewer": event.reviewer,
                 "rationale": event.rationale,
                 "occurred_at": event.occurred_at,
+                "candidate_method": event.candidate_method,
+                "candidate_score": event.candidate_score,
+                "candidate_threshold": event.candidate_threshold,
+                "candidate_shared_terms": event.candidate_shared_terms,
                 "evidence_by_theory": (
                     tuple(asdict(item) for item in result.evidence) if result else (),
                 ),
@@ -133,6 +194,10 @@ class KnowledgeTheoryPipeline:
                 "reviewer": event.reviewer,
                 "rationale": event.rationale,
                 "occurred_at": event.occurred_at,
+                "candidate_method": event.candidate_method,
+                "candidate_score": event.candidate_score,
+                "candidate_threshold": event.candidate_threshold,
+                "candidate_shared_terms": event.candidate_shared_terms,
                 "evidence_by_theory": tuple(
                     tuple(asdict(evidence) for evidence in item.evidence)
                     if item else () for item in sources
