@@ -540,6 +540,39 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
         "opposing_polarity_excluded": True,
     }
     assert candidates.json()["items"] == []
+    translations_path = (
+        f"/knowledge/theories/{theories.json()['bundle_id']}/translations"
+    )
+    assert api.get(translations_path).status_code == 403
+    manual_translation = api.post(
+        translations_path + "/manual",
+        json={
+            "theory_id": proposal["theory_id"],
+            "translated_statement": "Tata kelola meningkatkan kinerja desa",
+            "generated_at": "2026-07-16T08:00:00Z",
+        },
+        headers={"Authorization": "Bearer review"},
+    )
+    assert manual_translation.status_code == 201
+    assert manual_translation.json()["source_statement"] == proposal["statement"]
+    assert manual_translation.json()["status"] == "advisory"
+    translations = api.get(
+        translations_path, headers={"Authorization": "Bearer review"}
+    )
+    assert translations.status_code == 200
+    assert translations.json()["source_preserved"] is True
+    assert translations.json()["items"][0]["target_language"] == "id"
+    translation_review = api.post(
+        f"/knowledge/theory-translations/{manual_translation.json()['translation_id']}/reviews",
+        json={
+            "rationale": "Terminologi Bahasa Indonesia telah diperiksa",
+            "reviewed_at": "2026-07-16T08:01:00Z",
+            "corrected_translation": "Tata kelola meningkatkan performa desa",
+        },
+        headers={"Authorization": "Bearer review"},
+    )
+    assert translation_review.status_code == 201
+    assert translation_review.json()["status"] == "reviewed"
     invalid_keep_separate = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-decisions",
         json={
@@ -764,6 +797,9 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert 'id="calibrationHistory"' in response.text
     assert 'id="calibrationQueueStats"' in response.text
     assert 'id="blindCalibrationCase"' in response.text
+    assert 'id="languageIndonesian"' in response.text
+    assert 'id="languageOriginal"' in response.text
+    assert 'id="translationList"' in response.text
     assert 'id="separateDialog"' in response.text
     assert "Simpan sebagai terpisah" in response.text
     assert 'id="decisionHistory"' in response.text

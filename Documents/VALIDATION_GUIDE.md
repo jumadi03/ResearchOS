@@ -163,6 +163,24 @@ Only finalized labels are added to calibration observations. Queue summaries
 report counts by score stratum and aggregate inter-reviewer agreement, while
 individual blind-review responses continue to hide score information.
 
+### Bahasa Indonesia theory representation
+
+Theory statements remain immutable in their original language. A Bahasa
+Indonesia translation is stored as a separate representation containing the
+bundle and theory IDs, exact source statement, SHA-256 source hash, provider,
+model, generator, time, review state, and its own integrity hash.
+
+Reviewers can generate an advisory translation through the configured AI
+Router or submit one manually. AI prompts require translation only and prohibit
+new claims or explanations. A reviewer may correct the Indonesian wording and
+mark it reviewed with a rationale. If the original statement changes, its hash
+no longer matches; the old translation is retained in storage but suppressed
+from the active workspace and cannot be reviewed.
+
+The workspace defaults to Bahasa Indonesia when a current translation exists
+and provides an `Original` toggle. Alignment decisions and provenance remain
+bound to the original statement regardless of the selected display language.
+
 ### Theory bundle registry
 
 The reviewer workspace loads `GET /knowledge/theories` to list available

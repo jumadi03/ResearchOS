@@ -71,6 +71,24 @@ class KnowledgeDiscoveryService:
     def alignment_candidate_metadata(self):
         return self.theory_pipeline.alignment_candidate_metadata()
 
+    def theory_translation_source(self, bundle_id, theory_id):
+        return self.theory_pipeline.theory_translation_source(
+            bundle_id, theory_id
+        )
+
+    def record_theory_translation(self, bundle_id, theory_id, **options):
+        return self.theory_pipeline.record_theory_translation(
+            bundle_id, theory_id, **options
+        )
+
+    def theory_translations(self, bundle_id):
+        return self.theory_pipeline.theory_translations(bundle_id)
+
+    def review_theory_translation(self, translation_id, **options):
+        return self.theory_pipeline.review_theory_translation(
+            translation_id, **options
+        )
+
     def alignment_quality(self, bundle_id, *, threshold=None):
         return self.theory_pipeline.alignment_quality(
             bundle_id, threshold=threshold

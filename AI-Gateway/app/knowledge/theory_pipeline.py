@@ -18,6 +18,9 @@ from app.knowledge.theory.calibration import (
 from app.knowledge.theory.models import TheoryReviewState
 from app.knowledge.theory.persistence import TheoryBundleStore
 from app.knowledge.theory.quality import AlignmentQualityEvaluator
+from app.knowledge.theory.translation import (
+    TheoryTranslation, TheoryTranslationStore,
+)
 from app.knowledge.validation.engine import ValidationEngine
 from app.knowledge.validation.models import RiskOfBias
 from app.knowledge.validation.persistence import ValidationReportStore
@@ -41,6 +44,12 @@ class KnowledgeTheoryPipeline:
         )
         self.calibration_cases = {
             item.case_id: item for item in self.calibration_case_store.load_all()
+        }
+        self.translation_store = TheoryTranslationStore(
+            output_root / "theory-translations"
+        )
+        self.translations = {
+            item.translation_id: item for item in self.translation_store.load_all()
         }
         self.calibrations = list(self.calibration_store.load_all())
         approved_calibrations = [
@@ -117,6 +126,87 @@ class KnowledgeTheoryPipeline:
                 "opposing_polarity_excluded": True,
             },
         }
+
+    def theory_translation_source(self, bundle_id, theory_id):
+        bundle = self._bundle(bundle_id)
+        proposal = next((
+            item for item in bundle.proposals if item.theory_id == theory_id
+        ), None)
+        if proposal is None:
+            raise KeyError(f"Unknown theory proposal: {theory_id}")
+        return {
+            "bundle_id": bundle_id, "theory_id": theory_id,
+            "statement": proposal.statement,
+            "source_hash": TheoryTranslation.hash_source(proposal.statement),
+        }
+
+    def record_theory_translation(
+        self, bundle_id, theory_id, *, translated_statement, provider,
+        model, generated_by, generated_at,
+    ):
+        source = self.theory_translation_source(bundle_id, theory_id)
+        translated = translated_statement.strip()
+        if not translated:
+            raise ValueError("Translated statement is required")
+        identity = (
+            f"{bundle_id}:{theory_id}:id:{source['source_hash']}"
+        )
+        item = TheoryTranslation(
+            translation_id=f"theory-translation-{sha256(identity.encode()).hexdigest()[:24]}",
+            bundle_id=bundle_id, theory_id=theory_id,
+            source_language="original", target_language="id",
+            source_statement=source["statement"],
+            source_hash=source["source_hash"],
+            translated_statement=translated,
+            provider=provider, model=model, generated_by=generated_by,
+            generated_at=generated_at,
+        ).finalized()
+        self.translations[item.translation_id] = item
+        return item, self.translation_store.save(item)
+
+    def theory_translations(self, bundle_id):
+        bundle = self._bundle(bundle_id)
+        by_theory = {}
+        for item in self.translations.values():
+            proposal = next((
+                proposal for proposal in bundle.proposals
+                if proposal.theory_id == item.theory_id
+            ), None)
+            if (
+                item.bundle_id == bundle_id and proposal is not None
+                and item.source_hash == TheoryTranslation.hash_source(proposal.statement)
+            ):
+                by_theory[item.theory_id] = item
+        return tuple(
+            asdict(by_theory[item.theory_id])
+            for item in bundle.proposals if item.theory_id in by_theory
+        )
+
+    def review_theory_translation(
+        self, translation_id, *, reviewer, rationale, reviewed_at,
+        corrected_translation=None,
+    ):
+        item = self.translations.get(translation_id)
+        if item is None:
+            raise KeyError(f"Unknown theory translation: {translation_id}")
+        if not rationale.strip():
+            raise ValueError("Translation review rationale is required")
+        source = self.theory_translation_source(item.bundle_id, item.theory_id)
+        if source["source_hash"] != item.source_hash:
+            raise ValueError("Translation source has changed and must be regenerated")
+        translation = (
+            corrected_translation.strip()
+            if corrected_translation is not None else item.translated_statement
+        )
+        if not translation:
+            raise ValueError("Reviewed translation is required")
+        reviewed = replace(
+            item, translated_statement=translation, status="reviewed",
+            reviewer=reviewer, review_rationale=rationale.strip(),
+            reviewed_at=reviewed_at, content_hash="",
+        ).finalized()
+        self.translations[translation_id] = reviewed
+        return reviewed, self.translation_store.save(reviewed)
 
     def alignment_quality(self, bundle_id, *, threshold=None):
         bundle = self._bundle(bundle_id)

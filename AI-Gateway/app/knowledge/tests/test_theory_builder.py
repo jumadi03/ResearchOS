@@ -383,6 +383,56 @@ def test_stratified_calibration_queue_is_blind_independent_and_adjudicated(
     assert restored.alignment_calibration_summary()["queue"]["finalized"] == 1
 
 
+def test_theory_translation_preserves_source_and_requires_current_hash(
+    tmp_path: Path,
+) -> None:
+    pipeline = KnowledgeTheoryPipeline(tmp_path, {})
+    bundle = TheoryBuilder().build((
+        graph("translation", "Open science improves reproducibility"),
+    ), created_at="time")
+    pipeline.bundles[bundle.bundle_id] = bundle
+    theory_id = bundle.proposals[0].theory_id
+
+    translated, _ = pipeline.record_theory_translation(
+        bundle.bundle_id, theory_id,
+        translated_statement="Sains terbuka meningkatkan reprodusibilitas",
+        provider="human", model="reviewer-translation-v1",
+        generated_by="translator@example",
+        generated_at="2026-07-16T08:00:00Z",
+    )
+    assert translated.status == "advisory"
+    assert translated.source_statement == bundle.proposals[0].statement
+    assert translated.source_hash
+    listed = pipeline.theory_translations(bundle.bundle_id)
+    assert listed[0]["translated_statement"].startswith("Sains terbuka")
+    reviewed, _ = pipeline.review_theory_translation(
+        translated.translation_id, reviewer="reviewer@example",
+        rationale="Terminology checked against the source statement",
+        corrected_translation="Sains terbuka meningkatkan keterulangan hasil",
+        reviewed_at="2026-07-16T08:01:00Z",
+    )
+    assert reviewed.status == "reviewed"
+    assert reviewed.translated_statement.endswith("keterulangan hasil")
+    restored = KnowledgeTheoryPipeline(tmp_path, {})
+    restored.bundles[bundle.bundle_id] = bundle
+    assert restored.theory_translations(bundle.bundle_id)[0]["status"] == "reviewed"
+    changed = replace(
+        bundle,
+        proposals=(replace(
+            bundle.proposals[0], statement="Open science may improve reproducibility",
+        ),),
+        content_hash="",
+    ).finalized()
+    restored.bundles[bundle.bundle_id] = changed
+    assert restored.theory_translations(bundle.bundle_id) == ()
+    with pytest.raises(ValueError, match="source has changed"):
+        restored.review_theory_translation(
+            translated.translation_id, reviewer="another-reviewer",
+            rationale="Attempted review against changed source",
+            reviewed_at="2026-07-16T08:02:00Z",
+        )
+
+
 def test_theory_review_is_attributable_and_requires_rationale() -> None:
     import pytest
     builder = TheoryBuilder()

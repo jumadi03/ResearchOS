@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added source-bound Bahasa Indonesia theory representations with AI-assisted
+  generation, manual reviewer entry, immutable source hashes, human correction
+  and review, stale-translation suppression, and an Original/Indonesia toggle.
 - Added a stratified blind calibration queue with balanced score bands,
   independent dual review, reviewer exclusion, agreement measurement, and
   third-reviewer adjudication before labels enter threshold calibration.

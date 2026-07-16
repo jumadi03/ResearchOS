@@ -97,6 +97,26 @@ class CalibrationCaseReviewRequest(BaseModel):
     reviewed_at: str = Field(min_length=1)
 
 
+class TheoryTranslationGenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    theory_id: str = Field(min_length=1)
+    generated_at: str = Field(min_length=1)
+
+
+class TheoryTranslationSubmissionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    theory_id: str = Field(min_length=1)
+    translated_statement: str = Field(min_length=3)
+    generated_at: str = Field(min_length=1)
+
+
+class TheoryTranslationReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rationale: str = Field(min_length=8)
+    reviewed_at: str = Field(min_length=1)
+    corrected_translation: str | None = Field(default=None, min_length=3)
+
+
 class EvidenceReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     decision: str
