@@ -242,6 +242,24 @@ def client(
 def payload():
     return {
         "question": {"question_id": "q1", "text": "Why?"},
+        "discovery_contract": {
+            "contract_id": "c1",
+            "project_id": "researchos-default",
+            "research_question_id": "q1",
+            "search_plan_id": "p1",
+            "scope": "Tourism research",
+            "source_categories": ["scholarly_index"],
+            "inclusion_rules": ["Relevant scientific studies"],
+            "exclusion_rules": ["Non-scientific commentary"],
+            "languages": ["en"],
+            "document_types": ["journal_article"],
+            "evidence_types": ["reported_result"],
+            "maximum_depth": 1,
+            "retrieval_budget": 10,
+            "license_policy": "metadata_only",
+            "human_review_policy": "human_review_required",
+            "stopping_conditions": ["retrieval budget exhausted"],
+        },
         "search_plan": {
             "plan_id": "p1", "query": "tourism", "providers": ["openalex"],
             "limit_per_provider": 10,
@@ -254,9 +272,48 @@ def test_discovery_api_is_authenticated_and_persists_run(tmp_path: Path) -> None
     assert response.status_code == 201
     body = response.json()
     assert body["records"][0]["title"] == "Result"
+    assert body["discovery_contract"]["contract_id"] == "c1"
     assert "raw" not in body["records"][0]["source_records"][0]
     assert tuple((tmp_path / "runs" / body["run_id"]).glob("discovery-*.json"))
     assert tuple((tmp_path / "runs" / body["run_id"] / "raw").rglob("*.json"))
+
+
+def test_discovery_api_requires_a_bound_safe_contract(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    missing = payload()
+    missing.pop("discovery_contract")
+    assert api.post("/knowledge/discovery/runs", json=missing).status_code == 422
+
+    mismatched = payload()
+    mismatched["discovery_contract"]["research_question_id"] = "other"
+    response = api.post("/knowledge/discovery/runs", json=mismatched)
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Discovery contract does not match research question"
+    )
+
+    over_budget = payload()
+    over_budget["discovery_contract"]["retrieval_budget"] = 5
+    response = api.post("/knowledge/discovery/runs", json=over_budget)
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Search plan exceeds discovery contract retrieval budget"
+    )
+
+
+def test_discovery_capabilities_expose_required_contract_bounds(
+    tmp_path: Path,
+) -> None:
+    response = client(tmp_path).get("/knowledge/discovery/capabilities")
+    assert response.status_code == 200
+    assert response.json()["discovery_contract"] == {
+        "required": True,
+        "maximum_depth": {"minimum": 1, "maximum": 10},
+        "retrieval_budget": {"minimum": 1, "maximum": 100000},
+        "binding": [
+            "research_question_id", "search_plan_id", "date_range",
+        ],
+    }
 
 
 def test_discovery_and_metadata_use_repository_port(tmp_path: Path) -> None:

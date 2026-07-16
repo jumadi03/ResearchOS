@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.knowledge.authentication import KnowledgeRole
-from app.knowledge.models import ScientificQuestion, SearchPlan
+from app.knowledge.models import DiscoveryContract, ScientificQuestion, SearchPlan
 from app.models.knowledge import (
     AlignmentCalibrationApprovalRequest, AlignmentCalibrationProposalRequest,
     AlignmentCalibrationRollbackRequest,
@@ -39,6 +39,12 @@ def discovery_capabilities(
     return {
         "providers": list(DISCOVERY_PROVIDERS),
         "limit_per_provider": {"default": 25, "minimum": 1, "maximum": 1000},
+        "discovery_contract": {
+            "required": True,
+            "maximum_depth": {"minimum": 1, "maximum": 10},
+            "retrieval_budget": {"minimum": 1, "maximum": 100000},
+            "binding": ["research_question_id", "search_plan_id", "date_range"],
+        },
         "acquisition_access_statuses": ["open", "restricted", "unavailable"],
         "workflow": ["discover", "collect_metadata", "acquire", "extract"],
     }
@@ -53,10 +59,20 @@ def discover(
     authorize(request, credentials)
     try:
         question = ScientificQuestion(**req.question.model_dump())
+        contract_data = req.discovery_contract.model_dump()
+        for name in (
+            "source_categories", "inclusion_rules", "exclusion_rules",
+            "languages", "document_types", "evidence_types",
+            "stopping_conditions",
+        ):
+            contract_data[name] = tuple(contract_data[name])
+        contract = DiscoveryContract(**contract_data)
         plan_data = req.search_plan.model_dump()
         plan_data["providers"] = tuple(plan_data["providers"])
         plan = SearchPlan(**plan_data)
-        run, snapshot = request.app.state.knowledge_service.discover(question, plan)
+        run, snapshot = request.app.state.knowledge_service.discover(
+            question, contract, plan,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     result = asdict(run)

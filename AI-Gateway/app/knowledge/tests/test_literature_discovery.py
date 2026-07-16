@@ -8,7 +8,9 @@ from app.knowledge.discovery.persistence import (
 from app.knowledge.discovery.providers import (
     CrossrefProvider, OpenAlexProvider, ProviderError, ProviderPage,
 )
-from app.knowledge.models import MatchKind, ScientificQuestion, SearchPlan
+from app.knowledge.models import (
+    DiscoveryContract, MatchKind, ScientificQuestion, SearchPlan,
+)
 
 
 class StubProvider:
@@ -31,6 +33,17 @@ def plan(*providers: str) -> SearchPlan:
     return SearchPlan("plan-1", "tourism village failure", providers)
 
 
+def contract(*, budget=100, question_id="question-1", plan_id="plan-1"):
+    return DiscoveryContract(
+        "contract-1", "researchos-default", question_id, plan_id,
+        "Tourism village research", ("scholarly_index",),
+        ("Studies about tourism villages",), ("Non-scientific commentary",),
+        ("en",), ("journal_article",), ("observational_result",),
+        1, budget, "metadata_only", "human_review_required",
+        ("retrieval budget exhausted",),
+    )
+
+
 def test_discovery_normalizes_and_exactly_merges_doi_records() -> None:
     openalex = StubProvider("openalex", ({
         "id": "https://openalex.org/W1", "title": "Tourism Village Failure",
@@ -46,7 +59,7 @@ def test_discovery_normalizes_and_exactly_merges_doi_records() -> None:
         run_id_factory=lambda: "run-1",
     )
 
-    run = engine.discover(question(), plan("openalex", "crossref"))
+    run = engine.discover(question(), contract(), plan("openalex", "crossref"))
 
     assert len(run.records) == 1
     assert run.records[0].doi == "10.1/abc"
@@ -59,7 +72,10 @@ def test_provider_failure_is_explicit_and_preserves_other_results() -> None:
     failed = StubProvider("crossref", failure=ProviderError("rate limited", retryable=True))
     engine = LiteratureDiscoveryEngine((successful, failed), clock=lambda: "now", run_id_factory=lambda: "run")
 
-    run = engine.discover(question(), plan("openalex", "crossref", "semantic_scholar"))
+    run = engine.discover(
+        question(), contract(),
+        plan("openalex", "crossref", "semantic_scholar"),
+    )
 
     assert len(run.records) == 1
     assert [(failure.provider, failure.retryable) for failure in run.failures] == [
@@ -74,7 +90,7 @@ def test_fuzzy_title_match_is_flagged_but_not_merged() -> None:
     ))
     run = LiteratureDiscoveryEngine(
         (provider,), clock=lambda: "now", run_id_factory=lambda: "run"
-    ).discover(question(), plan("semantic_scholar"))
+    ).discover(question(), contract(), plan("semantic_scholar"))
 
     assert len(run.records) == 2
     assert all(record.match_kind is MatchKind.POSSIBLE for record in run.records)
@@ -86,8 +102,8 @@ def test_snapshot_is_byte_stable_and_content_addressed(tmp_path: Path) -> None:
     engine = LiteratureDiscoveryEngine(
         (provider,), clock=lambda: "2026-01-01T00:00:00Z", run_id_factory=lambda: "run-1"
     )
-    first = engine.discover(question(), plan("openalex"))
-    second = engine.discover(question(), plan("openalex"))
+    first = engine.discover(question(), contract(), plan("openalex"))
+    second = engine.discover(question(), contract(), plan("openalex"))
 
     assert serialize_run(first) == serialize_run(second)
     store = DiscoverySnapshotStore(tmp_path)
@@ -180,7 +196,26 @@ def test_cache_and_raw_pages_avoid_second_provider_call_and_preserve_hash(tmp_pa
         (cached,), clock=lambda: "now", run_id_factory=lambda: "run",
         raw_page_store=RawPageStore(tmp_path / "runs"),
     )
-    run = engine.discover(question(), plan("openalex"))
+    run = engine.discover(question(), contract(), plan("openalex"))
     raw_files = tuple((tmp_path / "runs" / "run" / "raw" / "openalex").glob("*.json"))
     assert len(raw_files) == 1
     assert run.records[0].source_records[0].response_hash in raw_files[0].name
+
+
+def test_discovery_contract_is_bound_and_budgeted_before_provider_call() -> None:
+    import pytest
+
+    provider = StubProvider("openalex", ({"id": "W1", "title": "Result"},))
+    engine = LiteratureDiscoveryEngine((provider,))
+    with pytest.raises(ValueError, match="research question"):
+        engine.discover(
+            question(), contract(question_id="other"), plan("openalex"),
+        )
+    with pytest.raises(ValueError, match="search plan"):
+        engine.discover(
+            question(), contract(plan_id="other"), plan("openalex"),
+        )
+    with pytest.raises(ValueError, match="retrieval budget"):
+        engine.discover(
+            question(), contract(budget=1), plan("openalex", "crossref"),
+        )

@@ -8,7 +8,10 @@ from uuid import uuid4
 from app.knowledge.discovery.deduplication import deduplicate
 from app.knowledge.discovery.normalization import normalize
 from app.knowledge.discovery.providers import LiteratureProvider, ProviderError
-from app.knowledge.models import DiscoveryRun, ProviderFailure, ScientificQuestion, SearchPlan
+from app.knowledge.models import (
+    DiscoveryContract, DiscoveryRun, ProviderFailure, ScientificQuestion,
+    SearchPlan,
+)
 
 
 class LiteratureDiscoveryEngine:
@@ -25,7 +28,11 @@ class LiteratureDiscoveryEngine:
         self._run_id_factory = run_id_factory
         self._raw_page_store = raw_page_store
 
-    def discover(self, question: ScientificQuestion, plan: SearchPlan) -> DiscoveryRun:
+    def discover(
+        self, question: ScientificQuestion, contract: DiscoveryContract,
+        plan: SearchPlan,
+    ) -> DiscoveryRun:
+        contract.validate_binding(question, plan)
         started_at = self._clock()
         run_id = self._run_id_factory()
         records = []
@@ -59,7 +66,8 @@ class LiteratureDiscoveryEngine:
                     )
                 )
         return DiscoveryRun(
-            run_id=run_id, question=question, search_plan=plan,
+            run_id=run_id, question=question, discovery_contract=contract,
+            search_plan=plan,
             started_at=started_at, records=deduplicate(tuple(records)),
             failures=tuple(failures),
         )

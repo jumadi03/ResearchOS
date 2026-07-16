@@ -35,6 +35,74 @@ class ScientificQuestion:
 
 
 @dataclass(frozen=True, slots=True)
+class DiscoveryContract:
+    contract_id: str
+    project_id: str
+    research_question_id: str
+    search_plan_id: str
+    scope: str
+    source_categories: tuple[str, ...]
+    inclusion_rules: tuple[str, ...]
+    exclusion_rules: tuple[str, ...]
+    languages: tuple[str, ...]
+    document_types: tuple[str, ...]
+    evidence_types: tuple[str, ...]
+    maximum_depth: int
+    retrieval_budget: int
+    license_policy: str
+    human_review_policy: str
+    stopping_conditions: tuple[str, ...]
+    year_from: int | None = None
+    year_to: int | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "contract_id", "project_id", "research_question_id",
+            "search_plan_id", "scope", "license_policy",
+            "human_review_policy",
+        ):
+            object.__setattr__(self, name, _required(getattr(self, name), name))
+        for name in (
+            "source_categories", "inclusion_rules", "exclusion_rules",
+            "languages", "document_types", "evidence_types",
+            "stopping_conditions",
+        ):
+            values = tuple(dict.fromkeys(
+                item.strip() for item in getattr(self, name) if item.strip()
+            ))
+            if not values:
+                raise ValueError(f"{name} must not be empty")
+            object.__setattr__(self, name, values)
+        if not 1 <= self.maximum_depth <= 10:
+            raise ValueError("maximum_depth must be between 1 and 10")
+        if not 1 <= self.retrieval_budget <= 100_000:
+            raise ValueError(
+                "retrieval_budget must be between 1 and 100000"
+            )
+        if self.year_from and self.year_to and self.year_from > self.year_to:
+            raise ValueError("year_from must not exceed year_to")
+
+    def validate_binding(
+        self, question: "ScientificQuestion", plan: "SearchPlan",
+    ) -> None:
+        if self.research_question_id != question.question_id:
+            raise ValueError(
+                "Discovery contract does not match research question"
+            )
+        if self.search_plan_id != plan.plan_id:
+            raise ValueError("Discovery contract does not match search plan")
+        if self.year_from != plan.year_from or self.year_to != plan.year_to:
+            raise ValueError(
+                "Discovery contract date range does not match search plan"
+            )
+        planned_retrievals = len(plan.providers) * plan.limit_per_provider
+        if planned_retrievals > self.retrieval_budget:
+            raise ValueError(
+                "Search plan exceeds discovery contract retrieval budget"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class SearchPlan:
     plan_id: str
     query: str
@@ -96,6 +164,7 @@ class ProviderFailure:
 class DiscoveryRun:
     run_id: str
     question: ScientificQuestion
+    discovery_contract: DiscoveryContract
     search_plan: SearchPlan
     started_at: str
     records: tuple[LiteratureRecord, ...]

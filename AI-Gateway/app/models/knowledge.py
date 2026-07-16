@@ -12,6 +12,28 @@ class ScientificQuestionRequest(BaseModel):
     phenomenon_id: str | None = None
 
 
+class DiscoveryContractRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    contract_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    research_question_id: str = Field(min_length=1)
+    search_plan_id: str = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    source_categories: list[str] = Field(min_length=1)
+    inclusion_rules: list[str] = Field(min_length=1)
+    exclusion_rules: list[str] = Field(min_length=1)
+    languages: list[str] = Field(min_length=1)
+    document_types: list[str] = Field(min_length=1)
+    evidence_types: list[str] = Field(min_length=1)
+    maximum_depth: int = Field(ge=1, le=10)
+    retrieval_budget: int = Field(ge=1, le=100_000)
+    license_policy: str = Field(min_length=1)
+    human_review_policy: str = Field(min_length=1)
+    stopping_conditions: list[str] = Field(min_length=1)
+    year_from: int | None = Field(default=None, ge=1000, le=9999)
+    year_to: int | None = Field(default=None, ge=1000, le=9999)
+
+
 class SearchPlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     plan_id: str = Field(min_length=1)
@@ -25,6 +47,7 @@ class SearchPlanRequest(BaseModel):
 class LiteratureDiscoveryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: ScientificQuestionRequest
+    discovery_contract: DiscoveryContractRequest
     search_plan: SearchPlanRequest
 
 

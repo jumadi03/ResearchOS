@@ -1,6 +1,9 @@
 """Scientific Knowledge Subsystem."""
 
 from .discovery.engine import LiteratureDiscoveryEngine
-from .models import ScientificQuestion, SearchPlan
+from .models import DiscoveryContract, ScientificQuestion, SearchPlan
 
-__all__ = ["LiteratureDiscoveryEngine", "ScientificQuestion", "SearchPlan"]
+__all__ = [
+    "DiscoveryContract", "LiteratureDiscoveryEngine", "ScientificQuestion",
+    "SearchPlan",
+]

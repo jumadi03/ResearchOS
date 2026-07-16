@@ -13,7 +13,9 @@ from app.knowledge.ingestion.models import DocumentCandidate
 from app.knowledge.ingestion.registry import DocumentRegistry
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
 from app.knowledge.modeling.persistence import KnowledgeGraphStore
-from app.knowledge.models import DiscoveryRun, ScientificQuestion, SearchPlan
+from app.knowledge.models import (
+    DiscoveryContract, DiscoveryRun, ScientificQuestion, SearchPlan,
+)
 from app.knowledge.retrieval.collector import MetadataCollector
 from app.knowledge.retrieval.persistence import MetadataSnapshotStore
 
@@ -44,8 +46,11 @@ class KnowledgeIngestionPipeline:
         self.extractions = {}
         self.graphs = {}
 
-    def discover(self, question: ScientificQuestion, plan: SearchPlan):
-        run = self.engine.discover(question, plan)
+    def discover(
+        self, question: ScientificQuestion, contract: DiscoveryContract,
+        plan: SearchPlan,
+    ):
+        run = self.engine.discover(question, contract, plan)
         if self.data_repository is not None:
             self.data_repository.persist_discovery(run)
         self.runs[run.run_id] = run

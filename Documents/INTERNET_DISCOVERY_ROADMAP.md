@@ -10,8 +10,9 @@
 - Authority: project owner
 - Recorded: 2026-07-17
 - Safety prerequisite: P0 Evidence-to-Theory Safety Gate
-- Current status: P0 completed and verified
-- Next deliverable: SCAN-001A Discovery Contract Foundation
+- Completed: P0 Evidence-to-Theory Safety Gate
+- Completed: SCAN-001A Discovery Contract Foundation
+- Next deliverable: SCAN-001B Canonical Source Registry
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,

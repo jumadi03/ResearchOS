@@ -3,7 +3,9 @@
 from pathlib import Path
 
 from app.knowledge.discovery.providers import LiteratureProvider
-from app.knowledge.models import DiscoveryRun, ScientificQuestion, SearchPlan
+from app.knowledge.models import (
+    DiscoveryContract, DiscoveryRun, ScientificQuestion, SearchPlan,
+)
 from app.knowledge.ingestion.models import DocumentCandidate
 from app.knowledge.repository_service import KnowledgeRepositoryService
 from app.knowledge.ingestion_pipeline import KnowledgeIngestionPipeline
@@ -108,8 +110,11 @@ class KnowledgeDiscoveryService:
         self.object_translations[translation_id] = reviewed
         return reviewed, self.object_translation_store.save(reviewed)
 
-    def discover(self, question: ScientificQuestion, plan: SearchPlan):
-        return self.ingestion_pipeline.discover(question, plan)
+    def discover(
+        self, question: ScientificQuestion, contract: DiscoveryContract,
+        plan: SearchPlan,
+    ):
+        return self.ingestion_pipeline.discover(question, contract, plan)
 
     def collect_metadata(self, run_id: str):
         return self.ingestion_pipeline.collect_metadata(run_id)

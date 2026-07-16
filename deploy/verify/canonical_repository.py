@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 from app.knowledge.models import (
+    DiscoveryContract,
     DiscoveryRun,
     LiteratureRecord,
     MatchKind,
@@ -53,6 +54,15 @@ def discovery_run() -> DiscoveryRun:
     return DiscoveryRun(
         run_id="repository-healthcheck",
         question=ScientificQuestion("repository-healthcheck", "Is persistence healthy?"),
+        discovery_contract=DiscoveryContract(
+            "repository-healthcheck-contract", "researchos-default",
+            "repository-healthcheck", "repository-healthcheck",
+            "Canonical repository healthcheck", ("scholarly_index",),
+            ("Healthcheck record",), ("Unrelated record",), ("en",),
+            ("journal_article",), ("reported_result",), 1, 25,
+            "metadata_only", "human_review_required",
+            ("healthcheck complete",),
+        ),
         search_plan=SearchPlan("repository-healthcheck", "healthcheck", ("openalex",)),
         started_at="2026-07-15T12:00:00Z",
         records=(record,),

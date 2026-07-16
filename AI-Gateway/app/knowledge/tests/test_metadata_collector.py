@@ -1,6 +1,6 @@
 from app.knowledge.discovery.engine import LiteratureDiscoveryEngine
 from app.knowledge.discovery.providers import ProviderPage
-from app.knowledge.models import ScientificQuestion, SearchPlan
+from app.knowledge.models import DiscoveryContract, ScientificQuestion, SearchPlan
 from app.knowledge.retrieval.collector import MetadataCollector
 from app.knowledge.retrieval.models import LifecycleSignal
 
@@ -26,7 +26,17 @@ def test_metadata_collector_retains_conflicts_citations_and_retraction() -> None
     })
     discovery = LiteratureDiscoveryEngine(
         (openalex, crossref), clock=lambda: "time", run_id_factory=lambda: "run"
-    ).discover(ScientificQuestion("q", "Why?"), SearchPlan("p", "study", ("openalex", "crossref")))
+    ).discover(
+        ScientificQuestion("q", "Why?"),
+        DiscoveryContract(
+            "c", "researchos-default", "q", "p", "Study discovery",
+            ("scholarly_index",), ("Relevant studies",),
+            ("Non-scientific sources",), ("en",), ("journal_article",),
+            ("reported_result",), 1, 50, "metadata_only",
+            "human_review_required", ("budget exhausted",),
+        ),
+        SearchPlan("p", "study", ("openalex", "crossref")),
+    )
 
     result = MetadataCollector().collect(discovery, created_at="later")
 
