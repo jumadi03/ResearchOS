@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Hardened GitHub container contract builds with Docker daemon diagnostics and
+  three bounded, backoff retries. Deterministic failures remain blocking after
+  the final attempt while transient runner/registry failures self-recover.
 - Extended bilingual representations to scientific documents, evidence,
   artifacts, library cards, inspector titles, and graph focus content using
   object/source hashes, AI or manual translation, and immutable reviewer

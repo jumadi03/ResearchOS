@@ -104,10 +104,35 @@ jobs:
           check config /etc/prometheus/prometheus.yml
       - name: Build API and worker image
         working-directory: AI-Gateway
-        run: docker build --tag researchos-ci .
+        run: |
+          docker version
+          for attempt in 1 2 3; do
+            if docker build --progress plain --tag researchos-ci .; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::API image build failed after 3 attempts"
+              exit 1
+            fi
+            delay=$((attempt * 5))
+            echo "::warning::API image build attempt $attempt failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
       - name: Build backup image
         working-directory: deploy/backup
-        run: docker build --tag researchos-backup-ci .
+        run: |
+          for attempt in 1 2 3; do
+            if docker build --progress plain --tag researchos-backup-ci .; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Backup image build failed after 3 attempts"
+              exit 1
+            fi
+            delay=$((attempt * 5))
+            echo "::warning::Backup image build attempt $attempt failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
 
   storage-integration:
     name: PostgreSQL and MinIO integration
