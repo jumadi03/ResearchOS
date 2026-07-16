@@ -1,3 +1,5 @@
+from dataclasses import asdict
+import json
 from pathlib import Path
 
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
@@ -8,7 +10,11 @@ from app.knowledge.ingestion.registry import DocumentRegistry
 
 
 class Response:
-    headers = {"Content-Type": "application/pdf; charset=binary"}
+    headers = {
+        "Content-Type": "application/pdf; charset=binary",
+        "ETag": '"capture-v1"',
+        "Set-Cookie": "must-not-be-retained=secret",
+    }
     content = b"%PDF-1.7\nvalid"
     url = "https://example.test/paper.pdf"
     status_code = 200
@@ -42,6 +48,31 @@ def test_acquisition_is_content_addressed_versioned_and_verified(tmp_path: Path)
     assert first == repeated and path == repeated_path
     assert registry.verify(first)
     assert len(tuple((tmp_path / "blobs").rglob("*.pdf"))) == 1
+    assert first.content_encoding == "binary"
+    assert first.response_headers == (
+        ("content-type", "application/pdf; charset=binary"),
+        ("etag", '"capture-v1"'),
+    )
+    assert first.capture_manifest_hash
+    assert first.manifest_hash
+
+
+def test_document_manifest_tampering_is_rejected(tmp_path: Path) -> None:
+    registry = DocumentRegistry(tmp_path)
+    result = DocumentAcquirer(
+        transport=lambda *args, **kwargs: Response(),
+    ).acquire(candidate(), acquired_at="time")
+    document, path = registry.register(result)
+    tampered = asdict(document)
+    tampered["final_url"] = "https://attacker.test/replaced.pdf"
+    path.write_text(json.dumps(tampered), encoding="utf-8")
+
+    try:
+        registry.get(document.document_id)
+    except ValueError as exc:
+        assert "integrity verification failed" in str(exc)
+    else:
+        raise AssertionError("Tampered raw-capture manifest was accepted")
 
 
 def test_unknown_rights_create_metadata_only_entry_without_transport(tmp_path: Path) -> None:

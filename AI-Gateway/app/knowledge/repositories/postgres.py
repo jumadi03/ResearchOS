@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+from urllib.parse import urlparse
 
 from app.knowledge.discovery.normalization import canonical_json
 from app.knowledge.ingestion.models import AcquisitionResult, AcquisitionStatus
@@ -216,6 +217,31 @@ class _PostgresRepositoryCore:
         }.get(result.media_type)
         if representation_type is None:
             raise ValueError(f"Unsupported representation media type: {result.media_type}")
+        matching_source = next((
+            source for source in record.source_records
+            if source.provider == result.source_provider
+            and source.response_hash == result.source_response_hash
+        ), None)
+        if matching_source is None:
+            raise ValueError(
+                "Representation source does not belong to the canonical record"
+            )
+        if (
+            result.source_definition_id != matching_source.source_definition_id
+            or result.query_family_id != matching_source.query_family_id
+        ):
+            raise ValueError(
+                "Representation discovery provenance does not match canonical source"
+            )
+        if (
+            not result.capture_manifest_hash
+            or result.capture_manifest_hash
+            != result.expected_capture_manifest_hash()
+        ):
+            raise ValueError("Raw capture manifest integrity verification failed")
+        self._validate_representation_uri(
+            storage_uri, result.content_hash, representation_type,
+        )
 
         with self._connect() as connection:
             with connection.cursor() as cursor:
@@ -260,13 +286,23 @@ class _PostgresRepositoryCore:
                     INSERT INTO scientific_representations(
                         object_id, representation_type, storage_uri, media_type,
                         checksum_sha256, file_size, document_version, source_url,
-                        retrieval_method, retrieved_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'https_download',%s)
+                        retrieval_method, retrieved_at, final_url, http_status,
+                        redirect_chain, response_headers, content_encoding, license,
+                        source_definition_id, query_family_id, capture_manifest_hash
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,%s,%s
+                    )
                     RETURNING representation_id
                 """, (
                     document_id, representation_type, storage_uri, result.media_type,
                     result.content_hash, result.byte_size, version, result.source_url,
-                    result.acquired_at,
+                    result.retrieval_method, result.acquired_at, result.final_url,
+                    result.http_status, json.dumps(result.redirect_chain),
+                    json.dumps(dict(result.response_headers)),
+                    result.content_encoding, result.license,
+                    result.source_definition_id, result.query_family_id,
+                    result.capture_manifest_hash,
                 ))
                 representation_id = cursor.fetchone()[0]
                 cursor.execute(
@@ -274,6 +310,27 @@ class _PostgresRepositoryCore:
                     (result.license, document_id),
                 )
                 return str(representation_id), version
+
+    @staticmethod
+    def _validate_representation_uri(
+        storage_uri: str, checksum_sha256: str, representation_type: str,
+    ) -> None:
+        parsed = urlparse(storage_uri)
+        expected_path = (
+            f"representations/{checksum_sha256[:2]}/"
+            f"{checksum_sha256}.{representation_type}"
+        )
+        if (
+            parsed.scheme != "s3"
+            or not parsed.netloc
+            or parsed.path.lstrip("/") != expected_path
+            or parsed.params
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                "Representation storage URI is not canonical content-addressed storage"
+            )
 
     def get_representation(
         self, record: LiteratureRecord, checksum_sha256: str,
@@ -283,7 +340,11 @@ class _PostgresRepositoryCore:
                 cursor.execute("""
                     SELECT r.representation_id, r.object_id, r.representation_type,
                            r.storage_uri, r.media_type, r.checksum_sha256,
-                           r.file_size, r.document_version
+                           r.file_size, r.document_version, r.source_url,
+                           r.final_url, r.retrieval_method, r.retrieved_at,
+                           r.http_status, r.redirect_chain, r.response_headers,
+                           r.content_encoding, r.license, r.source_definition_id,
+                           r.query_family_id, r.capture_manifest_hash
                     FROM scientific_representations r
                     JOIN canonical_objects c ON c.object_id=r.object_id
                     WHERE c.stable_key=%s AND r.checksum_sha256=%s
@@ -297,6 +358,13 @@ class _PostgresRepositoryCore:
             representation_id=str(row[0]), object_id=str(row[1]),
             representation_type=row[2], storage_uri=row[3], media_type=row[4],
             checksum_sha256=row[5], file_size=row[6], document_version=row[7],
+            source_url=row[8], final_url=row[9], retrieval_method=row[10],
+            retrieved_at=row[11].isoformat() if row[11] else None,
+            http_status=row[12], redirect_chain=tuple(row[13] or ()),
+            response_headers=tuple(sorted((row[14] or {}).items())),
+            content_encoding=row[15], license=row[16],
+            source_definition_id=row[17], query_family_id=row[18],
+            capture_manifest_hash=row[19],
         )
 
 

@@ -36,6 +36,20 @@ class MinioScientificObjectStore:
             namespace="representations",
         )
 
+    def verify_capture(self, result: AcquisitionResult, storage_uri: str) -> None:
+        representation = StoredRepresentation(
+            representation_id="capture-verification",
+            object_id=result.record_id,
+            representation_type="pdf",
+            storage_uri=storage_uri,
+            media_type=result.media_type or "",
+            checksum_sha256=result.content_hash or "",
+            file_size=result.byte_size or 0,
+            document_version=1,
+        )
+        if self.read_verified(representation) != result.content:
+            raise ValueError("Stored raw capture differs from acquired payload")
+
     def put_bytes(
         self, content: bytes, *, media_type: str, checksum_sha256: str,
         extension: str, namespace: str,

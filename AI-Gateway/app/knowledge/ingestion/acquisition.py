@@ -102,6 +102,11 @@ def _source_license(raw: dict, *locations: dict) -> str | None:
 
 
 class DocumentAcquirer:
+    _CAPTURE_HEADERS = frozenset({
+        "accept-ranges", "cache-control", "content-disposition",
+        "content-encoding", "content-language", "content-length",
+        "content-type", "date", "etag", "expires", "last-modified", "vary",
+    })
     def __init__(
         self, *, transport: Callable = requests.get,
         timeout: float = 30.0, max_bytes: int = 25_000_000,
@@ -190,6 +195,8 @@ class DocumentAcquirer:
                 http_status=getattr(response, "status_code", 200),
                 redirect_chain=tuple(redirect_chain),
                 declared_content_length=declared_length,
+                response_headers=self._capture_headers(response),
+                content_encoding=self._content_encoding(response, media_type),
             )
         except requests.RequestException as exc:
             return self._result(candidate, acquired_at, AcquisitionStatus.FAILED, reason=str(exc))
@@ -212,7 +219,8 @@ class DocumentAcquirer:
     def _result(
         candidate, acquired_at, status, *, reason=None, media_type=None,
         content=None, final_url=None, http_status=None, redirect_chain=(),
-        declared_content_length=None,
+        declared_content_length=None, response_headers=(),
+        content_encoding=None,
     ):
         return AcquisitionResult(
             candidate.record_id, status, acquired_at, candidate.url,
@@ -223,6 +231,7 @@ class DocumentAcquirer:
             final_url, http_status, redirect_chain, declared_content_length,
             candidate.retrieval_method, candidate.source_definition_id,
             candidate.query_family_id,
+            response_headers, content_encoding,
         )
 
     @staticmethod
@@ -259,3 +268,23 @@ class DocumentAcquirer:
             address.is_private or address.is_loopback or address.is_link_local
             or address.is_multicast or address.is_reserved
         )
+
+    @classmethod
+    def _capture_headers(cls, response) -> tuple[tuple[str, str], ...]:
+        return tuple(sorted(
+            (str(key).casefold(), str(value))
+            for key, value in response.headers.items()
+            if str(key).casefold() in cls._CAPTURE_HEADERS
+        ))
+
+    @staticmethod
+    def _content_encoding(response, media_type: str) -> str:
+        explicit = getattr(response, "encoding", None)
+        if explicit:
+            return str(explicit)
+        content_type = response.headers.get("Content-Type", "")
+        for part in content_type.split(";")[1:]:
+            key, _, value = part.partition("=")
+            if key.strip().casefold() == "charset" and value.strip():
+                return value.strip().strip("\"'")
+        return "binary" if media_type == "application/pdf" else "unknown"

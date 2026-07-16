@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -175,7 +176,13 @@ class RecordingObjectStore:
         self.byte_objects = []
     def put(self, result):
         self.results.append(result)
-        return f"s3://researchos-documents/{result.content_hash}.pdf"
+        return (
+            "s3://researchos-documents/representations/"
+            f"{result.content_hash[:2]}/{result.content_hash}.pdf"
+        )
+    def verify_capture(self, result, storage_uri):
+        assert storage_uri.endswith(f"/{result.content_hash}.pdf")
+        assert result.content is not None
     def read_verified(self, representation):
         self.reads.append(representation)
         if self.corrupt:
@@ -444,6 +451,37 @@ def test_acquired_document_uses_object_and_representation_ports(tmp_path: Path) 
     assert persisted_record.record_id == record["record_id"]
     assert result.content_hash == object_store.results[0].content_hash
     assert uri.startswith("s3://researchos-documents/")
+    assert result.capture_manifest_hash
+    assert result.content_encoding == "binary"
+    assert result.retrieval_method == "https_pdf"
+
+
+def test_canonical_persistence_failure_does_not_create_local_success(
+    tmp_path: Path,
+) -> None:
+    class FailingRepository(RecordingRepository):
+        def persist_representation(self, record, result, storage_uri):
+            raise RuntimeError("canonical persistence unavailable")
+
+    api = client(
+        tmp_path, repository=FailingRepository(),
+        object_store=RecordingObjectStore(),
+    )
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    record = discovered["records"][0]
+    source = record["source_records"][0]
+    with pytest.raises(RuntimeError, match="canonical persistence unavailable"):
+        api.post(
+            f"/knowledge/discovery/runs/{discovered['run_id']}/documents",
+            json={
+                "record_id": record["record_id"],
+                "url": "https://example.test/paper.pdf",
+                "access_status": "open", "license": "CC-BY-4.0",
+                "source_provider": source["provider"],
+                "source_response_hash": source["response_hash"],
+            },
+        )
+    assert not (tmp_path / "documents" / "records").exists()
 
 
 def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None:

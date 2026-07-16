@@ -31,6 +31,7 @@ result = AcquisitionResult(
     declared_content_length=len(content), retrieval_method="https_pdf",
     source_definition_id="source-healthcheck",
     query_family_id="query-family-healthcheck",
+    content_encoding="binary",
 )
 document, _ = DocumentRegistry(root / "documents").register(result)
 with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as connection:

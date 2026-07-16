@@ -92,13 +92,14 @@ class KnowledgeIngestionPipeline:
         result = self.document_acquirer.acquire(
             candidate, acquired_at=DiscoveryRun.timestamp()
         )
-        registered = self.document_registry.register(result)
+        storage_uri = None
         if result.content is not None and self.object_store is not None:
             if self.data_repository is None:
                 raise RuntimeError("Object storage requires a canonical data repository")
             storage_uri = self.object_store.put(result)
+            self.object_store.verify_capture(result, storage_uri)
             self.data_repository.persist_representation(record, result, storage_uri)
-        return registered
+        return self.document_registry.register(result, storage_uri=storage_uri)
 
     def extract_document(self, document_id: str):
         document = self.document_registry.get(document_id)

@@ -44,7 +44,7 @@ WHERE schemaname='public' AND tablename IN (
 
 DO $$
 BEGIN
-    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 16 THEN
+    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 17 THEN
         RAISE EXCEPTION 'database schema version does not match application';
     END IF;
 END;

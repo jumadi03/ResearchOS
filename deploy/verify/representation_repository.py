@@ -33,6 +33,11 @@ def result(content: bytes, acquired_at: str) -> AcquisitionResult:
         retrieval_method="https_pdf",
         source_definition_id="source-openalex",
         query_family_id="repository-healthcheck-query-family",
+        response_headers=(
+            ("content-type", "application/pdf"),
+            ("etag", '"researchos-scan-001f"'),
+        ),
+        content_encoding="binary",
     )
 
 
@@ -45,30 +50,62 @@ def main() -> None:
         secret_key=os.environ["MINIO_SECRET_KEY"],
         bucket=os.getenv("MINIO_DOCUMENT_BUCKET", "researchos-documents"),
     )
-    first = result(b"%PDF-1.7\nResearchOS representation v1\n", "2026-07-15T13:00:00Z")
-    second = result(b"%PDF-1.7\nResearchOS representation v2\n", "2026-07-15T13:05:00Z")
+    source = record.source_records[0]
+    first = replace(
+        result(
+            b"%PDF-1.7\nResearchOS SCAN-001F header capture v1\n",
+            "2026-07-15T13:00:00Z",
+        ),
+        source_definition_id=source.source_definition_id,
+        query_family_id=source.query_family_id,
+        capture_manifest_hash=None,
+    )
+    second = replace(
+        result(
+            b"%PDF-1.7\nResearchOS SCAN-001F header capture v2\n",
+            "2026-07-15T13:05:00Z",
+        ),
+        source_definition_id=source.source_definition_id,
+        query_family_id=source.query_family_id,
+        capture_manifest_hash=None,
+    )
     first_uri = store.put(first)
     first_id = repository.persist_representation(record, first, first_uri)
     assert repository.persist_representation(record, first, store.put(first)) == first_id
     second_uri = store.put(second)
     second_id = repository.persist_representation(record, second, second_uri)
 
-    assert first_id[1] == 1, first_id
-    assert second_id[1] == 2, second_id
+    assert second_id[1] == first_id[1] + 1, (first_id, second_id)
     with repository._connect() as connection:
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT document_version, checksum_sha256, storage_uri
+                SELECT document_version, checksum_sha256, storage_uri,
+                       final_url,http_status,redirect_chain,response_headers,
+                       content_encoding,license,source_definition_id,
+                       query_family_id,capture_manifest_hash,retrieval_method
                 FROM scientific_representations r
                 JOIN canonical_objects c ON c.object_id=r.object_id
                 WHERE c.stable_key='doi:10.0000/researchos.repository-healthcheck'
                   AND representation_type='pdf'
+                  AND checksum_sha256 IN (%s,%s)
                 ORDER BY document_version
-            """)
+            """, (first.content_hash, second.content_hash))
             rows = cursor.fetchall()
     assert rows == [
-        (1, first.content_hash, first_uri),
-        (2, second.content_hash, second_uri),
+        (
+            first_id[1], first.content_hash, first_uri, first.final_url, 200, [],
+            dict(first.response_headers), "binary", first.license,
+            first.source_definition_id,
+            first.query_family_id, first.capture_manifest_hash,
+            first.retrieval_method,
+        ),
+        (
+            second_id[1], second.content_hash, second_uri, second.final_url, 200, [],
+            dict(second.response_headers), "binary", second.license,
+            second.source_definition_id,
+            second.query_family_id, second.capture_manifest_hash,
+            second.retrieval_method,
+        ),
     ], rows
     stored = repository.get_representation(record, second.content_hash)
     assert store.read_verified(stored) == second.content
@@ -84,6 +121,26 @@ def main() -> None:
         pass
     else:
         raise AssertionError("Missing object was not rejected")
+    try:
+        repository.persist_representation(
+            record, second,
+            f"s3://researchos-documents/arbitrary/{second.content_hash}.pdf",
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Non-canonical storage URI was accepted")
+    try:
+        repository.persist_representation(
+            record, replace(
+                second, source_definition_id="source-invented",
+                capture_manifest_hash=None,
+            ), second_uri,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Invented discovery provenance was accepted")
     print("representation repository healthcheck: passed")
 
 
