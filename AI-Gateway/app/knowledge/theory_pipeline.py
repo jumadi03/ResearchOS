@@ -88,6 +88,63 @@ class KnowledgeTheoryPipeline:
         self.bundles[bundle_id] = decided
         return decided, self.theory_store.save(decided)
 
+    def alignment_history(self, bundle_id):
+        bundle = self._bundle(bundle_id)
+        proposals = {item.theory_id: item for item in bundle.proposals}
+        entries = []
+        for event in bundle.alignments:
+            result = proposals.get(event.resulting_theory_id)
+            entries.append({
+                "decision_id": event.alignment_id,
+                "decision": "aligned",
+                "theory_ids": event.source_theory_ids,
+                "resulting_theory_id": event.resulting_theory_id,
+                "statements": (event.statement,),
+                "reviewer": event.reviewer,
+                "rationale": event.rationale,
+                "occurred_at": event.occurred_at,
+                "evidence_by_theory": (
+                    tuple(asdict(item) for item in result.evidence) if result else (),
+                ),
+            })
+        for event in bundle.alignment_decisions:
+            sources = tuple(proposals.get(item) for item in event.theory_ids)
+            entries.append({
+                "decision_id": event.decision_id,
+                "decision": event.decision,
+                "theory_ids": event.theory_ids,
+                "resulting_theory_id": None,
+                "statements": tuple(
+                    item.statement if item else "Historical source theory"
+                    for item in sources
+                ),
+                "reviewer": event.reviewer,
+                "rationale": event.rationale,
+                "occurred_at": event.occurred_at,
+                "evidence_by_theory": tuple(
+                    tuple(asdict(evidence) for evidence in item.evidence)
+                    if item else () for item in sources
+                ),
+            })
+        reports = sorted(
+            (item for item in self.validation_reports.values()
+             if item.theory_bundle_id == bundle_id),
+            key=lambda item: (item.assessed_at, item.report_id), reverse=True,
+        )
+        return {
+            "bundle_id": bundle_id,
+            "latest_validation": ({
+                "report_id": reports[0].report_id,
+                "status": reports[0].status.value,
+                "assessed_at": reports[0].assessed_at,
+            } if reports else None),
+            "items": tuple(sorted(
+                entries,
+                key=lambda item: (item["occurred_at"], item["decision_id"]),
+                reverse=True,
+            )),
+        }
+
     def list_theory_bundles(self):
         summaries = []
         for bundle in self.bundles.values():

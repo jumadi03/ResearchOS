@@ -533,6 +533,19 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
         }, headers={"Authorization": "Bearer review"},
     )
     assert invalid_keep_separate.status_code == 422
+    forbidden_history = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-history"
+    )
+    assert forbidden_history.status_code == 403
+    history = api.get(
+        f"/knowledge/theories/{theories.json()['bundle_id']}/alignment-history",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert history.status_code == 200
+    assert history.json() == {
+        "bundle_id": theories.json()["bundle_id"],
+        "latest_validation": None, "items": [],
+    }
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
     assert gaps.status_code == 201
     assert gaps.json()["gaps"][0]["gap_type"] == "limited_coverage"
@@ -620,6 +633,8 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert "/workspace-assets/theory.js" in response.text
     assert 'id="separateDialog"' in response.text
     assert "Simpan sebagai terpisah" in response.text
+    assert 'id="decisionHistory"' in response.text
+    assert "Decision History" in response.text
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:

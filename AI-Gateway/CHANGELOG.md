@@ -36,6 +36,8 @@ follows Semantic Versioning.
   persistent snapshots when the API restarts.
 - Add evidence-level candidate provenance and immutable reviewer decisions to
   keep semantically distinct theory pairs separate and suppress repeat prompts.
+- Add a filterable theory-alignment decision ledger with reviewer attribution,
+  evidence links, validation status, and permanent audit deep-links.
 
 ## [0.4.0] - 2026-07-16
 

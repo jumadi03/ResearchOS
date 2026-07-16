@@ -71,6 +71,9 @@ class KnowledgeDiscoveryService:
     def keep_theories_separate(self, bundle_id, **options):
         return self.theory_pipeline.keep_theories_separate(bundle_id, **options)
 
+    def alignment_history(self, bundle_id):
+        return self.theory_pipeline.alignment_history(bundle_id)
+
     def list_theory_bundles(self):
         return self.theory_pipeline.list_theory_bundles()
 

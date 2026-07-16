@@ -97,6 +97,13 @@ an immutable `keep_separate` decision at
 `POST /knowledge/theories/{bundle_id}/alignment-decisions`. A decided pair is
 suppressed from later candidate queues so the same review is not repeated.
 
+The immutable reviewer ledger is available from
+`GET /knowledge/theories/{bundle_id}/alignment-history`. It combines aligned
+and `keep_separate` events with reviewer identity, time, rationale, source
+theory identifiers, preserved evidence provenance, and the latest active
+validation status. Workspace audit links can reopen a bundle and highlight one
+specific decision without changing the underlying event.
+
 ### Theory bundle registry
 
 The reviewer workspace loads `GET /knowledge/theories` to list available

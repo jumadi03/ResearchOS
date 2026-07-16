@@ -11,6 +11,7 @@ from app.knowledge.modeling.models import (
 from app.knowledge.theory.builder import TheoryBuilder
 from app.knowledge.theory.models import TheoryReviewState
 from app.knowledge.theory.persistence import TheoryBundleStore
+from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
 from app.knowledge.validation.engine import ValidationEngine
 from app.knowledge.validation.models import RiskOfBias, ValidationStatus
 
@@ -72,7 +73,7 @@ def test_related_but_non_equivalent_claims_remain_separate() -> None:
     assert len(bundle.proposals) == 2
 
 
-def test_reviewer_alignment_merges_accepted_theories_and_records_audit_event() -> None:
+def test_reviewer_alignment_merges_accepted_theories_and_records_audit_event(tmp_path: Path) -> None:
     builder = TheoryBuilder()
     bundle = builder.build((
         graph("one", "Open practices improve reproducibility"),
@@ -101,6 +102,12 @@ def test_reviewer_alignment_merges_accepted_theories_and_records_audit_event() -
     assert aligned.alignments[0].source_theory_ids == tuple(sorted(source_ids))
     assert aligned.alignments[0].resulting_theory_id == proposal.theory_id
     assert aligned.alignments[0].reviewer == "reviewer@example"
+    pipeline = KnowledgeTheoryPipeline(tmp_path, {})
+    pipeline.bundles[aligned.bundle_id] = aligned
+    history = pipeline.alignment_history(aligned.bundle_id)
+    assert history["items"][0]["decision"] == "aligned"
+    assert history["items"][0]["resulting_theory_id"] == proposal.theory_id
+    assert len(history["items"][0]["evidence_by_theory"][0]) == 2
 
 
 def test_alignment_fails_closed_without_prior_acceptance() -> None:
@@ -119,7 +126,7 @@ def test_alignment_fails_closed_without_prior_acceptance() -> None:
         )
 
 
-def test_alignment_candidates_are_advisory_ranked_and_accepted_only() -> None:
+def test_alignment_candidates_are_advisory_ranked_and_accepted_only(tmp_path: Path) -> None:
     builder = TheoryBuilder()
     bundle = builder.build((
         graph("one", "Open science practices improve reproducibility"),
@@ -155,6 +162,13 @@ def test_alignment_candidates_are_advisory_ranked_and_accepted_only() -> None:
     assert decided.alignment_decisions[0].decision == "keep_separate"
     assert decided.alignment_decisions[0].reviewer == "reviewer@example"
     assert builder.alignment_candidates(decided) == ()
+    pipeline = KnowledgeTheoryPipeline(tmp_path, {})
+    pipeline.bundles[decided.bundle_id] = decided
+    history = pipeline.alignment_history(decided.bundle_id)
+    assert history["latest_validation"] is None
+    assert history["items"][0]["decision"] == "keep_separate"
+    assert set(history["items"][0]["theory_ids"]) == related_ids
+    assert history["items"][0]["evidence_by_theory"][0][0]["object_id"]
 
 
 def test_theory_review_is_attributable_and_requires_rationale() -> None:
