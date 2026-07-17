@@ -191,3 +191,19 @@ storage contracts, deployment boundaries, and whether restoration tooling
 already exists outside the currently inspected canonical paths. Do not change
 code until that dependency verification and architecture position are reported
 and accepted.
+
+### Phase 1A implementation traceability
+
+Phase 1A establishes the backup-set and restore-evidence foundation. New backup
+runs publish a deterministic portable manifest and store its hash in
+PostgreSQL. Restore verification is modeled as a separate immutable ledger,
+bound to the exact backup ID and set hash and restricted to isolated targets.
+The administration API and interface no longer equate archive integrity with a
+successful restore. Compatibility is additive: the historical `ready` response
+remains but is explicitly marked as a deprecated backup-integrity alias.
+
+This does **not** complete Rule 13. No restore executor or scheduled full drill
+is introduced here, and architecture/configuration components are not yet
+included in the produced set. Consequently `recovery_ready` remains fail-closed
+until a later accepted increment performs and records a matching isolated
+restore.

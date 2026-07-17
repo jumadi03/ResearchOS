@@ -293,6 +293,24 @@ Research roles cannot invoke administrative actions. Backup readiness is based
 on a PostgreSQL ledger written only after the database, MinIO, and knowledge
 archives all pass integrity checks.
 
+DATA maintenance Phase 1A (schema 29) corrects the recovery semantics without
+breaking existing clients. Each new backup publishes a deterministic,
+SHA-256-bound manifest for its PostgreSQL, MinIO, and knowledge components.
+`backup_runs` remains mutable operational staging while a backup is being
+constructed; it is no longer classified as an immutable ledger. Isolated
+restore results belong to the separate append-only
+`backup_restore_verifications` ledger. A composite foreign key binds every
+verification to the exact backup ID and manifest hash, the target kind is
+restricted to `isolated`, and non-empty check evidence plus actor and timing
+provenance are mandatory.
+
+The recovery projection now distinguishes legacy component checks
+(`ready`, retained only as a deprecated compatibility alias), portable set
+integrity (`backup_integrity_ready`), isolated restore proof
+(`restore_verified`), and the conjunction required for an operational recovery
+claim (`recovery_ready`). Phase 1A defines no restoration executor and performs
+no mutation of active PostgreSQL, MinIO, knowledge, or architecture data.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly

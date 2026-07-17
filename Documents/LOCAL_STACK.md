@@ -55,6 +55,22 @@ MinIO archive includes a JSONL restoration manifest containing object metadata.
 Every artifact has a verified SHA-256 sidecar, and files are published atomically after verification.
 Backups are retained for 14 days by default. Configure intervals in `stack.env`.
 
+Schema 29 adds a portable backup-set manifest that binds the PostgreSQL dump,
+MinIO archive, and knowledge archive to their exact filenames and SHA-256
+hashes. The manifest itself is hashed, and that hash is stored with the backup
+ledger entry. A completed archive-integrity check is deliberately distinct from
+recovery readiness: ResearchOS may report `backup_integrity_ready` only for a
+manifest-bound set, and may report `recovery_ready` only when a matching
+append-only `backup_restore_verifications` record proves a successful restore
+to an isolated target. The older `ready` API field remains temporarily as a
+compatibility alias for legacy archive checks and must not be interpreted as
+restore evidence.
+
+This increment defines the portable set and restore-evidence contracts only. It
+does not introduce a restore executor and cannot restore over active ResearchOS
+data. A later, separately reviewed increment must implement the isolated
+restore drill before recovery readiness can become true.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before

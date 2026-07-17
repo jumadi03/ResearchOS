@@ -44,13 +44,92 @@ WHERE schemaname='public' AND tablename IN (
     'scientific_identifiers','identity_resolution_events',
     'evidence_objects','provenance_events',
     'knowledge_nodes','knowledge_edges','research_artifacts',
-    'artifact_lifecycle_events','publication_representations'
+    'artifact_lifecycle_events','publication_representations',
+    'backup_restore_verifications'
 );
 
 DO $$
 BEGIN
-    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 28 THEN
+    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 29 THEN
         RAISE EXCEPTION 'database schema version does not match application';
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM storage_contract_registry
+        WHERE resource_name='backup_runs'
+          AND lifecycle_class='operational_staging'
+          AND responsibility LIKE 'Mutable backup construction%'
+    ) THEN
+        RAISE EXCEPTION 'backup_runs authority classification is stale';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='backup_restore_verifications_immutable'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'restore verification immutability is missing';
+    END IF;
+END;
+$$;
+
+DO $$
+DECLARE
+    test_backup_id uuid;
+    test_verification_id uuid;
+    set_hash text := repeat('a', 64);
+BEGIN
+    BEGIN
+        INSERT INTO backup_runs(
+            backup_stamp,status,database_path,minio_path,knowledge_path,
+            database_verified,minio_verified,knowledge_verified,
+            backup_set_id,backup_set_hash,manifest_path,integrity_verified,
+            completed_at
+        ) VALUES (
+            'health-restore-contract','completed','database','minio','knowledge',
+            true,true,true,'health-backup-set',set_hash,'manifest',true,now()
+        ) RETURNING backup_id INTO test_backup_id;
+
+        INSERT INTO backup_restore_verifications(
+            backup_id,backup_set_hash,target_kind,target_identifier,components,
+            outcome,checks,actor,started_at,completed_at,content_hash
+        ) VALUES (
+            test_backup_id,set_hash,'isolated','health-isolated-target',
+            ARRAY['postgresql','minio','knowledge'],'verified',
+            '[{"check":"contract","outcome":"passed"}]'::jsonb,
+            'healthcheck',now(),now(),repeat('b', 64)
+        ) RETURNING verification_id INTO test_verification_id;
+
+        BEGIN
+            UPDATE backup_restore_verifications
+            SET outcome='failed' WHERE verification_id=test_verification_id;
+            RAISE EXCEPTION 'restore evidence mutation was not rejected';
+        EXCEPTION
+            WHEN raise_exception THEN
+                IF SQLERRM <> 'provenance ledger is append-only' THEN
+                    RAISE;
+                END IF;
+        END;
+
+        BEGIN
+            INSERT INTO backup_restore_verifications(
+                backup_id,backup_set_hash,target_kind,target_identifier,
+                components,outcome,checks,actor,started_at,completed_at,content_hash
+            ) VALUES (
+                test_backup_id,repeat('c', 64),'isolated','mismatched-set',
+                ARRAY['postgresql'],'failed',
+                '[{"check":"binding","outcome":"failed"}]'::jsonb,
+                'healthcheck',now(),now(),repeat('d', 64)
+            );
+            RAISE EXCEPTION 'mismatched backup set hash was not rejected';
+        EXCEPTION
+            WHEN foreign_key_violation THEN NULL;
+        END;
+
+        RAISE EXCEPTION 'restore contract healthcheck rollback';
+    EXCEPTION
+        WHEN raise_exception THEN
+            IF SQLERRM <> 'restore contract healthcheck rollback' THEN
+                RAISE;
+            END IF;
+    END;
 END;
 $$;
