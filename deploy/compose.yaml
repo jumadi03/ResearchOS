@@ -134,6 +134,20 @@ services:
     depends_on:
       migrate: {condition: service_completed_successfully}
 
+  restore-coordinator:
+    profiles: ["restore-coordinator"]
+    build: {context: ../AI-Gateway}
+    restart: "no"
+    env_file: ["stack.env"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
+    entrypoint: ["python", "/coordinator/coordinate_restore_drill.py"]
+    command: ["--help"]
+    volumes:
+      - ./restore/coordinate_restore_drill.py:/coordinator/coordinate_restore_drill.py:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.17.1
     restart: unless-stopped

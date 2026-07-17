@@ -297,3 +297,19 @@ timestamps beyond the allowed future skew fail closed with explicit reasons.
 The immutable evidence remains unchanged, and this increment introduces no
 scheduler, worker job, orchestration service, private-key exposure, database
 migration, or direct admission path.
+
+### Phase 1F-B implementation traceability
+
+Phase 1F-B adds the coordination foundation required before periodic execution.
+Schema 31 defines one operational restore-drill run lease and a separate
+append-only lifecycle-event ledger. PostgreSQL, rather than a client path,
+selects the latest eligible backup and returns its safe manifest filename.
+
+Only one run may be active. Lease identity, owner, backup binding, and expiry
+are immutable. Completion requires a matching canonical Phase 1E verification
+ID and report content hash. Wrong tokens, concurrent acquisition, mismatched
+evidence, and expired completion fail closed with explicit reasons.
+
+The coordinator is DB-only and has no private key, backup/report/trust mounts,
+Docker socket, API route, or worker integration. This increment does not add a
+scheduler or execute the drill automatically.

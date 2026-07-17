@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added Phase 1F-B Schema 31 exclusive restore-drill coordination with
+  server-selected backup binding, bounded lease ownership, immutable lifecycle
+  events, and completion tied to canonical signed verification evidence.
 - Added Phase 1F-A live restore-evidence freshness enforcement, separating
   trusted cryptographic verification from bounded evidence age and requiring
   both before `recovery_ready` can become true.
