@@ -705,6 +705,24 @@ Execution remains outside the contract until a later, separately reviewed
 increment defines preflight revalidation, transactional application,
 post-migration verification, and recovery behavior.
 
+### FMA-008 preflight revalidation
+
+The second FMA-008 increment adds a live, fail-closed preflight boundary:
+
+- an approved plan is revalidated against the current canonical File Registry
+  and Architecture Graph;
+- source revision, registry identity and hash, policy provenance, source paths
+  and content hashes, target availability, rollback completeness, and graph
+  currency are recorded as explicit checks;
+- changed canonical state produces `stale`, while missing approval or another
+  non-staleness safety failure produces `blocked`;
+- a fully successful evaluation produces `ready`; and
+- every result is immutable, content-addressed, provenance-bearing, and
+  explicitly not an execution authorization.
+
+Preflight does not mutate the repository. A future executor must consume a
+fresh `ready` result and independently revalidate it at the mutation boundary.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

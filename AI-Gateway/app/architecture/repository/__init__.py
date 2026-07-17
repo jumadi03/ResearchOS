@@ -54,9 +54,13 @@ from .dashboard_store import RepositoryDashboardArtifactStore
 from .evolution_models import (
     RepositoryEvolutionDecision,
     RepositoryEvolutionPlan,
+    RepositoryEvolutionPreflight,
     RepositoryMove,
+    RepositoryPreflightCheck,
+    RepositoryPreflightOutcome,
 )
 from .evolution_planner import RepositoryEvolutionPlanner
+from .evolution_preflight import RepositoryEvolutionPreflightEngine
 
 __all__ = [
     "RepositoryClassifier",
@@ -100,5 +104,9 @@ __all__ = [
     "RepositoryEvolutionDecision",
     "RepositoryEvolutionPlan",
     "RepositoryEvolutionPlanner",
+    "RepositoryEvolutionPreflight",
+    "RepositoryEvolutionPreflightEngine",
     "RepositoryMove",
+    "RepositoryPreflightCheck",
+    "RepositoryPreflightOutcome",
 ]
