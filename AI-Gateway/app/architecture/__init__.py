@@ -49,6 +49,7 @@ from .repository import (
     RepositoryVerificationMode,
     RepositoryVerificationOutcome,
     RepositoryVerificationReport,
+    RepositoryTraceabilityGraphBuilder,
 )
 
 
@@ -93,4 +94,5 @@ __all__ = [
     "RepositoryVerificationMode",
     "RepositoryVerificationOutcome",
     "RepositoryVerificationReport",
+    "RepositoryTraceabilityGraphBuilder",
 ]

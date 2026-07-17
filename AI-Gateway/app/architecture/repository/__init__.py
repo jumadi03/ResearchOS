@@ -35,6 +35,7 @@ from .verification_models import (
     RepositoryVerificationReport,
 )
 from .placement_naming_verifier import RepositoryPlacementNamingVerifier
+from .traceability_graph_builder import RepositoryTraceabilityGraphBuilder
 
 __all__ = [
     "RepositoryClassifier",
@@ -62,4 +63,5 @@ __all__ = [
     "RepositoryVerificationMode",
     "RepositoryVerificationOutcome",
     "RepositoryVerificationReport",
+    "RepositoryTraceabilityGraphBuilder",
 ]

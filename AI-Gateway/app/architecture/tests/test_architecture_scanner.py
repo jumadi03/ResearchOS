@@ -113,6 +113,12 @@ def test_contract() -> None:
 
         assert "logs" not in path.parts
 
+        assert "build" not in path.parts
+
+        assert "tmp" not in path.parts
+
+        assert ".tmp" not in path.parts
+
     #
     # Artifact Contract
     #

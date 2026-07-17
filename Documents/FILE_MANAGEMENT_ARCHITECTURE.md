@@ -492,6 +492,62 @@ policy or move those files. The working-tree report identity was
 `repository-verification:ResearchOS:703d612b12656c05`; it is transient audit
 evidence, not a committed generated report or compliance decision.
 
+## FMA-005 implementation traceability
+
+FMA-005 integrates dependency and repository traceability into the existing
+canonical Architecture Graph:
+
+- graph schema 1.1 compatibility and graph-wide uniqueness/referential
+  integrity:
+  `AI-Gateway/app/architecture/schema.py` and
+  `AI-Gateway/app/architecture/models/architecture_graph.py`;
+- selected-source scanning that retains repository-relative identities while
+  rejecting duplicate, unsafe, escaping, symbolic-link, missing, non-file, and
+  non-Python paths:
+  `AI-Gateway/app/architecture/scanner.py` and
+  `AI-Gateway/app/architecture/graph_builder.py`;
+- File Registry, policy, evaluation, ownership hierarchy, and exact
+  module-to-file integration:
+  `AI-Gateway/app/architecture/repository/traceability_graph_builder.py`; and
+- selected-source, compatibility, provenance, hierarchy, tamper, orphan,
+  duplicate, and dependency-boundary tests:
+  `AI-Gateway/app/architecture/tests/test_repository_traceability_graph.py`.
+
+Architecture Graph 1.0 remains readable and retains its historical identity.
+New traceability snapshots use schema 1.1. They extend the same
+`ArchitectureGraph`, `ArchitectureNode`, and `ArchitectureEdge` contracts;
+FMA-005 does not create a parallel graph.
+
+Every internal Module in a traceability snapshot must match one File Registry
+entry by exact repository-relative path. Project traceability metadata binds
+the graph to the registry, policy bundle, verification report, source
+revision, and evaluation date. Ambiguous Engine-to-Subsystem or
+Capability-to-Engine provenance fails closed.
+
+The pre-implementation unrestricted scan discovered 893 Python modules. Only
+326 belonged to the then-current tracked registry; 272 came from `build/` and
+295 from `tmp/`. The tracked-source boundary removes that contamination rather
+than hiding it after graph construction.
+
+The first read-only working-tree schema 1.1 observation produced:
+
+| Traceability measure | Count |
+| --- | ---: |
+| Files | 448 |
+| Internal modules represented by exact file identity | 328 |
+| Repository evaluations | 896 |
+| Repository policies | 14 |
+| Total graph nodes | 2,247 |
+| Total graph edges | 5,767 |
+| Internal modules from `build/` or `tmp/` | 0 |
+
+Its transient graph identity was `graph:ResearchOS:c5155b3b194e9487`.
+The observation includes the uncommitted FMA-005 implementation and is audit
+evidence only. No generated graph is committed, no relationship between tests
+and source is guessed from names, no roadmap or vision relationship is
+invented, and Repository Evaluation remains distinct from Architecture
+Compliance.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

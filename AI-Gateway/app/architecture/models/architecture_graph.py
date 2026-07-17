@@ -20,7 +20,7 @@ class ArchitectureGraph:
     nodes: tuple[ArchitectureNode, ...] = ()
     edges: tuple[ArchitectureEdge, ...] = ()
     source_revision: str | None = None
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     content_hash: str = ""
 
     def canonical_payload(self) -> dict[str, object]:
@@ -58,6 +58,36 @@ class ArchitectureGraph:
             content_hash=content_hash,
         )
 
+    def verify(self) -> bool:
+        """Verify identity, uniqueness, and edge referential integrity."""
+        try:
+            GRAPH_SCHEMA.require_readable(self.schema_version)
+            expected = self.finalized()
+        except (TypeError, ValueError):
+            return False
+        node_ids = [node.node_id for node in self.nodes]
+        edge_ids = [edge.edge_id for edge in self.edges]
+        known_nodes = set(node_ids)
+        return (
+            bool(self.project_name.strip())
+            and all(
+                node.node_id.strip()
+                and node.node_type.strip()
+                and node.canonical_name.strip()
+                for node in self.nodes
+            )
+            and all(
+                edge.edge_id.strip()
+                and edge.source_id in known_nodes
+                and edge.target_id in known_nodes
+                and edge.relation_type.strip()
+                for edge in self.edges
+            )
+            and len(node_ids) == len(known_nodes)
+            and len(edge_ids) == len(set(edge_ids))
+            and self == expected
+        )
+
     def to_json(self, *, indent: int | None = 2) -> str:
         """Serialize the complete graph deterministically."""
         payload = {
@@ -87,6 +117,10 @@ class ArchitectureGraph:
             content_hash=payload.get("content_hash", ""),
         )
         expected = graph.finalized()
-        if graph.content_hash != expected.content_hash or graph.graph_id != expected.graph_id:
+        if (
+            graph.content_hash != expected.content_hash
+            or graph.graph_id != expected.graph_id
+            or not expected.verify()
+        ):
             raise ValueError("Architecture Graph identity or content hash is invalid")
         return expected

@@ -77,7 +77,9 @@ class SchemaMigrationRegistry:
         return migrated
 
 
-GRAPH_SCHEMA = SchemaPolicy("Architecture Graph", "1.0", frozenset({"1.0"}))
+GRAPH_SCHEMA = SchemaPolicy(
+    "Architecture Graph", "1.1", frozenset({"1.0", "1.1"})
+)
 LAW_BUNDLE_SCHEMA = SchemaPolicy("Law Bundle", "1.0", frozenset({"1.0"}))
 REPOSITORY_POLICY_BUNDLE_SCHEMA = SchemaPolicy(
     "Repository Policy Bundle", "1.0", frozenset({"1.0"})

@@ -20,6 +20,8 @@ class ArchitectureGraphBuilder:
     root: Path
     project_name: str
     source_revision: str | None = None
+    source_paths: tuple[str, ...] | None = None
+    schema_version: str = "1.1"
 
     @staticmethod
     def _module_node_id(module: str) -> str:
@@ -41,7 +43,7 @@ class ArchitectureGraphBuilder:
         parser = ArchitectureParser()
         collector = NodeCollector()
         class_extractor = ClassExtractor()
-        artifacts = scanner.scan()
+        artifacts = scanner.scan(self.source_paths)
 
         project_id = f"project:{self.project_name}"
         nodes: dict[str, ArchitectureNode] = {
@@ -116,7 +118,11 @@ class ArchitectureGraphBuilder:
             graph_id="",
             project_name=self.project_name,
             source_revision=self.source_revision,
+            schema_version=self.schema_version,
             nodes=tuple(sorted(nodes.values(), key=lambda item: item.node_id)),
             edges=tuple(sorted(edges.values(), key=lambda item: item.edge_id)),
         )
-        return graph.finalized()
+        graph = graph.finalized()
+        if not graph.verify():
+            raise ValueError("Architecture Graph integrity verification failed")
+        return graph

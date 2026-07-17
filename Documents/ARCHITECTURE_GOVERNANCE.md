@@ -76,10 +76,25 @@ PDF is not used as an intermediate representation.
 
 ## Architecture Graph MVP
 
-The current graph schema is version `1.0` and represents `Project`, `Module`,
-and `Class` nodes with `CONTAINS`, `DEFINES`, and `IMPORTS` relationships.
-Source paths are relative to the scan root. Nodes and edges are sorted before
+The current graph schema is version `1.1`. Schema `1.0` represents `Project`,
+`Module`, and `Class` nodes with `CONTAINS`, `DEFINES`, and `IMPORTS`
+relationships. Schema `1.1` preserves those contracts and adds
+repository-traceability node and relationship types through FMA-005. Source
+paths are relative to the scan root. Nodes and edges are sorted before
 serialization, and snapshot identity is derived from a SHA-256 content hash.
+
+Repository traceability is built into the same canonical graph. Its source
+modules are selected from a verified, revision-bound File Registry rather than
+unrestricted filesystem discovery. This prevents build output, test temporary
+trees, and other untracked Python files from entering dependency or compliance
+evidence. FMA-005 adds `File`, `RepositoryPolicy`, `RepositoryEvaluation`,
+`Subsystem`, `Engine`, and `Capability` nodes plus evidence-backed ownership,
+policy, evaluation, and exact module-to-file relationships.
+
+Graph integrity verification rejects duplicate node or edge identifiers and
+edges whose source or target is absent. A traceability graph is accepted only
+when its File Registry, Repository Policy Bundle, and Repository Verification
+Report share project, revision, identity, and content-hash provenance.
 
 The graph is built with `ArchitectureGraphBuilder`. Its `source_revision`
 should be populated with a commit identifier or another immutable source
@@ -289,7 +304,7 @@ rejected before their content is used.
 
 | Artifact | Current | Readable legacy |
 |---|---:|---:|
-| Architecture Graph | `1.0` | none |
+| Architecture Graph | `1.1` | `1.0` |
 | Architecture Law Bundle | `1.0` | none |
 | Compliance Report | `1.0` | `0.9` |
 | Review Session | `1.0` | `0.9` |

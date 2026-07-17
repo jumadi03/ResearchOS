@@ -7,6 +7,7 @@ from the project filesystem.
 
 from dataclasses import dataclass
 from pathlib import Path
+from pathlib import PurePosixPath
 
 from .models import ArchitectureArtifact
 
@@ -35,6 +36,9 @@ class ArchitectureScanner:
         ".pytest_cache",
         ".mypy_cache",
         "logs",
+        "build",
+        "tmp",
+        ".tmp",
     )
 
     def is_project_file(
@@ -46,8 +50,12 @@ class ArchitectureScanner:
         to the ResearchOS project.
         """
 
+        try:
+            relative = path.resolve().relative_to(self.root.resolve())
+        except ValueError:
+            return False
         return not any(
-            ignored in path.parts
+            ignored in relative.parts
             for ignored in self.IGNORED_DIRECTORIES
         )
 
@@ -118,6 +126,7 @@ class ArchitectureScanner:
 
     def scan(
         self,
+        source_paths: tuple[str, ...] | None = None,
     ) -> tuple[
         ArchitectureArtifact,
         ...
@@ -126,9 +135,46 @@ class ArchitectureScanner:
         Scan the project.
         """
 
-        python_files = (
-            self.discover_python_files()
-        )
+        if source_paths is None:
+            python_files = self.discover_python_files()
+        else:
+            if len(source_paths) != len(set(source_paths)):
+                raise ValueError("Duplicate architecture source paths are not allowed")
+            selected = []
+            root = self.root.resolve(strict=True)
+            for value in source_paths:
+                normalized = value.replace("\\", "/")
+                item = PurePosixPath(normalized)
+                if (
+                    not normalized
+                    or item.is_absolute()
+                    or any(part in {"", ".", ".."} for part in item.parts)
+                    or item.suffix.lower() != ".py"
+                ):
+                    raise ValueError(
+                        f"Unsafe architecture source path: {value}"
+                    )
+                target = self.root.joinpath(*item.parts)
+                unresolved = self.root
+                for part in item.parts:
+                    unresolved = unresolved / part
+                    if unresolved.is_symlink():
+                        raise ValueError(
+                            f"Symbolic links are not architecture sources: {value}"
+                        )
+                resolved = target.resolve(strict=True)
+                try:
+                    resolved.relative_to(root)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Architecture source escapes scan root: {value}"
+                    ) from exc
+                if not resolved.is_file():
+                    raise ValueError(
+                        f"Architecture source is not a file: {value}"
+                    )
+                selected.append(target)
+            python_files = tuple(sorted(selected))
 
         artifacts = tuple(
             self.build_artifact(path)
