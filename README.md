@@ -98,6 +98,8 @@ schema and persistence, and dependency-security gates.
 - [Autonomous intelligence roadmap](Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md)
 - [Scientific interface vision](Documents/SCIENTIFIC_INTERFACE_VISION.md)
 - [Responsible evolution vision](Documents/RESPONSIBLE_EVOLUTION_VISION.md)
+- [Long-term engineering charter](Documents/LONG_TERM_ENGINEERING_CHARTER.md)
+- [Maintenance baseline audit and roadmap](Documents/MAINTENANCE_BASELINE_AUDIT.md)
 - [ResearchOS in 5 Minutes](Documents/GETTING_STARTED.md)
 - [Your first ResearchOS workflow](Documents/FIRST_RESEARCH_WORKFLOW.md)
 - [End-to-end scientific workflow pilot](Documents/END_TO_END_PILOT.md)
