@@ -5,9 +5,8 @@ mkdir -p /backups
 
 snapshot_minio() {
   local destination="$1"
-  local before copied after attempt
+  local before after attempt
   before="$(mktemp)"
-  copied="$(mktemp)"
   after="$(mktemp)"
 
   mc alias set source "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" --api S3v4 >/dev/null || return 1
@@ -56,8 +55,9 @@ write_tree_manifest() {
 snapshot_tree() {
   local source="$1"
   local destination="$2"
-  local before after attempt
+  local before copied after attempt
   before="$(mktemp)"
+  copied="$(mktemp)"
   after="$(mktemp)"
 
   for attempt in 1 2 3; do

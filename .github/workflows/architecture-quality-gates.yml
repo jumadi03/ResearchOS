@@ -133,6 +133,14 @@ jobs:
             echo "::warning::Backup image build attempt $attempt failed; retrying in ${delay}s"
             sleep "$delay"
           done
+      - name: Validate and build isolated restore drill
+        working-directory: deploy/restore
+        env:
+          RESTORE_MANIFEST: backup-set-20000101T000000Z.json
+          RESTORE_REPORT_DIR: /tmp/researchos-restore-report
+        run: |
+          docker compose -f compose.restore-drill.yaml --profile restore-drill config --quiet
+          docker build --progress plain --tag researchos-restore-drill-ci --file Dockerfile ..
 
   storage-integration:
     name: PostgreSQL and MinIO integration

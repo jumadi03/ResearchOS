@@ -109,6 +109,36 @@ present, hash-verified, and ready for an isolated restore drill. It does not
 mean a restore occurred, does not write restore evidence, and does not make
 `recovery_ready` true.
 
+Phase 1D adds a manually invoked restore drill in
+`deploy/restore/compose.restore-drill.yaml`. It is deliberately separate from
+the normal stack: its network is internal, its PostgreSQL and MinIO data live
+only on `tmpfs`, the backup volume is read-only, and neither the active
+PostgreSQL database nor the active MinIO service is addressable from the drill
+executor. Database and bucket names are constants owned by the executor rather
+than operator-provided targets.
+
+Run one drill from `deploy/restore`:
+
+```powershell
+$env:RESTORE_MANIFEST = "backup-set-YYYYMMDDTHHMMSSZ.json"
+$env:RESTORE_REPORT_DIR = (Resolve-Path "..\..\.tmp").Path
+$env:RESTORE_REPORT = "restore-drill-report.json"
+docker compose -f compose.restore-drill.yaml --profile restore-drill up `
+  --build --abort-on-container-exit --exit-code-from restore-drill
+docker compose -f compose.restore-drill.yaml --profile restore-drill down `
+  --remove-orphans
+```
+
+The executor revalidates the six-component manifest, safely extracts archives
+without links or traversal, verifies filesystem tree manifests, restores and
+checks the migration ledger in PostgreSQL, restores MinIO objects and compares
+their sizes and SHA-256 content, validates the non-secret configuration
+allowlist, and then removes the temporary database and bucket. The resulting
+JSON is attributable and content-hashed. It has `ledger_written: false`;
+therefore even a `verified` Phase 1D report does not make the operational
+`recovery_ready` projection true. Ledger admission belongs to a separately
+accepted increment.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before

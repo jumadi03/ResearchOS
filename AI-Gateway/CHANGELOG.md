@@ -7,6 +7,11 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added the Phase 1D isolated restore-drill executor for all six manifest-bound
+  backup components. The drill uses an internal-only network, executor-owned
+  PostgreSQL database and MinIO bucket, tmpfs targets, read-only backup input,
+  fail-closed archive extraction, full cleanup, and a hash-bound report without
+  writing operational restore evidence.
 - Extended portable backup sets to stable, symlink-free snapshots of
   architecture, allowlisted non-secret configuration, and versioned migration
   sources, completing six-component coverage for a future isolated restore drill.
