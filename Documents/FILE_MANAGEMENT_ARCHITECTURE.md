@@ -740,6 +740,29 @@ filesystem mutation capability:
 This dry-run contract validates orchestration shape only. It does not move,
 rename, overwrite, or delete files and cannot be used as a filesystem adapter.
 
+### FMA-008 isolated transactional executor
+
+The fourth FMA-008 increment introduces a root-confined executor for isolated
+workspaces only:
+
+- verified plan, `ready` preflight, and dry-run identities and hashes must
+  match before filesystem access;
+- every source must be a regular non-symlink file inside the execution root
+  with the expected content hash;
+- targets and symlink path components are rejected, and moves use a
+  no-overwrite same-filesystem boundary;
+- a failed forward operation triggers reverse-order rollback of every
+  completed move;
+- immutable audit results distinguish `completed`, `failed_safe`,
+  `rolled_back`, and `recovery_required`; the last state is mandatory when
+  rollback is incomplete; and
+- successful moves are hash-verified immediately.
+
+This increment is tested only against temporary isolated roots. It is not
+wired to an API, worker, deployment volume, or the ResearchOS source root.
+Production activation remains prohibited until post-migration verification
+and recovery governance are separately implemented and accepted.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

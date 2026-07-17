@@ -67,6 +67,18 @@ from .evolution_dry_run_models import (
     RepositoryEvolutionDryRun,
 )
 from .evolution_dry_run import RepositoryEvolutionDryRunEngine
+from .evolution_execution_models import (
+    RepositoryEvolutionExecution,
+    RepositoryExecutionAction,
+    RepositoryExecutionEvent,
+    RepositoryExecutionOutcome,
+    RepositoryExecutionStatus,
+)
+from .evolution_executor import (
+    NoOverwriteFileMover,
+    RepositoryEvolutionExecutor,
+    RepositoryFileMover,
+)
 
 __all__ = [
     "RepositoryClassifier",
@@ -119,4 +131,12 @@ __all__ = [
     "RepositoryDryRunStep",
     "RepositoryEvolutionDryRun",
     "RepositoryEvolutionDryRunEngine",
+    "RepositoryEvolutionExecution",
+    "RepositoryEvolutionExecutor",
+    "RepositoryExecutionAction",
+    "RepositoryExecutionEvent",
+    "RepositoryExecutionOutcome",
+    "RepositoryExecutionStatus",
+    "RepositoryFileMover",
+    "NoOverwriteFileMover",
 ]
