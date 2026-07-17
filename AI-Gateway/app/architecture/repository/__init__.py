@@ -61,6 +61,12 @@ from .evolution_models import (
 )
 from .evolution_planner import RepositoryEvolutionPlanner
 from .evolution_preflight import RepositoryEvolutionPreflightEngine
+from .evolution_dry_run_models import (
+    RepositoryDryRunDirection,
+    RepositoryDryRunStep,
+    RepositoryEvolutionDryRun,
+)
+from .evolution_dry_run import RepositoryEvolutionDryRunEngine
 
 __all__ = [
     "RepositoryClassifier",
@@ -109,4 +115,8 @@ __all__ = [
     "RepositoryMove",
     "RepositoryPreflightCheck",
     "RepositoryPreflightOutcome",
+    "RepositoryDryRunDirection",
+    "RepositoryDryRunStep",
+    "RepositoryEvolutionDryRun",
+    "RepositoryEvolutionDryRunEngine",
 ]

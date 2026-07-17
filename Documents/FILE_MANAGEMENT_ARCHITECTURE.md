@@ -723,6 +723,23 @@ The second FMA-008 increment adds a live, fail-closed preflight boundary:
 Preflight does not mutate the repository. A future executor must consume a
 fresh `ready` result and independently revalidate it at the mutation boundary.
 
+### FMA-008 dry-run execution contract
+
+The third FMA-008 increment adds deterministic execution simulation without a
+filesystem mutation capability:
+
+- only a verified `ready` preflight with plan identity, hash, project, and
+  revision provenance matching the verified plan is accepted;
+- forward operations are ordered and paired with the exact reverse rollback
+  sequence;
+- the immutable result records plan and preflight identities and hashes;
+- `blocked`, `stale`, corrupted, or cross-plan inputs fail closed; and
+- the result explicitly states that it neither mutates the repository nor
+  authorizes execution.
+
+This dry-run contract validates orchestration shape only. It does not move,
+rename, overwrite, or delete files and cannot be used as a filesystem adapter.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

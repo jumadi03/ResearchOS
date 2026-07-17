@@ -6,6 +6,8 @@ from app.architecture.models import ArchitectureGraph
 from app.architecture.repository import (
     FileGovernanceState,
     RepositoryEvolutionDecision,
+    RepositoryEvolutionDryRun,
+    RepositoryEvolutionDryRunEngine,
     RepositoryEvolutionPlan,
     RepositoryEvolutionPlanner,
     RepositoryEvolutionPreflight,
@@ -75,6 +77,14 @@ def _graph(revision="r1") -> ArchitectureGraph:
     return ArchitectureGraph(
         "", "ResearchOS", source_revision=revision,
     ).finalized()
+
+
+def _ready_preflight(plan=None, registry=None):
+    registry = registry or _registry()
+    plan = plan or _approved_plan(registry)
+    return RepositoryEvolutionPreflightEngine().evaluate(
+        plan, registry, _graph(registry.source_revision),
+    )
 
 
 def test_plan_is_deterministic_provenance_bound_reversible_and_non_executable():
@@ -243,3 +253,88 @@ def test_preflight_rejects_unverified_inputs_and_tampered_artifact():
     )
     with pytest.raises(ValueError, match="preflight is invalid"):
         RepositoryEvolutionPreflight.from_json(payload)
+
+
+def test_dry_run_is_deterministic_reversible_provenance_bound_and_non_mutating(
+    tmp_path,
+):
+    marker = tmp_path / "repository-marker.txt"
+    marker.write_text("unchanged", encoding="utf-8")
+    registry = _registry()
+    plan = _approved_plan(registry)
+    preflight = _ready_preflight(plan, registry)
+    engine = RepositoryEvolutionDryRunEngine()
+
+    first = engine.simulate(plan, preflight)
+    second = engine.simulate(plan, preflight)
+
+    assert first == second
+    assert first.verify()
+    assert first.plan_id == plan.plan_id
+    assert first.plan_hash == plan.content_hash
+    assert first.preflight_id == preflight.preflight_id
+    assert first.preflight_hash == preflight.content_hash
+    assert first.forward_steps[0].source_path == "docs/a.md"
+    assert first.forward_steps[0].target_path == "Documents/a.md"
+    assert first.rollback_steps[0].source_path == "Documents/a.md"
+    assert first.rollback_steps[0].target_path == "docs/a.md"
+    assert first.mutates_repository is False
+    assert first.is_execution_authorization is False
+    assert marker.read_text(encoding="utf-8") == "unchanged"
+    assert RepositoryEvolutionDryRun.from_json(first.to_json()) == first
+
+
+@pytest.mark.parametrize(
+    "outcome,error",
+    [
+        (RepositoryPreflightOutcome.BLOCKED, "preflight is blocked"),
+        (RepositoryPreflightOutcome.STALE, "preflight is stale"),
+    ],
+)
+def test_dry_run_rejects_non_ready_preflight(outcome, error):
+    registry = _registry()
+    plan = _approved_plan(registry)
+    ready = _ready_preflight(plan, registry)
+    failed_check = replace(ready.checks[0], passed=False, reason="not_ready")
+    preflight = replace(
+        ready, outcome=outcome, checks=(failed_check, *ready.checks[1:]),
+    ).finalized()
+
+    if outcome is RepositoryPreflightOutcome.STALE:
+        stale_check = replace(
+            ready.checks[1], passed=False, reason="revision_changed",
+        )
+        preflight = replace(
+            ready,
+            outcome=outcome,
+            checks=(ready.checks[0], stale_check, *ready.checks[2:]),
+        ).finalized()
+
+    assert preflight.verify()
+    with pytest.raises(ValueError, match=error):
+        RepositoryEvolutionDryRunEngine().simulate(plan, preflight)
+
+
+def test_dry_run_rejects_mismatched_or_tampered_provenance():
+    registry = _registry()
+    first_plan = _approved_plan(registry)
+    preflight = _ready_preflight(first_plan, registry)
+    second_plan = replace(
+        first_plan,
+        decision_rationale="A separate human review produced a new plan.",
+    ).finalized()
+
+    with pytest.raises(ValueError, match="provenance do not match"):
+        RepositoryEvolutionDryRunEngine().simulate(second_plan, preflight)
+
+    dry_run = RepositoryEvolutionDryRunEngine().simulate(
+        first_plan, preflight,
+    )
+    payload = dry_run.to_json().replace(
+        '"mutates_repository": false', '"mutates_repository": true',
+    )
+    with pytest.raises(ValueError, match="dry run is invalid"):
+        RepositoryEvolutionDryRun.from_json(payload)
+
+    incomplete = replace(dry_run, rollback_steps=()).finalized()
+    assert not incomplete.verify()
