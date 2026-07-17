@@ -2,24 +2,25 @@
 
 ## Status
 
-- Document status: specification draft for project-owner review
-- Version: 0.1 draft
+- Document status: project-owner-accepted working specification
+- Version: 0.1 working specification
 - Identifier: not assigned
-- Classification: project-governance specification draft
+- Classification: project-governance working specification
 - Working owner: ResearchOS project
-- Decision status: pending review of an exact repository revision
+- Decision status: accepted as bounded working direction
 - Formal ratification status: not defined by current repository governance
 - Enforcement status: not implemented
 - Recorded: 2026-07-18
 - Evidence basis: Stage 0 Dependency Verification and Phase Inventory; Stage 1
   Governance Architecture Review; Stage 2 Governance Consolidation Review
 
-This draft does not declare itself canonical, ratified, published, active, or
-approved. The project owner's discussion-stage agreement authorizes continued
-drafting but is not yet a durable working-direction decision about an exact
-repository revision. This draft does not alter the status of any existing
-document or governance instrument. Its working title describes its function
-and does not establish a document family or identifier convention.
+This specification does not declare itself canonical, ratified, published,
+active, or approved as binding governance. The project owner reviewed exact
+draft revision `a113a23b4edea2f0540d562c9d42d47c3fe30f61` and recorded a
+bounded working-direction decision in pull request `#26`. This specification
+does not alter the status of any existing document or governance instrument.
+Its working title describes its function and does not establish a document
+family or identifier convention.
 
 ## 1. Purpose
 
@@ -633,29 +634,27 @@ Governance Baseline
 The availability of an earlier artifact does not automatically authorize the
 next activity.
 
-## 18. Durable Working-Direction Decision Boundary
+## 18. Durable Working-Direction Decision Record
 
-Discussion-stage agreement is design input, not durable repository evidence
-for a status claim about an exact instrument revision.
+Discussion-stage agreement remains design input until an exact repository
+revision and a durable external decision record exist. Those requirements were
+met for the working-direction decision recorded below.
 
-Before this specification can receive a working-direction claim:
+The decision was accepted only after:
 
-1. the exact content must have a stable repository revision;
-2. the revision must be reviewed against the requirements in Section 14;
-3. the project owner must make an explicit bounded decision about that exact
+1. the exact content received a stable repository revision;
+2. the revision was reviewed against the requirements in Section 14;
+3. the project owner made an explicit bounded decision about that exact
    revision;
-4. the decision evidence must remain durably traceable from the repository;
-   and
-5. the effect and non-effect must be recorded without implying formal
+4. the decision was recorded durably on the introducing pull request; and
+5. its effect and non-effect were recorded without implying formal
    ratification.
-
-The durable decision record must include the fields below.
 
 ### Decision
 
 - Instrument: `Governance Instrument Status and Decision Boundary
   Specification`
-- Version: exact reviewed version
+- Version: `0.1 draft` at the reviewed revision
 - Instrument location:
   `Documents/GOVERNANCE_INSTRUMENT_STATUS_AND_DECISION_BOUNDARY.md`
 - Claim class: working-direction claim
@@ -663,24 +662,24 @@ The durable decision record must include the fields below.
 - Authority basis: existing project-owner authority consistently recorded by
   ResearchOS vision, governance, roadmap, architecture, and engineering
   documents
-- Decision date: to be recorded by the future decision
-- Decision evidence: durable review and decision reference for the exact
-  repository revision
+- Reviewed revision: `a113a23b4edea2f0540d562c9d42d47c3fe30f61`
+- Decision date: 2026-07-18
+- Decision evidence:
+  `https://github.com/jumadi03/ResearchOS/pull/26#issuecomment-5006887614`
 - Scope: evaluation and recording of governance-instrument status claims and
   decision boundaries
 - Rationale: ResearchOS needs an upstream, non-self-authorizing boundary before
   formal authority, documentation, roadmap, or Project Phase governance can be
   specified safely
 
-### Proposed bounded effect
+### Bounded effect
 
-If the future decision is affirmative, the specification may be used as
-bounded working direction for subsequent governance analysis and specification
-work.
+The specification is accepted as bounded working direction for subsequent
+governance analysis and specification work.
 
-### Required non-effect
+### Non-effect
 
-The future decision must not:
+This decision does not:
 
 - formally ratify the specification;
 - give it global binding precedence;
@@ -692,7 +691,7 @@ The future decision must not:
   changes; or
 - approve any later governance deliverable.
 
-### Required supporting evidence
+### Supporting evidence
 
 - Stage 0 terminology, phase, lifecycle, naming, authority, and governance
   inventory;
@@ -702,9 +701,10 @@ The future decision must not:
   dependency review, construction readiness, and first-deliverable
   recommendation;
 - repository documents listed in Section 4; and
-- the exact repository revision reviewed by the project owner.
+- the exact repository revision reviewed by the project owner; and
+- the durable pull-request decision reference recorded above.
 
-### Required unresolved dependencies
+### Unresolved dependencies
 
 - formal ratification authority;
 - cross-governance precedence;
@@ -714,8 +714,8 @@ The future decision must not:
 - Project Phase Governance; and
 - governance coverage mapping.
 
-### Required reconsideration condition
+### Reconsideration condition
 
-A future working-direction decision must require review if an external
-authority model, documentation-governance specification, or conflicting
-higher-scope governance instrument is later accepted.
+This working-direction decision must be reviewed if an external authority
+model, documentation-governance specification, or conflicting higher-scope
+governance instrument is later accepted.
