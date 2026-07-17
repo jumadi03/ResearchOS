@@ -106,6 +106,13 @@ from .evolution_closure import (
     RepositoryEvolutionClosure,
     RepositoryEvolutionClosureAuditor,
 )
+from .contract_registry_models import (
+    PublicContractEntry,
+    PublicContractKind,
+    PublicContractLifecycle,
+    PublicContractRegistryManifest,
+)
+from .contract_registry import PublicContractRegistry
 
 __all__ = [
     "RepositoryClassifier",
@@ -185,4 +192,9 @@ __all__ = [
     "RepositoryClosurePath",
     "RepositoryEvolutionClosure",
     "RepositoryEvolutionClosureAuditor",
+    "PublicContractEntry",
+    "PublicContractKind",
+    "PublicContractLifecycle",
+    "PublicContractRegistry",
+    "PublicContractRegistryManifest",
 ]

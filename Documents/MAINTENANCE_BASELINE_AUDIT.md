@@ -367,3 +367,23 @@ task definition.
 This increment provides an installable contract only. Enabling the Windows
 task, activating the canonical database schedule, and producing the first
 periodic restore proof require a separately approved operational step.
+
+### Phase 2A implementation traceability
+
+Phase 2A introduces an advisory, content-addressed Public Contract Registry in
+the existing Architecture Governance subsystem. Its initial inventory records
+five verified surfaces spanning the Kernel namespace, health/readiness HTTP
+contract, database migration ledger, scheduled restore-controller CLI, and the
+deprecated recovery `ready` compatibility alias.
+
+The registry uses the canonical lifecycle `active`, `deprecated`,
+`compatibility_period`, `removal_candidate`, and `removed`. Every non-active
+entry must identify its official replacement, milestone, migration guide,
+affected callers, and regression tests. Duplicate identities or public
+surfaces, incomplete deprecation records, tampering, and unknown schema
+versions fail validation.
+
+This phase is deliberately advisory. It does not remove a contract, mutate a
+caller, change a runtime API, enforce a removal decision, or create a second
+schema authority. Expansion of the inventory and any enforcement require
+separately approved deliverables.
