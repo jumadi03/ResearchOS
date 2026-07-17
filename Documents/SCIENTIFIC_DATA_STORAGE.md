@@ -403,6 +403,18 @@ active runs. The DB-only coordinator cannot read signing material, backup
 artifacts, reports, or active storage, while the isolated drill still cannot
 access PostgreSQL.
 
+DATA maintenance Phase 1F-C composes those separated authorities through a
+manually invoked host controller. It acquires a server-selected lease, runs the
+fixed isolated Compose drill, always attempts teardown, submits only the
+resulting signed report to the existing admission boundary, and completes the
+lease using the returned canonical verification ID and report content hash.
+
+The controller has no operator-selectable backup path or restore target and
+does not receive a database URL or private-key path. A post-acquisition error
+attempts an explicit failed transition with a bounded stage reason. This is
+end-to-end orchestration evidence, not periodic scheduling; no API, UI,
+background worker, scheduler, or Docker socket is added to a container.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly

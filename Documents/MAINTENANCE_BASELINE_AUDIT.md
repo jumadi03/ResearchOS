@@ -313,3 +313,18 @@ evidence, and expired completion fail closed with explicit reasons.
 The coordinator is DB-only and has no private key, backup/report/trust mounts,
 Docker socket, API route, or worker integration. This increment does not add a
 scheduler or execute the drill automatically.
+
+### Phase 1F-C implementation traceability
+
+Phase 1F-C adds a manually invoked host controller that composes the accepted
+Phase 1F-B lease, Phase 1D isolated execution, Phase 1E signed admission, and
+canonical completion contracts. The controller never accepts a backup path,
+restore target, database URL, private-key path, report path, or verification
+identity from the operator. PostgreSQL selects the backup; the drill and
+admission services retain their existing isolated mounts and authorities.
+
+Every post-acquisition failure attempts an explicit canonical lease failure,
+and isolated Compose cleanup is attempted even when execution fails. Admission
+receipts provide the exact report content hash and verification ID used for
+completion. The controller is host-only, uses fixed argument arrays without a
+shell, and adds no API, UI, worker, scheduler, or container Docker socket.

@@ -241,6 +241,27 @@ socket, API route, worker job, or active-storage target. The drill still has no
 database credential, and admission remains the only path to canonical restore
 evidence.
 
+Phase 1F-C adds a manually invoked host controller for the complete accepted
+workflow. Run it from the repository root:
+
+```powershell
+AI-Gateway\.venv\Scripts\python.exe `
+  deploy\restore\run_restore_drill_controller.py `
+  --owner "<operator identity>" --lease-seconds 7200
+```
+
+The controller accepts only an attributable owner and bounded lease duration.
+PostgreSQL selects the backup. The controller then runs the fixed isolated
+drill, always attempts Compose teardown, admits the signed report through the
+public-trust boundary, and completes the lease with the exact canonical
+verification ID and content hash. Any failure after acquisition attempts to
+close the lease with an explicit stage reason.
+
+Reports are retained below the ignored
+`deploy/restore/reports/<run-id>/` directory. The controller does not accept
+backup paths, target identifiers, report paths, database URLs, or key paths.
+It is not a scheduler and is not exposed through the API, UI, or worker.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before
