@@ -243,3 +243,26 @@ All six components may now be `covered` and the aggregate matrix may be
 `COMPLETE`. This is readiness for an isolated restore drill only. Phase 1C does
 not execute a restore, write `backup_restore_verifications`, mutate an active
 target, or complete Rule 13.
+
+### Phase 1D implementation traceability
+
+Phase 1D adds a manual isolated restore-drill executor without connecting it to
+the API, worker, scheduler, active stack, or immutable restore ledger. A
+standalone Compose project has only an internal network, read-only backup input,
+tmpfs PostgreSQL and MinIO targets, and fixed executor-owned database and bucket
+identities. Active volume mounts, active hostnames, `stack.env`, and
+operator-selected target identifiers are absent.
+
+The executor revalidates coverage and manifest hashes before target mutation.
+It rejects unsafe archive members, verifies four filesystem tree manifests and
+the configuration allowlist, restores PostgreSQL and reconciles the complete
+schema migration ledger, restores MinIO and verifies object sizes and content
+hashes, then removes the temporary database and bucket. Blocked, failed, and
+verified outcomes remain explicit and every report is attributable and
+content-hashed.
+
+Phase 1D proves that a complete backup set can be restored in isolation, but it
+does not yet satisfy the operational recovery projection. The report explicitly
+states `ledger_written: false`; admission to the append-only
+`backup_restore_verifications` ledger requires a separate contract review and
+accepted increment.

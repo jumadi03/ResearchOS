@@ -341,6 +341,28 @@ active environment or credential values. No restore is performed, the
 `backup_restore_verifications` ledger remains unchanged, and operational
 `recovery_ready` remains false until a later restore increment succeeds.
 
+DATA maintenance Phase 1D introduces that restore operation only as a manually
+invoked, isolated and report-only drill. A dedicated Compose project creates
+executor-owned PostgreSQL and MinIO targets on an internal network with tmpfs
+storage. The executor can read the canonical backup volume but cannot resolve,
+mount, or receive identifiers for the active storage targets.
+
+Before mutation of its temporary targets, the executor reruns recovery coverage
+and hash checks. Archive extraction rejects absolute paths, traversal, links,
+devices, duplicate members, and unknown member types. Knowledge, architecture,
+configuration, and migration trees must match their embedded manifests.
+PostgreSQL must restore successfully and its `schema_migrations` ledger must
+match every archived migration file and checksum. MinIO object sizes and
+content hashes must match the restored source. Configuration remains restricted
+to the three-file non-secret allowlist.
+
+The executor always attempts removal of its fixed temporary database and bucket
+and reports cleanup failure as a failed drill. Its report includes actor,
+timestamps, backup and manifest identity, fixed isolated target identity,
+component checks, outcome, cleanup result, and a content hash. Phase 1D does
+not insert that report into `backup_restore_verifications`, expose an API,
+schedule execution, or assert operational recovery readiness.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly
