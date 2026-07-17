@@ -797,6 +797,25 @@ where available, post-verification identities and hashes. Recovery governance
 cannot invoke the filesystem executor. Automatic rollback execution and
 subsequent canonical revalidation remain separate controlled increments.
 
+### FMA-008 isolated recovery executor
+
+The seventh FMA-008 increment executes only an
+`automatic_rollback_eligible` decision inside an isolated root:
+
+- recovery, original execution, and dry-run identities and hashes must match;
+- the existing root-confinement, symlink, hash, and no-overwrite boundary is
+  reused;
+- a complete rollback produces `recovered`;
+- failure before mutation produces `failed_safe`;
+- failure after partial rollback triggers compensation back to the migrated
+  state and produces `restored_migrated_state` when complete; and
+- incomplete compensation produces `recovery_required` without hiding the
+  partial state.
+
+The recovery executor is not connected to production paths, API, worker, or
+deployment storage. A recovered filesystem still requires canonical registry
+and graph revalidation before any migration lifecycle can close.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

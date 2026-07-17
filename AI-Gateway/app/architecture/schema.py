@@ -114,6 +114,9 @@ REPOSITORY_EVOLUTION_POST_VERIFICATION_SCHEMA = SchemaPolicy(
 REPOSITORY_EVOLUTION_RECOVERY_SCHEMA = SchemaPolicy(
     "Repository Evolution Recovery Decision", "1.0", frozenset({"1.0"})
 )
+REPOSITORY_EVOLUTION_RECOVERY_EXECUTION_SCHEMA = SchemaPolicy(
+    "Repository Evolution Recovery Execution", "1.0", frozenset({"1.0"})
+)
 COMPLIANCE_SCHEMA = SchemaPolicy(
     "Compliance Report", "1.0", frozenset({"0.9", "1.0"})
 )

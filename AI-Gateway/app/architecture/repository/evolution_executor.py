@@ -65,11 +65,14 @@ class RepositoryEvolutionExecutor:
         self._validate_workspace(resolved)
         fingerprint = self._workspace_fingerprint(resolved)
         events: list[RepositoryExecutionEvent] = []
-        completed: list[tuple[object, Path, Path]] = []
+        completed: list[tuple[object, Path, Path, bool]] = []
         for step, source, target in resolved:
+            target_parent_existed = target.parent.exists()
             try:
                 self._mover.move(source, target)
-                completed.append((step, source, target))
+                completed.append(
+                    (step, source, target, target_parent_existed)
+                )
                 if self._hash(target) != step.content_hash:
                     raise OSError("moved_content_hash_mismatch")
                 events.append(self._event(
@@ -81,7 +84,9 @@ class RepositoryEvolutionExecutor:
                     item[1] == source and item[2] == target
                     for item in completed
                 ):
-                    completed.append((step, source, target))
+                    completed.append(
+                        (step, source, target, target_parent_existed)
+                    )
                 events.append(self._event(
                     events, RepositoryExecutionAction.FORWARD, step,
                     RepositoryExecutionOutcome.FAILED, "move_failed",
@@ -162,10 +167,11 @@ class RepositoryEvolutionExecutor:
         return digest.hexdigest()
 
     def _rollback(self, completed, events) -> None:
-        for step, source, target in reversed(completed):
+        for step, source, target, target_parent_existed in reversed(completed):
             try:
                 self._mover.move(target, source)
-                self._cleanup_empty_parents(target.parent)
+                if not target_parent_existed:
+                    self._cleanup_empty_parents(target.parent)
                 outcome = RepositoryExecutionOutcome.MOVED
                 reason = "rollback_completed"
             except Exception:

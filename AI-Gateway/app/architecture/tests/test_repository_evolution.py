@@ -20,6 +20,7 @@ from app.architecture.repository import (
     RepositoryEvolutionPreflight,
     RepositoryEvolutionPreflightEngine,
     RepositoryEvolutionRecovery,
+    RepositoryEvolutionRecoveryExecutor,
     RepositoryEvolutionRecoveryPlanner,
     RepositoryFileClassification,
     RepositoryFileEntry,
@@ -30,6 +31,8 @@ from app.architecture.repository import (
     RepositoryExecutionStatus,
     RepositoryPostVerificationOutcome,
     RepositoryRecoveryDecision,
+    RepositoryRecoveryExecution,
+    RepositoryRecoveryExecutionStatus,
     NoOverwriteFileMover,
 )
 
@@ -833,3 +836,84 @@ def test_recovery_rejects_cross_execution_provenance(tmp_path):
 
     with pytest.raises(ValueError, match="provenance do not match"):
         RepositoryEvolutionRecoveryPlanner().decide(execution, other)
+
+
+def _automatic_recovery_contract(root, *, two_moves=False):
+    plan, preflight, dry_run = _execution_contract(
+        root, two_moves=two_moves,
+    )
+    execution = RepositoryEvolutionExecutor(root).execute(
+        plan, preflight, dry_run,
+    )
+    recovery = RepositoryEvolutionRecovery(
+        "", execution.project_name, execution.execution_id,
+        execution.content_hash, execution.status, dry_run.dry_run_id,
+        dry_run.content_hash, "post:blocked", "f" * 64,
+        RepositoryPostVerificationOutcome.BLOCKED,
+        RepositoryRecoveryDecision.AUTOMATIC_ROLLBACK_ELIGIBLE,
+        ("post_migration_verification_blocked",),
+        dry_run.rollback_steps,
+    ).finalized()
+    assert recovery.verify()
+    return execution, dry_run, recovery
+
+
+def test_isolated_recovery_executor_restores_original_paths(tmp_path):
+    execution, dry_run, recovery = _automatic_recovery_contract(
+        tmp_path, two_moves=True,
+    )
+
+    result = RepositoryEvolutionRecoveryExecutor(tmp_path).recover(
+        recovery, execution, dry_run,
+    )
+
+    assert result.status is RepositoryRecoveryExecutionStatus.RECOVERED
+    assert (tmp_path / "docs/a.md").read_bytes() == b"alpha\n"
+    assert (tmp_path / "docs/b.md").read_bytes() == b"bravo\n"
+    assert not result.requires_manual_recovery
+    assert RepositoryRecoveryExecution.from_json(result.to_json()) == result
+
+
+@pytest.mark.parametrize(
+    "fail_calls,expected",
+    [
+        ({1}, RepositoryRecoveryExecutionStatus.FAILED_SAFE),
+        ({2}, RepositoryRecoveryExecutionStatus.RESTORED_MIGRATED_STATE),
+        ({2, 3}, RepositoryRecoveryExecutionStatus.RECOVERY_REQUIRED),
+    ],
+)
+def test_recovery_executor_reports_compensation_outcome_explicitly(
+    tmp_path, fail_calls, expected,
+):
+    execution, dry_run, recovery = _automatic_recovery_contract(
+        tmp_path, two_moves=True,
+    )
+
+    result = RepositoryEvolutionRecoveryExecutor(
+        tmp_path, mover=_FailingMover(fail_calls),
+    ).recover(recovery, execution, dry_run)
+
+    assert result.status is expected
+    assert result.requires_manual_recovery is (
+        expected is RepositoryRecoveryExecutionStatus.RECOVERY_REQUIRED
+    )
+    assert result.verify()
+
+
+def test_recovery_executor_rejects_non_eligible_decision(tmp_path):
+    execution, dry_run, recovery = _automatic_recovery_contract(tmp_path)
+    blocked = replace(
+        recovery,
+        post_verification_id=None,
+        post_verification_hash=None,
+        post_verification_outcome=None,
+        decision=RepositoryRecoveryDecision.BLOCKED,
+        reasons=("post_migration_verification_required",),
+        rollback_steps=(),
+    ).finalized()
+    assert blocked.verify()
+
+    with pytest.raises(ValueError, match="not eligible"):
+        RepositoryEvolutionRecoveryExecutor(tmp_path).recover(
+            blocked, execution, dry_run,
+        )

@@ -7,7 +7,10 @@ from enum import StrEnum
 from hashlib import sha256
 import json
 
-from app.architecture.schema import REPOSITORY_EVOLUTION_RECOVERY_SCHEMA
+from app.architecture.schema import (
+    REPOSITORY_EVOLUTION_RECOVERY_EXECUTION_SCHEMA,
+    REPOSITORY_EVOLUTION_RECOVERY_SCHEMA,
+)
 
 from .evolution_dry_run_models import (
     RepositoryDryRunDirection,
@@ -36,6 +39,13 @@ class RepositoryRecoveryDecision(StrEnum):
     MANUAL_RECOVERY_REQUIRED = "manual_recovery_required"
     CANONICAL_REVALIDATION_REQUIRED = "canonical_revalidation_required"
     BLOCKED = "blocked"
+
+
+class RepositoryRecoveryExecutionStatus(StrEnum):
+    RECOVERED = "recovered"
+    FAILED_SAFE = "failed_safe"
+    RESTORED_MIGRATED_STATE = "restored_migrated_state"
+    RECOVERY_REQUIRED = "recovery_required"
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,3 +306,156 @@ class RepositoryEvolutionRecoveryPlanner:
             RepositoryRecoveryDecision.AUTOMATIC_ROLLBACK_ELIGIBLE,
             ("post_migration_verification_blocked",),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryRecoveryExecution:
+    recovery_execution_id: str
+    project_name: str
+    recovery_id: str
+    recovery_hash: str
+    execution_id: str
+    execution_hash: str
+    dry_run_id: str
+    dry_run_hash: str
+    workspace_fingerprint: str
+    status: RepositoryRecoveryExecutionStatus
+    events: tuple["RepositoryExecutionEvent", ...]
+    schema_version: str = "1.0"
+    content_hash: str = ""
+
+    @property
+    def requires_manual_recovery(self) -> bool:
+        return self.status is RepositoryRecoveryExecutionStatus.RECOVERY_REQUIRED
+
+    def canonical_payload(self):
+        return {
+            "schema_version": self.schema_version,
+            "project_name": self.project_name,
+            "recovery_id": self.recovery_id,
+            "recovery_hash": self.recovery_hash,
+            "execution_id": self.execution_id,
+            "execution_hash": self.execution_hash,
+            "dry_run_id": self.dry_run_id,
+            "dry_run_hash": self.dry_run_hash,
+            "workspace_fingerprint": self.workspace_fingerprint,
+            "status": self.status,
+            "events": [asdict(item) for item in self.events],
+        }
+
+    def calculate_content_hash(self):
+        return sha256(json.dumps(
+            self.canonical_payload(), ensure_ascii=False,
+            separators=(",", ":"), sort_keys=True,
+        ).encode("utf-8")).hexdigest()
+
+    def finalized(self):
+        candidate = replace(
+            self, recovery_execution_id="", content_hash="",
+        )
+        content_hash = candidate.calculate_content_hash()
+        return replace(
+            candidate,
+            recovery_execution_id=(
+                f"repository-recovery-execution:{self.project_name}:"
+                f"{content_hash[:16]}"
+            ),
+            content_hash=content_hash,
+        )
+
+    def verify(self):
+        from .evolution_execution_models import (
+            RepositoryExecutionAction,
+            RepositoryExecutionOutcome,
+        )
+        rollback = sum(
+            item.action is RepositoryExecutionAction.ROLLBACK
+            and item.outcome is RepositoryExecutionOutcome.MOVED
+            for item in self.events
+        )
+        compensated = sum(
+            item.action is RepositoryExecutionAction.FORWARD
+            and item.outcome is RepositoryExecutionOutcome.MOVED
+            for item in self.events
+        )
+        failures = sum(
+            item.outcome is RepositoryExecutionOutcome.FAILED
+            for item in self.events
+        )
+        expected = (
+            RepositoryRecoveryExecutionStatus.RECOVERED
+            if failures == 0
+            else RepositoryRecoveryExecutionStatus.FAILED_SAFE
+            if rollback == 0
+            else RepositoryRecoveryExecutionStatus.RESTORED_MIGRATED_STATE
+            if compensated == rollback
+            else RepositoryRecoveryExecutionStatus.RECOVERY_REQUIRED
+        )
+        return (
+            bool(
+                self.project_name.strip()
+                and self.recovery_id.strip()
+                and _valid_hash(self.recovery_hash)
+                and self.execution_id.strip()
+                and _valid_hash(self.execution_hash)
+                and self.dry_run_id.strip()
+                and _valid_hash(self.dry_run_hash)
+                and _valid_hash(self.workspace_fingerprint)
+                and self.events
+            )
+            and [item.sequence for item in self.events]
+            == list(range(1, len(self.events) + 1))
+            and all(item.verify() for item in self.events)
+            and self.status is expected
+            and self == self.finalized()
+        )
+
+    def to_json(self, *, indent=2):
+        return json.dumps(
+            {
+                "recovery_execution_id": self.recovery_execution_id,
+                "content_hash": self.content_hash,
+                "requires_manual_recovery": self.requires_manual_recovery,
+                **self.canonical_payload(),
+            },
+            ensure_ascii=False, indent=indent, sort_keys=True,
+        )
+
+    @classmethod
+    def from_json(cls, value):
+        from .evolution_execution_models import (
+            RepositoryExecutionAction,
+            RepositoryExecutionEvent,
+            RepositoryExecutionOutcome,
+        )
+        payload = json.loads(value)
+        REPOSITORY_EVOLUTION_RECOVERY_EXECUTION_SCHEMA.require_readable(
+            payload.get("schema_version", "")
+        )
+        result = cls(
+            payload.get("recovery_execution_id", ""),
+            payload["project_name"], payload["recovery_id"],
+            payload["recovery_hash"], payload["execution_id"],
+            payload["execution_hash"], payload["dry_run_id"],
+            payload["dry_run_hash"], payload["workspace_fingerprint"],
+            RepositoryRecoveryExecutionStatus(payload["status"]),
+            tuple(
+                RepositoryExecutionEvent(
+                    **{
+                        **item,
+                        "action": RepositoryExecutionAction(item["action"]),
+                        "outcome": RepositoryExecutionOutcome(item["outcome"]),
+                    }
+                )
+                for item in payload["events"]
+            ),
+            payload.get("schema_version", ""),
+            payload.get("content_hash", ""),
+        )
+        if (
+            payload.get("requires_manual_recovery")
+            is not result.requires_manual_recovery
+            or not result.verify()
+        ):
+            raise ValueError("Repository recovery execution is invalid")
+        return result

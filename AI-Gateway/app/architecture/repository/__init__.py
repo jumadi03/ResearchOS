@@ -89,7 +89,10 @@ from .evolution_recovery import (
     RepositoryEvolutionRecovery,
     RepositoryEvolutionRecoveryPlanner,
     RepositoryRecoveryDecision,
+    RepositoryRecoveryExecution,
+    RepositoryRecoveryExecutionStatus,
 )
+from .evolution_recovery_executor import RepositoryEvolutionRecoveryExecutor
 
 __all__ = [
     "RepositoryClassifier",
@@ -157,4 +160,7 @@ __all__ = [
     "RepositoryEvolutionRecovery",
     "RepositoryEvolutionRecoveryPlanner",
     "RepositoryRecoveryDecision",
+    "RepositoryRecoveryExecution",
+    "RepositoryRecoveryExecutionStatus",
+    "RepositoryEvolutionRecoveryExecutor",
 ]
