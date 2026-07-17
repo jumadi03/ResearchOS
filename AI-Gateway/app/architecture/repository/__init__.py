@@ -93,6 +93,12 @@ from .evolution_recovery import (
     RepositoryRecoveryExecutionStatus,
 )
 from .evolution_recovery_executor import RepositoryEvolutionRecoveryExecutor
+from .evolution_post_recovery import (
+    RepositoryEvolutionPostRecoveryVerifier,
+    RepositoryPostRecoveryCheck,
+    RepositoryPostRecoveryOutcome,
+    RepositoryPostRecoveryVerification,
+)
 
 __all__ = [
     "RepositoryClassifier",
@@ -163,4 +169,8 @@ __all__ = [
     "RepositoryRecoveryExecution",
     "RepositoryRecoveryExecutionStatus",
     "RepositoryEvolutionRecoveryExecutor",
+    "RepositoryEvolutionPostRecoveryVerifier",
+    "RepositoryPostRecoveryCheck",
+    "RepositoryPostRecoveryOutcome",
+    "RepositoryPostRecoveryVerification",
 ]

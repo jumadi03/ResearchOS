@@ -15,6 +15,7 @@ from app.architecture.repository import (
     RepositoryEvolutionExecutor,
     RepositoryEvolutionPostVerification,
     RepositoryEvolutionPostVerifier,
+    RepositoryEvolutionPostRecoveryVerifier,
     RepositoryEvolutionPlan,
     RepositoryEvolutionPlanner,
     RepositoryEvolutionPreflight,
@@ -30,6 +31,7 @@ from app.architecture.repository import (
     RepositoryPreflightOutcome,
     RepositoryExecutionStatus,
     RepositoryPostVerificationOutcome,
+    RepositoryPostRecoveryOutcome,
     RepositoryRecoveryDecision,
     RepositoryRecoveryExecution,
     RepositoryRecoveryExecutionStatus,
@@ -917,3 +919,85 @@ def test_recovery_executor_rejects_non_eligible_decision(tmp_path):
         RepositoryEvolutionRecoveryExecutor(tmp_path).recover(
             blocked, execution, dry_run,
         )
+
+
+def _recovered_canonical_state(root):
+    plan, preflight, dry_run = _execution_contract(root)
+    execution = RepositoryEvolutionExecutor(root).execute(
+        plan, preflight, dry_run,
+    )
+    recovery = RepositoryEvolutionRecovery(
+        "", execution.project_name, execution.execution_id,
+        execution.content_hash, execution.status, dry_run.dry_run_id,
+        dry_run.content_hash, "post:blocked", "f" * 64,
+        RepositoryPostVerificationOutcome.BLOCKED,
+        RepositoryRecoveryDecision.AUTOMATIC_ROLLBACK_ELIGIBLE,
+        ("post_migration_verification_blocked",),
+        dry_run.rollback_steps,
+    ).finalized()
+    recovery_execution = RepositoryEvolutionRecoveryExecutor(root).recover(
+        recovery, execution, dry_run,
+    )
+    source = _source_registry_for_execution_plan()
+    move = plan.moves[0]
+    entries = tuple(
+        replace(item, previous_paths=(move.target_path,))
+        if item.file_id == move.file_id else item
+        for item in source.entries
+    )
+    event = FileContinuityEvent(
+        "", move.file_id, move.target_path, move.source_path,
+        move.content_hash, move.content_hash, "r2", "r3",
+        "architecture", "Canonical recovery continuity.",
+        "2026-07-17T19:00:00+08:00",
+    ).finalized()
+    registry = RepositoryFileRegistry(
+        "", "ResearchOS", "r3", "inventory:r3", "9" * 64,
+        source.policy_bundle_id, source.policy_bundle_hash,
+        entries, (event,),
+    ).finalized()
+    project = ArchitectureNode(
+        "project:ResearchOS", "Project", "ResearchOS",
+        metadata={"repository_traceability": {
+            "registry_id": registry.registry_id,
+            "registry_hash": registry.content_hash,
+        }},
+    )
+    graph = ArchitectureGraph(
+        "", "ResearchOS",
+        (project, *(ArchitectureNode(
+            item.file_id, "File", item.current_path,
+            source_path=item.current_path,
+            metadata={"content_hash": item.content_hash},
+        ) for item in registry.entries)),
+        source_revision="r3",
+    ).finalized()
+    return plan, recovery, recovery_execution, registry, graph
+
+
+def test_post_recovery_verifies_canonical_restoration(tmp_path):
+    result = RepositoryEvolutionPostRecoveryVerifier().verify(
+        *_recovered_canonical_state(tmp_path)
+    )
+    assert result.outcome is RepositoryPostRecoveryOutcome.RECOVERED_VERIFIED
+    assert all(item.passed for item in result.checks)
+    assert result.closes_migration_lifecycle is False
+    assert result.verify()
+
+
+def test_post_recovery_blocks_missing_continuity(tmp_path):
+    plan, recovery, execution, registry, graph = (
+        _recovered_canonical_state(tmp_path)
+    )
+    registry = replace(registry, continuity_events=()).finalized()
+    project = replace(graph.nodes[0], metadata={
+        "repository_traceability": {
+            "registry_id": registry.registry_id,
+            "registry_hash": registry.content_hash,
+        },
+    })
+    graph = replace(graph, nodes=(project, *graph.nodes[1:])).finalized()
+    result = RepositoryEvolutionPostRecoveryVerifier().verify(
+        plan, recovery, execution, registry, graph,
+    )
+    assert result.outcome is RepositoryPostRecoveryOutcome.RECOVERY_BLOCKED

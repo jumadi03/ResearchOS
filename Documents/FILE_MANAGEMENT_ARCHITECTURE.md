@@ -816,6 +816,20 @@ The recovery executor is not connected to production paths, API, worker, or
 deployment storage. A recovered filesystem still requires canonical registry
 and graph revalidation before any migration lifecycle can close.
 
+### FMA-008 post-recovery canonical revalidation
+
+The eighth FMA-008 increment proves recovery against new canonical state:
+
+- original file identities, paths, and hashes must be restored;
+- migration targets must be retired from the File Registry;
+- rollback continuity events must reach the recovery revision; and
+- the Architecture Graph must match that revision, File nodes, and registry
+  provenance.
+
+Results are `recovered_verified`, `recovery_blocked`, or
+`manual_recovery_required`. Even `recovered_verified` does not close the
+migration lifecycle; closure remains a separate attributable audit decision.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;
