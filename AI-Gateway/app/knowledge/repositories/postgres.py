@@ -18,6 +18,7 @@ from app.knowledge.repositories.postgres_semantic import PostgresSemanticReposit
 from app.knowledge.repositories.postgres_read_model import PostgresReadModelRepositoryMixin
 from app.knowledge.repositories.postgres_evidence import PostgresEvidenceRepositoryMixin
 from app.knowledge.repositories.postgres_artifacts import PostgresArtifactRepositoryMixin
+from app.knowledge.repositories.postgres_monitoring import PostgresMonitoringRepositoryMixin
 
 
 def normalized_source_license(raw: dict) -> str | None:
@@ -664,6 +665,7 @@ class _PostgresRepositoryCore:
 
 
 class PostgresScientificDataRepository(
+    PostgresMonitoringRepositoryMixin,
     PostgresSemanticRepositoryMixin,
     PostgresReadModelRepositoryMixin,
     PostgresEvidenceRepositoryMixin,

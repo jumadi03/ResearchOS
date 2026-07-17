@@ -28,6 +28,21 @@ class KnowledgeRepositoryService:
     def semantic_search(self, **options):
         return self._required("semantic retrieval").semantic_search(**options)
 
+    def create_source_watch(self, baseline, **options):
+        return self._required("continuous monitoring").create_source_watch(
+            baseline, **options
+        )
+
+    def list_source_watches(self, project_id):
+        return self._required("continuous monitoring").list_source_watches(
+            project_id
+        )
+
+    def acknowledge_scientific_change(self, change_id, **options):
+        return self._required(
+            "scientific change acknowledgement"
+        ).acknowledge_scientific_change(change_id, **options)
+
     def list_projects(self):
         return self._required("product reads").list_projects()
 

@@ -24,7 +24,8 @@
 - Completed: SCAN-001K Human Review
 - Completed: SCAN-001L Knowledge Intake
 - Completed: SCAN-001M Citation Snowballing
-- Next deliverable: SCAN-001N Continuous Monitoring
+- Completed: SCAN-001N Continuous Monitoring
+- Next deliverable: SCAN-001O Consolidation Review
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,
@@ -363,6 +364,41 @@ URL. Citation direction does not imply support, contradiction, relevance, or
 scientific acceptance. Every candidate must return through normal discovery,
 screening, extraction, and human-review boundaries before entering canonical
 knowledge.
+
+### SCAN-001N implementation traceability
+
+SCAN-001N adds contract-bound continuous monitoring without creating a second
+scheduler or promoting detected changes directly into evidence:
+
+- immutable watch, monitoring-run, and scientific-change contracts plus
+  deterministic comparison:
+  `AI-Gateway/app/knowledge/monitoring/models.py`,
+  `AI-Gateway/app/knowledge/monitoring/engine.py`, and
+  `AI-Gateway/app/knowledge/monitoring/serialization.py`;
+- canonical PostgreSQL definition ledger, mutable schedule state, immutable
+  run/change/acknowledgement ledgers, and schema version 27:
+  `AI-Gateway/app/knowledge/repositories/postgres_monitoring.py` and
+  `deploy/postgres/init/027_continuous_scientific_monitoring.sql`;
+- deduplicated scheduling and isolated execution through the existing
+  resilient background worker:
+  `AI-Gateway/app/workers/main.py` and
+  `AI-Gateway/app/knowledge/monitoring/executor.py`;
+- authenticated API creation, listing, and actor-attributed acknowledgement:
+  `AI-Gateway/app/knowledge/service.py`,
+  `AI-Gateway/app/models/knowledge.py`, and
+  `AI-Gateway/app/router/knowledge.py`; and
+- domain, regression, architecture, storage, and runtime verification:
+  `AI-Gateway/app/knowledge/tests/test_continuous_monitoring.py`,
+  `deploy/verify/canonical_storage_healthcheck.sql`, and
+  `deploy/verify/storage_compliance.py`.
+
+Every watch is bound to the exact canonical question, discovery contract,
+planned query, and source definitions of its baseline. Paused or expired
+watches are not scheduled; schedule identity is deduplicated; provider
+failures remain explicit; and a missing result is never labeled unavailable
+without affirmative provider evidence. Detected changes remain discovery
+candidates and must pass normal screening, extraction, human review, and
+knowledge-intake gates.
 
 ## Canonical documentation review protocol
 

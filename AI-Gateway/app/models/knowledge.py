@@ -70,6 +70,21 @@ class CitationTraversalRequest(BaseModel):
     retrieval_budget: int = Field(ge=1, le=100_000)
 
 
+class SourceWatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cadence_minutes: int = Field(ge=15, le=525_600)
+    created_at: str = Field(min_length=1)
+    next_run_at: str = Field(min_length=1)
+    maximum_runs: int | None = Field(default=None, ge=1)
+    ends_at: str | None = None
+
+
+class ScientificChangeAcknowledgementRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rationale: str = Field(min_length=1)
+    occurred_at: str = Field(min_length=1)
+
+
 class DocumentAcquisitionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     record_id: str = Field(min_length=1)

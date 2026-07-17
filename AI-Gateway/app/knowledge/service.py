@@ -131,6 +131,20 @@ class KnowledgeDiscoveryService:
     def traverse_citations(self, run_id: str, **values):
         return self.ingestion_pipeline.traverse_citations(run_id, **values)
 
+    def create_source_watch(self, run_id: str, **options):
+        baseline = self.ingestion_pipeline.runs.get(run_id)
+        if baseline is None:
+            raise KeyError(f"Unknown discovery run: {run_id}")
+        return self.repository_service.create_source_watch(baseline, **options)
+
+    def list_source_watches(self, project_id: str):
+        return self.repository_service.list_source_watches(project_id)
+
+    def acknowledge_scientific_change(self, change_id: str, **options):
+        return self.repository_service.acknowledge_scientific_change(
+            change_id, **options
+        )
+
     def acquire_document(self, run_id: str, candidate: DocumentCandidate):
         return self.ingestion_pipeline.acquire_document(run_id, candidate)
 

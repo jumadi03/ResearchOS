@@ -13,6 +13,7 @@ from app.knowledge.extraction.models import (
     EvidenceAdmission, EvidenceReviewAssessment, EvidenceReviewEvent, ExtractionManifest,
 )
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
+from app.knowledge.monitoring.models import MonitoringRun, ScientificSourceWatch
 from app.knowledge.intake.models import KnowledgeIntakeManifest
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
@@ -29,6 +30,27 @@ class ScientificDataRepository(Protocol):
     def persist_citation_traversal(
         self, run: CitationTraversalRun,
     ) -> None: ...
+
+    def create_source_watch(
+        self, baseline: DiscoveryRun, **options,
+    ) -> ScientificSourceWatch: ...
+
+    def load_source_watch(
+        self, watch_id: str,
+    ) -> tuple[ScientificSourceWatch, DiscoveryRun]: ...
+
+    def list_source_watches(
+        self, project_id: str,
+    ) -> tuple[ScientificSourceWatch, ...]: ...
+
+    def persist_monitoring_run(
+        self, watch: ScientificSourceWatch, run: MonitoringRun,
+        current: DiscoveryRun,
+    ) -> None: ...
+
+    def acknowledge_scientific_change(
+        self, change_id: str, **options,
+    ) -> str: ...
 
     def persist_representation(
         self, record: LiteratureRecord, result: AcquisitionResult, storage_uri: str,

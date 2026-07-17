@@ -22,6 +22,11 @@ JOB_RETRY_BASE_SECONDS = int(os.getenv("JOB_RETRY_BASE_SECONDS", "5"))
 JOB_TIMEOUT_SECONDS = int(os.getenv("JOB_TIMEOUT_SECONDS", "600"))
 WORKER_METRICS_PORT = int(os.getenv("WORKER_METRICS_PORT", "9102"))
 WORKER_ID = os.getenv("WORKER_ID", f"{socket.gethostname()}:{uuid4()}")
+KNOWLEDGE_PROVIDER_TIMEOUT = float(os.getenv("KNOWLEDGE_PROVIDER_TIMEOUT", "20"))
+KNOWLEDGE_PROVIDER_MAX_ATTEMPTS = int(
+    os.getenv("KNOWLEDGE_PROVIDER_MAX_ATTEMPTS", "3")
+)
+SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
 _stop_requested = False
 metrics = WorkerMetrics()
 
@@ -112,6 +117,41 @@ def validate_semantic_source(cursor, payload):
 
 def claim(connection):
     with connection.transaction(), connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE scientific_source_watch_state s SET
+                status='expired',updated_at=now()
+            FROM scientific_source_watches w
+            WHERE w.watch_id=s.watch_id AND s.status='active'
+              AND (
+                (w.ends_at IS NOT NULL AND s.next_run_at > w.ends_at)
+                OR (
+                    w.maximum_runs IS NOT NULL
+                    AND s.completed_runs >= w.maximum_runs
+                )
+              )
+        """)
+        cursor.execute("""
+            INSERT INTO background_jobs(job_type,payload,deduplication_key)
+            SELECT 'run_source_watch',
+                jsonb_build_object(
+                    'watch_id',s.watch_id,
+                    'scheduled_at',to_char(
+                        s.next_run_at AT TIME ZONE 'UTC',
+                        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                    )
+                ),
+                encode(digest(
+                    s.watch_id || ':' || s.next_run_at::text,'sha256'
+                ),'hex')
+            FROM scientific_source_watch_state s
+            JOIN scientific_source_watches w USING(watch_id)
+            WHERE s.status='active' AND s.next_run_at <= now()
+              AND (w.ends_at IS NULL OR s.next_run_at <= w.ends_at)
+              AND (
+                w.maximum_runs IS NULL OR s.completed_runs < w.maximum_runs
+              )
+            ON CONFLICT(deduplication_key) DO NOTHING
+        """)
         cursor.execute("""
             UPDATE background_jobs SET status='pending', locked_by=NULL,
                 lease_expires_at=NULL, available_at=now(),
@@ -253,6 +293,14 @@ def execute(connection, job_type, payload):
             inspection=inspection, screening_decision=decision,
         )
         ExtractionManifestStore(KNOWLEDGE_ROOT / "extractions").save(manifest)
+    elif job_type == "run_source_watch":
+        from app.knowledge.monitoring.executor import execute_source_watch
+        execute_source_watch(
+            DATABASE_URL, KNOWLEDGE_ROOT, payload,
+            timeout=KNOWLEDGE_PROVIDER_TIMEOUT,
+            max_attempts=KNOWLEDGE_PROVIDER_MAX_ATTEMPTS,
+            semantic_scholar_api_key=SEMANTIC_SCHOLAR_API_KEY,
+        )
     else:
         raise ValueError(f"Unsupported job type: {job_type}")
 
