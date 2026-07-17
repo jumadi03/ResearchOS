@@ -10,6 +10,7 @@
 - Recorded: 2026-07-17
 - Scope: long-term identity, direction, and success criteria
 - Related documents: `README.md`,
+  `Documents/SCIENTIFIC_GOVERNANCE_FRAMEWORK.md`,
   `Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md`,
   `Documents/SCIENTIFIC_INTERFACE_VISION.md`,
   `Documents/RESPONSIBLE_EVOLUTION_VISION.md`,
@@ -23,6 +24,12 @@ implementasi, spesifikasi komponen, klaim bahwa seluruh kemampuan sudah
 tersedia, atau pengganti kontrak dan kode kanonik. Roadmap dan sprint
 menentukan urutan realisasi; visi ini menentukan arah dan identitas yang tidak
 boleh hilang ketika implementasi berkembang.
+
+Tata kelola ilmiah lintas domain dicatat dalam
+`Documents/SCIENTIFIC_GOVERNANCE_FRAMEWORK.md`. Kerangka SGF menempatkan
+Scientific Constitution, human authority, ontology, lifecycle, trust,
+scientific memory, ethics, capability traceability, evolution, dan quality
+dalam satu keluarga dokumen berhierarki di atas metodologi dan arsitektur.
 
 Visi interaksi dan evolusi workspace dicatat secara khusus dalam
 `Documents/SCIENTIFIC_INTERFACE_VISION.md`. Antarmuka ResearchOS diarahkan

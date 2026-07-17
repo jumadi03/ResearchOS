@@ -94,6 +94,7 @@ schema and persistence, and dependency-security gates.
 ## Documentation
 
 - [ResearchOS vision](Documents/RESEARCHOS_VISION.md)
+- [Scientific Governance Framework (SGF-000)](Documents/SCIENTIFIC_GOVERNANCE_FRAMEWORK.md)
 - [Autonomous intelligence roadmap](Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md)
 - [Scientific interface vision](Documents/SCIENTIFIC_INTERFACE_VISION.md)
 - [Responsible evolution vision](Documents/RESPONSIBLE_EVOLUTION_VISION.md)
