@@ -343,4 +343,3 @@ migrations require a separate project-owner decision.
 Acceptance of this document authorizes FMA-001 dependency verification and
 repository classification audit. It does not authorize renaming, moving,
 deleting, or mass-registering existing files.
-
