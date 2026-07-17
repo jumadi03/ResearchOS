@@ -178,6 +178,8 @@ jobs:
           docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/representation_repository.py
           docker compose --env-file stack.env -f compose.yaml cp verify/source_inspection.py api:/tmp/source_inspection.py
           docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/source_inspection.py
+          docker compose --env-file stack.env -f compose.yaml cp verify/screening_decision.py api:/tmp/screening_decision.py
+          docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/screening_decision.py
       - name: Verify evidence admission and canonical graph safety
         working-directory: deploy
         run: |

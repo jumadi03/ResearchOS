@@ -42,6 +42,7 @@ class RecordingRepository:
         self.metadata_runs = []
         self.representations = []
         self.inspections = []
+        self.screening_decisions = []
         self.evidence_manifests = []
         self.evidence_reviews = []
         self.graphs = []
@@ -70,6 +71,12 @@ class RecordingRepository:
         assert inspection.verify()
         self.inspections.append((record, inspection))
         return "inspection-row-1"
+    def persist_screening_decision(self, record, decision):
+        assert decision.verify()
+        self.screening_decisions.append((record, decision))
+        return "screening-row-1"
+    def validate_screening_decision(self, decision):
+        assert any(item[1] == decision for item in self.screening_decisions)
     def persist_evidence(self, record, manifest):
         self.evidence_manifests.append((record, manifest))
         return tuple(f"evidence-{index}" for index, _ in enumerate(manifest.objects, 1))
@@ -505,6 +512,16 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
             "source_response_hash": source["response_hash"],
         },
     ).json()
+    bypass = api.post(
+        f"/knowledge/documents/{acquired['document_id']}/extractions"
+    )
+    assert bypass.status_code == 422
+    assert "screening decision" in bypass.json()["detail"]
+    screening = api.post(
+        f"/knowledge/documents/{acquired['document_id']}/screenings"
+    )
+    assert screening.status_code == 201
+    assert screening.json()["status"] == "eligible"
     extraction = api.post(f"/knowledge/documents/{acquired['document_id']}/extractions")
     assert extraction.status_code == 201
     assert object_store.reads[0].checksum_sha256 == acquired["content_hash"]
@@ -684,6 +701,10 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     assert response.status_code == 201
     assert response.json()["status"] == "acquired"
     assert response.json()["integrity_verified"] is True
+    screening = api.post(
+        f"/knowledge/documents/{response.json()['document_id']}/screenings"
+    )
+    assert screening.status_code == 201
     extraction = api.post(
         f"/knowledge/documents/{response.json()['document_id']}/extractions"
     )
@@ -976,6 +997,10 @@ def test_direct_service_cannot_build_canonical_graph_without_admission_authority
             "source_response_hash": source["response_hash"],
         },
     ).json()
+    screening = api.post(
+        f"/knowledge/documents/{document['document_id']}/screenings"
+    )
+    assert screening.status_code == 201
     extraction = api.post(
         f"/knowledge/documents/{document['document_id']}/extractions"
     ).json()

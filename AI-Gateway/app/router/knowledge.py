@@ -174,6 +174,27 @@ def inspect_document(
     return result
 
 
+@router.post("/documents/{document_id}/screenings", status_code=201)
+def screen_document(
+    document_id: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials)
+    try:
+        decision, snapshot = request.app.state.knowledge_service.screen_document(
+            document_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(decision)
+    result["snapshot"] = snapshot.name
+    result["integrity_verified"] = decision.verify()
+    return result
+
+
 @router.post("/documents/{document_id}/extractions", status_code=201)
 def extract_document(
     document_id: str,

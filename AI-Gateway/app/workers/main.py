@@ -210,18 +210,47 @@ def execute(connection, job_type, payload):
         from app.knowledge.ingestion.registry import DocumentRegistry
         from app.knowledge.inspection.engine import SourceInspectionEngine
         from app.knowledge.inspection.persistence import SourceInspectionStore
+        from app.knowledge.screening.persistence import ScreeningDecisionStore
         document_id = payload.get("document_id")
         if not document_id:
             raise ValueError("parse_document requires document_id")
         registry = DocumentRegistry(KNOWLEDGE_ROOT / "documents")
         document = registry.get(document_id)
         content = registry.read_verified_content(document)
-        inspection = SourceInspectionEngine().inspect(
-            document, content, inspected_at=payload.get("created_at", "worker"),
+        inspection_store = SourceInspectionStore(KNOWLEDGE_ROOT / "inspections")
+        inspection = inspection_store.latest_verified(
+            document.document_id, document.content_hash or "",
         )
-        SourceInspectionStore(KNOWLEDGE_ROOT / "inspections").save(inspection)
+        if inspection is None:
+            inspection = SourceInspectionEngine().inspect(
+                document, content, inspected_at=payload.get("created_at", "worker"),
+            )
+            inspection_store.save(inspection)
+        decision = ScreeningDecisionStore(
+            KNOWLEDGE_ROOT / "screenings"
+        ).find_eligible(
+            document.document_id, document.content_hash or "",
+            inspection.manifest_hash,
+        )
+        if decision is None:
+            raise ValueError("Eligible screening decision is required for evidence extraction")
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT status,decision_hash FROM screening_decisions
+                WHERE decision_key=%s AND source_document_id=%s
+                  AND document_content_hash=%s
+                  AND inspection_manifest_hash=%s
+            """, (
+                decision.decision_id, decision.document_id,
+                decision.document_content_hash,
+                decision.inspection_manifest_hash,
+            ))
+            canonical = cursor.fetchone()
+        if canonical != (decision.status.value, decision.decision_hash):
+            raise ValueError("Canonical screening decision does not match snapshot")
         manifest = EvidenceExtractionEngine().extract(
             document, content, created_at=payload.get("created_at", "worker"),
+            inspection=inspection, screening_decision=decision,
         )
         ExtractionManifestStore(KNOWLEDGE_ROOT / "extractions").save(manifest)
     else:

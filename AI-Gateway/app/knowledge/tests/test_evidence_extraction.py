@@ -9,6 +9,10 @@ from app.knowledge.extraction.persistence import ExtractionManifestStore
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.ingestion.models import AccessStatus, DocumentCandidate
 from app.knowledge.ingestion.registry import DocumentRegistry
+from app.knowledge.inspection.engine import SourceInspectionEngine
+from app.knowledge.screening.models import (
+    ScreeningDecision, ScreeningDimension, ScreeningReason, ScreeningStatus,
+)
 
 
 def pdf_bytes() -> bytes:
@@ -39,9 +43,29 @@ def document(tmp_path: Path):
     return registry.register(result)[0], registry, content
 
 
+def screened(source, content):
+    inspection = SourceInspectionEngine().inspect(
+        source, content, inspected_at="screened"
+    )
+    reasons = tuple(
+        ScreeningReason(dimension, f"{dimension.value.upper()}_PASS", True, "passed")
+        for dimension in ScreeningDimension
+    )
+    decision = ScreeningDecision(
+        "decision", source.document_id, source.record_id, "contract",
+        source.content_hash, inspection.manifest_hash, ScreeningStatus.ELIGIBLE,
+        reasons, "test", "1.0", "screened",
+    ).finalized()
+    return inspection, decision
+
+
 def test_extraction_has_coordinates_provenance_and_provisional_state(tmp_path: Path) -> None:
     source, _, content = document(tmp_path)
-    manifest = EvidenceExtractionEngine().extract(source, content, created_at="later")
+    inspection, decision = screened(source, content)
+    manifest = EvidenceExtractionEngine().extract(
+        source, content, created_at="later", inspection=inspection,
+        screening_decision=decision,
+    )
     assert [item.object_type for item in manifest.objects] == [ScientificObjectType.METHOD, ScientificObjectType.RESULT, ScientificObjectType.LIMITATION, ScientificObjectType.CONCLUSION]
     assert all(item.review_state is ExtractionReviewState.PROVISIONAL for item in manifest.objects)
     assert all(item.coordinates.page == 1 and item.coordinates.quote_hash for item in manifest.objects)
@@ -51,6 +75,17 @@ def test_extraction_has_coordinates_provenance_and_provisional_state(tmp_path: P
 
 def test_extraction_rejects_tampered_pdf(tmp_path: Path) -> None:
     import pytest
-    source, _, _ = document(tmp_path)
+    source, _, content = document(tmp_path)
+    inspection, decision = screened(source, content)
     with pytest.raises(ValueError, match="integrity"):
-        EvidenceExtractionEngine().extract(source, b"%PDF-tampered", created_at="later")
+        EvidenceExtractionEngine().extract(
+            source, b"%PDF-tampered", created_at="later",
+            inspection=inspection, screening_decision=decision,
+        )
+
+
+def test_direct_extractor_cannot_bypass_screening(tmp_path: Path) -> None:
+    import pytest
+    source, _, content = document(tmp_path)
+    with pytest.raises(ValueError, match="screening decision"):
+        EvidenceExtractionEngine().extract(source, content, created_at="later")

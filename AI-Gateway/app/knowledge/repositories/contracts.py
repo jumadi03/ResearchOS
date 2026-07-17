@@ -5,6 +5,7 @@ from typing import Protocol
 from app.knowledge.models import DiscoveryRun, LiteratureRecord
 from app.knowledge.ingestion.models import AcquisitionResult
 from app.knowledge.inspection.models import SourceInspection
+from app.knowledge.screening.models import ScreeningDecision
 from app.knowledge.retrieval.models import MetadataRun
 from app.knowledge.repositories.models import StoredRepresentation
 from app.knowledge.extraction.models import (
@@ -34,6 +35,12 @@ class ScientificDataRepository(Protocol):
     def persist_source_inspection(
         self, record: LiteratureRecord, inspection: SourceInspection,
     ) -> str: ...
+
+    def persist_screening_decision(
+        self, record: LiteratureRecord, decision: ScreeningDecision,
+    ) -> str: ...
+
+    def validate_screening_decision(self, decision: ScreeningDecision) -> None: ...
 
     def persist_evidence(
         self, record: LiteratureRecord, manifest: ExtractionManifest,

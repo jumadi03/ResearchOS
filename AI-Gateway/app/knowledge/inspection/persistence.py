@@ -67,3 +67,10 @@ class SourceInspectionStore:
             ):
                 return inspection
         return None
+
+    def latest_verified(self, document_id: str, content_hash: str) -> SourceInspection | None:
+        for path in sorted((self.root / document_id).glob("v*.json"), reverse=True):
+            inspection = self.load(path)
+            if inspection.document_content_hash == content_hash:
+                return inspection
+        return None

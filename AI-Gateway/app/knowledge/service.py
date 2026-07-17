@@ -134,6 +134,9 @@ class KnowledgeDiscoveryService:
     def inspect_document(self, document_id: str):
         return self.ingestion_pipeline.inspect_document(document_id)
 
+    def screen_document(self, document_id: str):
+        return self.ingestion_pipeline.screen_document(document_id)
+
     def extract_document(self, document_id: str):
         return self.ingestion_pipeline.extract_document(document_id)
 

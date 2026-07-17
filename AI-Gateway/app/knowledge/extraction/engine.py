@@ -13,6 +13,8 @@ from app.knowledge.extraction.models import (
     ExtractionReviewState, ScientificObjectType,
 )
 from app.knowledge.ingestion.models import SourceDocument
+from app.knowledge.inspection.models import SourceInspection
+from app.knowledge.screening.models import ScreeningDecision
 
 
 class EvidenceExtractionEngine:
@@ -33,7 +35,18 @@ class EvidenceExtractionEngine:
         "data": ScientificObjectType.DATASET,
     }
 
-    def extract(self, document: SourceDocument, pdf: bytes, *, created_at: str) -> ExtractionManifest:
+    def extract(
+        self, document: SourceDocument, pdf: bytes, *, created_at: str,
+        inspection: SourceInspection | None = None,
+        screening_decision: ScreeningDecision | None = None,
+    ) -> ExtractionManifest:
+        if inspection is None or screening_decision is None:
+            raise ValueError("Eligible screening decision is required for evidence extraction")
+        screening_decision.require_eligible(
+            document_id=document.document_id,
+            content_hash=document.content_hash or "",
+            inspection_manifest_hash=inspection.manifest_hash,
+        )
         if not document.content_hash or sha256(pdf).hexdigest() != document.content_hash:
             raise ValueError("SourceDocument content integrity verification failed")
         objects = []

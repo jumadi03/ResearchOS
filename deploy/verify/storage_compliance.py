@@ -12,7 +12,7 @@ import psycopg
 REQUIRED_RESOURCES = {
     "canonical_objects", "scientific_sources", "scientific_documents",
     "document_source_references", "metadata_observations",
-    "scientific_representations", "source_inspections",
+    "scientific_representations", "source_inspections", "screening_decisions",
     "scientific_identifiers", "identity_resolution_events",
     "evidence_objects", "evidence_review_events",
     "provenance_events", "knowledge_nodes", "knowledge_edges",
@@ -57,6 +57,7 @@ def main() -> None:
                 "artifact_lifecycle_events_immutable",
                 "scientific_representations_immutable",
                 "source_inspections_immutable",
+                "screening_decisions_immutable",
                 "identity_resolution_events_immutable",
                 "publication_representations_immutable",
             }

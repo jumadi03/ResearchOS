@@ -19,7 +19,8 @@
 - Completed: SCAN-001F Raw Capture and Integrity Store
 - Completed: SCAN-001G Source Inspection
 - Completed: SCAN-001H Identity Resolution
-- Next deliverable: SCAN-001I Screening Engine
+- Completed: SCAN-001I Screening Engine
+- Next deliverable: SCAN-001J Evidence Extraction
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,

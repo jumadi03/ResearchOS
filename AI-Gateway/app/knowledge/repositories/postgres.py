@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from app.knowledge.discovery.normalization import canonical_json
 from app.knowledge.ingestion.models import AcquisitionResult, AcquisitionStatus
 from app.knowledge.inspection.models import SourceInspection
+from app.knowledge.screening.models import ScreeningDecision
 from app.knowledge.models import DiscoveryRun, LiteratureRecord, SourceRecord
 from app.knowledge.retrieval.models import MetadataRun
 from app.knowledge.repositories.models import StoredRepresentation
@@ -507,6 +508,76 @@ class _PostgresRepositoryCore:
                 if existing[1] != inspection.manifest_hash:
                     raise RuntimeError("Source inspection integrity conflict")
                 return str(existing[0])
+
+    def persist_screening_decision(
+        self, record: LiteratureRecord, decision: ScreeningDecision,
+    ) -> str:
+        if not decision.verify() or decision.canonical_record_id != record.record_id:
+            raise ValueError("Screening decision integrity or record binding is invalid")
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT inspection_id FROM source_inspections
+                    WHERE document_id=%s AND document_content_hash=%s
+                      AND manifest_hash=%s
+                """, (
+                    decision.document_id, decision.document_content_hash,
+                    decision.inspection_manifest_hash,
+                ))
+                inspection = cursor.fetchone()
+                if inspection is None:
+                    raise KeyError("Canonical source inspection missing for screening")
+                document_id = self._upsert_document(cursor, record)
+                cursor.execute("""
+                    INSERT INTO screening_decisions(
+                        decision_key,canonical_document_id,source_document_id,
+                        inspection_id,discovery_contract_id,
+                        document_content_hash,inspection_manifest_hash,status,
+                        reasons,screener_name,screener_version,decided_at,decision_hash
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(decision_key) DO NOTHING
+                    RETURNING screening_decision_id
+                """, (
+                    decision.decision_id, document_id, decision.document_id,
+                    inspection[0], decision.discovery_contract_id,
+                    decision.document_content_hash,
+                    decision.inspection_manifest_hash, decision.status.value,
+                    json.dumps([asdict(item) for item in decision.reasons]),
+                    decision.screener_name, decision.screener_version,
+                    decision.decided_at, decision.decision_hash,
+                ))
+                inserted = cursor.fetchone()
+                if inserted:
+                    return str(inserted[0])
+                cursor.execute("""
+                    SELECT screening_decision_id,decision_hash
+                    FROM screening_decisions WHERE decision_key=%s
+                """, (decision.decision_id,))
+                existing = cursor.fetchone()
+                if existing[1] != decision.decision_hash:
+                    raise RuntimeError("Screening decision integrity conflict")
+                return str(existing[0])
+
+    def validate_screening_decision(self, decision: ScreeningDecision) -> None:
+        if not decision.verify():
+            raise ValueError("Screening decision integrity verification failed")
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT status,decision_hash FROM screening_decisions
+                    WHERE decision_key=%s AND source_document_id=%s
+                      AND document_content_hash=%s
+                      AND inspection_manifest_hash=%s
+                """, (
+                    decision.decision_id, decision.document_id,
+                    decision.document_content_hash,
+                    decision.inspection_manifest_hash,
+                ))
+                row = cursor.fetchone()
+        if row is None:
+            raise ValueError("Canonical screening decision is missing")
+        if row[0] != decision.status.value or row[1] != decision.decision_hash:
+            raise ValueError("Canonical screening decision does not match snapshot")
 
 
 class PostgresScientificDataRepository(

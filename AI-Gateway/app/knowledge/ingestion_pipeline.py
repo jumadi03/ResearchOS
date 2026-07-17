@@ -16,6 +16,8 @@ from app.knowledge.ingestion.models import DocumentCandidate
 from app.knowledge.ingestion.registry import DocumentRegistry
 from app.knowledge.inspection.engine import SourceInspectionEngine
 from app.knowledge.inspection.persistence import SourceInspectionStore
+from app.knowledge.screening.engine import ScientificScreeningEngine
+from app.knowledge.screening.persistence import ScreeningDecisionStore
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
 from app.knowledge.modeling.persistence import KnowledgeGraphStore
 from app.knowledge.models import (
@@ -47,6 +49,8 @@ class KnowledgeIngestionPipeline:
         self.document_registry = DocumentRegistry(output_root / "documents")
         self.inspection_engine = SourceInspectionEngine()
         self.inspection_store = SourceInspectionStore(output_root / "inspections")
+        self.screening_engine = ScientificScreeningEngine()
+        self.screening_store = ScreeningDecisionStore(output_root / "screenings")
         self.extraction_engine = EvidenceExtractionEngine()
         self.extraction_store = ExtractionManifestStore(output_root / "extractions")
         self.graph_builder = ScientificKnowledgeGraphBuilder()
@@ -54,6 +58,7 @@ class KnowledgeIngestionPipeline:
         self.runs: dict[str, DiscoveryRun] = {}
         self.extractions = {}
         self.inspections = {}
+        self.screening_decisions = {}
         self.graphs = {}
 
     def discover(
@@ -145,18 +150,56 @@ class KnowledgeIngestionPipeline:
         return inspection, self.inspection_store.save(inspection)
 
     def extract_document(self, document_id: str):
-        if not any(
-            item.document_id == document_id for item in self.inspections.values()
-        ):
-            self.inspect_document(document_id)
+        inspection = next((
+            item for item in self.inspections.values()
+            if item.document_id == document_id
+        ), None)
+        if inspection is None:
+            inspection, _ = self.inspect_document(document_id)
         document, record, content = self._verified_document_content(document_id)
+        decision = self.screening_store.find_eligible(
+            document_id, document.content_hash or "", inspection.manifest_hash,
+        )
+        if decision is None:
+            raise ValueError("Eligible screening decision is required for evidence extraction")
+        if self.data_repository is not None and self.object_store is not None:
+            self.data_repository.validate_screening_decision(decision)
         manifest = self.extraction_engine.extract(
-            document, content, created_at=DiscoveryRun.timestamp()
+            document, content, created_at=DiscoveryRun.timestamp(),
+            inspection=inspection, screening_decision=decision,
         )
         if self.data_repository is not None and self.object_store is not None:
             self.data_repository.persist_evidence(record, manifest)
         self.extractions[manifest.extraction_id] = manifest
         return manifest, self.extraction_store.save(manifest)
+
+    def screen_document(self, document_id: str):
+        inspection = next((
+            item for item in self.inspections.values()
+            if item.document_id == document_id
+        ), None)
+        if inspection is None:
+            inspection, _ = self.inspect_document(document_id)
+        document, record, _ = self._verified_document_content(document_id)
+        run = next((
+            run for run in self.runs.values()
+            if any(item.record_id == document.record_id for item in run.records)
+        ), None)
+        if run is not None and record is None:
+            record = next(
+                item for item in run.records
+                if item.record_id == document.record_id
+            )
+        if run is None or record is None:
+            raise ValueError("Discovery contract provenance is required for screening")
+        decision = self.screening_engine.screen(
+            record, document, inspection, run.discovery_contract,
+            decided_at=DiscoveryRun.timestamp(),
+        )
+        if self.data_repository is not None and self.object_store is not None:
+            self.data_repository.persist_screening_decision(record, decision)
+        self.screening_decisions[decision.decision_id] = decision
+        return decision, self.screening_store.save(decision)
 
     def build_knowledge_graph(self, extraction_id: str):
         manifest = self.extractions.get(extraction_id)
