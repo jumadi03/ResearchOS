@@ -38,6 +38,11 @@ from .repository import (
     RepositoryPolicyConflict,
     RepositoryPolicyException,
     RepositoryPolicyRegistry,
+    FileContinuityEvent,
+    FileGovernanceState,
+    RepositoryFileEntry,
+    RepositoryFileRegistry,
+    RepositoryFileRegistryBuilder,
 )
 
 
@@ -71,4 +76,9 @@ __all__ = [
     "RepositoryPolicyConflict",
     "RepositoryPolicyException",
     "RepositoryPolicyRegistry",
+    "FileContinuityEvent",
+    "FileGovernanceState",
+    "RepositoryFileEntry",
+    "RepositoryFileRegistry",
+    "RepositoryFileRegistryBuilder",
 ]

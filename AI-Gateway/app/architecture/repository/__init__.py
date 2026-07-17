@@ -20,6 +20,13 @@ from .policy_registry import (
     RepositoryPolicyConflict,
     RepositoryPolicyRegistry,
 )
+from .file_registry_models import (
+    FileContinuityEvent,
+    FileGovernanceState,
+    RepositoryFileEntry,
+    RepositoryFileRegistry,
+)
+from .file_registry_builder import RepositoryFileRegistryBuilder
 
 __all__ = [
     "RepositoryClassifier",
@@ -36,4 +43,9 @@ __all__ = [
     "RepositoryPolicyConflict",
     "RepositoryPolicyException",
     "RepositoryPolicyRegistry",
+    "FileContinuityEvent",
+    "FileGovernanceState",
+    "RepositoryFileEntry",
+    "RepositoryFileRegistry",
+    "RepositoryFileRegistryBuilder",
 ]

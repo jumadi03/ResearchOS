@@ -82,6 +82,9 @@ LAW_BUNDLE_SCHEMA = SchemaPolicy("Law Bundle", "1.0", frozenset({"1.0"}))
 REPOSITORY_POLICY_BUNDLE_SCHEMA = SchemaPolicy(
     "Repository Policy Bundle", "1.0", frozenset({"1.0"})
 )
+FILE_REGISTRY_SCHEMA = SchemaPolicy(
+    "Repository File Registry", "1.0", frozenset({"1.0"})
+)
 COMPLIANCE_SCHEMA = SchemaPolicy(
     "Compliance Report", "1.0", frozenset({"0.9", "1.0"})
 )

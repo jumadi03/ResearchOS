@@ -398,6 +398,56 @@ condition. Even a valid exception cannot approve an Architecture finding or
 produce a compliance `PASS`; those authorities remain with the existing
 Compliance and Review Engines.
 
+## FMA-003 implementation traceability
+
+FMA-003 derives a revision-bound File Registry from the verified FMA-001
+inventory and FMA-002 policy bundle:
+
+- immutable file identity, governance-state, continuity-event, and registry
+  contracts:
+  `AI-Gateway/app/architecture/repository/file_registry_models.py`;
+- deterministic registry construction, policy attribution, explicit governance
+  gaps, and fail-closed continuity validation:
+  `AI-Gateway/app/architecture/repository/file_registry_builder.py`;
+- exception attribution without compliance waiver:
+  `AI-Gateway/app/architecture/repository/policy_registry.py`; and
+- identity, revision, rename, conflict, tamper, schema, governance-gap, and
+  bypass tests:
+  `AI-Gateway/app/architecture/tests/test_file_registry.py`.
+
+An initial identity is content-addressed from the project, first observed path,
+and first observed content hash. A file that remains at the same path keeps its
+identity across content revisions. A rename is never inferred from matching
+content or similarity: identity continuity requires a finalized
+`FileContinuityEvent` whose old and new path, hash, revision, actor, rationale,
+timestamp, and event hash all verify.
+
+The registry records `assigned`, `partial`, or `unassigned` governance state
+instead of inventing missing ownership or lifecycle declarations. Exceptions
+remain attributable evidence and do not convert a governance gap or future
+compliance finding into a pass. Conflicting policy declarations and ambiguous,
+reused, stale, or incomplete continuity claims fail explicitly.
+
+FMA-003 does not persist a generated registry in the repository, change the
+Architecture Graph, move files, infer equivalence between distinct files, or
+issue a compliance result.
+
+The first read-only working-tree registry observation covered 443 files:
+
+| Governance state | Count |
+| --- | ---: |
+| Assigned | 298 |
+| Partial | 120 |
+| Unassigned | 25 |
+
+It was derived from inventory
+`repository-inventory:ResearchOS:a70c1e75d1eb0d56` and policy bundle
+`repository-policy:1.0:a778690b312ac90b`, producing registry identity
+`file-registry:ResearchOS:573241dcadf92d2f`. This is implementation evidence,
+not a committed generated registry or a compliance decision. The partial and
+unassigned counts are explicit input for later verification work; FMA-003 does
+not silently invent missing policy.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

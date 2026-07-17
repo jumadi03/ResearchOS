@@ -8,6 +8,7 @@ from .policy_models import (
     RepositoryLifecyclePolicy,
     RepositoryOwnershipPolicy,
     RepositoryPolicyBundle,
+    RepositoryPolicyException,
 )
 
 
@@ -73,3 +74,14 @@ class RepositoryPolicyRegistry:
                 f"Conflicting repository lifecycle policies for {path}"
             )
         return matches[0] if matches else None
+
+    def resolve_exceptions(
+        self, path: str, policy_ids: tuple[str, ...],
+    ) -> tuple[RepositoryPolicyException, ...]:
+        normalized = self._normalize(path)
+        applicable = set(policy_ids)
+        return tuple(
+            item for item in self.bundle.exceptions
+            if applicable.intersection(item.policy_ids)
+            and self._matches(normalized, item.path_patterns)
+        )
