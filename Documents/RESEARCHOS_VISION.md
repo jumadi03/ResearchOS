@@ -12,6 +12,7 @@
 - Related documents: `README.md`,
   `Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md`,
   `Documents/SCIENTIFIC_INTERFACE_VISION.md`,
+  `Documents/RESPONSIBLE_EVOLUTION_VISION.md`,
   `Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md`,
   `Documents/INTERNET_DISCOVERY_ROADMAP.md`,
   `Documents/SCIENTIFIC_DATA_STORAGE.md`, and
@@ -27,6 +28,13 @@ Visi interaksi dan evolusi workspace dicatat secara khusus dalam
 `Documents/SCIENTIFIC_INTERFACE_VISION.md`. Antarmuka ResearchOS diarahkan
 menjadi object-centric scientific workspace, bukan kumpulan halaman atau
 chatbot yang terpisah dari objek, provenance, lifecycle, dan human authority.
+
+Cara ResearchOS mempelajari dan mengusulkan perubahan terhadap knowledge,
+architecture, serta implementation-nya dicatat dalam
+`Documents/RESPONSIBLE_EVOLUTION_VISION.md`. ResearchOS diarahkan menjadi
+self-improving scientific platform, bukan self-modifying AI: setiap evolusi
+material harus melalui evidence, simulation, verification, human approval,
+controlled implementation, dan monitoring.
 
 ## Identitas
 

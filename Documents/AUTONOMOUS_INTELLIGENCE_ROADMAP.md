@@ -10,6 +10,7 @@
 - Recorded: 2026-07-17
 - Scope: provider independence, native scientific intelligence, and local-first evolution
 - Related documents: `Documents/RESEARCHOS_VISION.md`,
+  `Documents/RESPONSIBLE_EVOLUTION_VISION.md`,
   `Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md`,
   `Documents/INTERNET_DISCOVERY_ROADMAP.md`, and
   `Documents/ARCHITECTURE_GOVERNANCE.md`
