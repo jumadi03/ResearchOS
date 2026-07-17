@@ -429,6 +429,18 @@ skipping elapsed intervals deterministically. This phase does not introduce a
 scheduler daemon, API, UI, or worker job; an external host trigger may invoke
 the controller, but cannot select due time, backup, or target.
 
+DATA maintenance Phase 1F-E supplies that external trigger as a Windows Task
+Scheduler contract, not as a ResearchOS scheduling authority. Its action is
+fixed to the local ResearchOS Python environment and the controller's
+`--scheduled` mode. It runs only in the current interactive user context with
+limited privilege, ignores overlapping invocations, and has a bounded
+execution time.
+
+The task is installed disabled and is never silently overwritten. Plan and
+status operations are read-only; removal is explicit and preserves all
+PostgreSQL schedule state and immutable restore evidence. Activation and the
+first periodic proof remain outside this increment.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly

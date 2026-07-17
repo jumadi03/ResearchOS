@@ -346,3 +346,24 @@ while a slot is active.
 The Phase 1F-C controller adds only a `--scheduled` request mode. It remains
 host-only, while the API and scientific worker receive no Docker authority,
 signing material, schedule mutation path, or restore target access.
+
+### Phase 1F-E implementation traceability
+
+Phase 1F-E defines the Windows host-trigger contract without activating it.
+The fixed Task Scheduler definition invokes the accepted Phase 1F-C controller
+in scheduled mode every hour, while PostgreSQL Schema 32 remains the only due
+authority. The task uses the current interactive Windows identity, limited
+run level, a fixed three-hour execution limit, and an ignore-new
+multiple-instance policy.
+
+Planning and status are read-only. Installation verifies the canonical
+controller, ResearchOS virtual environment, and Docker command, rejects an
+existing task rather than silently replacing it, and registers the task
+disabled. Removal requires an explicit confirmation switch and never deletes
+schedule state, audit events, reports, or restore evidence. No password,
+database URL, target, manifest, report, key path, or lease token enters the
+task definition.
+
+This increment provides an installable contract only. Enabling the Windows
+task, activating the canonical database schedule, and producing the first
+periodic restore proof require a separately approved operational step.
