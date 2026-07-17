@@ -634,6 +634,33 @@ must consume this validated service boundary and retain bilingual labels,
 provenance drill-down, and explicit unknown states. It must not reconstruct
 repository health or compliance in JavaScript.
 
+### FMA-007 runtime publication boundary
+
+The Repository Dashboard runtime source is an immutable artifact bundle managed
+by:
+`AI-Gateway/app/architecture/repository/dashboard_store.py`.
+
+Each release directory is addressed by the dashboard snapshot SHA-256 and
+contains the exact File Registry, Repository Verification Report, Architecture
+Graph, Repository Health Report, and Dashboard Snapshot. Publication is
+transactional: artifacts are written to an internal staging directory, the
+complete release is rehydrated and projected again, and only then is the
+content-addressed active pointer replaced atomically.
+
+Restart rehydration rejects missing files, malformed schemas, modified hashes,
+mixed provenance, pointer tampering, and an active source revision that does
+not equal an injected expected deployment revision. Interrupted internal
+staging directories are recovered without deleting immutable releases.
+Publishing the same verified bundle is idempotent.
+
+This artifact store is the only FMA-007 filesystem boundary. Dashboard models,
+the projector, the read-only service, future API adapters, and browser code
+must not read repository files or recompute repository governance. The store
+does not discover tracked files, create a File Registry, run repository
+verification, or choose which snapshot becomes scientifically or
+architecturally authoritative; it only publishes and rehydrates artifacts
+already validated by the canonical pipeline.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

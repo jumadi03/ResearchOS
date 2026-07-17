@@ -8,6 +8,7 @@ from app.architecture.repository import (
     RepositoryDashboardProjector,
     RepositoryDashboardService,
     RepositoryDashboardSnapshot,
+    RepositoryDashboardArtifactStore,
     RepositoryHealthCategory,
     RepositoryHealthEngine,
     RepositoryHealthOutcome,
@@ -134,6 +135,72 @@ def test_dashboard_service_cannot_bypass_projection_validation(
     )
     with pytest.raises(ValueError, match="valid health report"):
         bypass.snapshot()
+
+
+def test_dashboard_store_publishes_and_rehydrates_complete_immutable_bundle(
+    tmp_path: Path,
+) -> None:
+    expected, registry, verification, graph, health = _snapshot(
+        tmp_path / "source"
+    )
+    root = tmp_path / "published"
+    store = RepositoryDashboardArtifactStore(
+        root, expected_revision="r1",
+    )
+
+    assert store.publish(registry, verification, graph, health) == expected
+    assert store.publish(registry, verification, graph, health) == expected
+    restarted = RepositoryDashboardArtifactStore(
+        root, expected_revision="r1",
+    )
+    assert restarted.snapshot() == expected
+    assert RepositoryDashboardService(restarted).snapshot() == expected
+    release = root / "releases" / expected.content_hash
+    assert sorted(path.name for path in release.iterdir()) == [
+        "architecture-graph.json",
+        "dashboard-snapshot.json",
+        "file-registry.json",
+        "health-report.json",
+        "verification-report.json",
+    ]
+
+
+def test_dashboard_store_rejects_tamper_stale_pointer_and_partial_release(
+    tmp_path: Path,
+) -> None:
+    expected, registry, verification, graph, health = _snapshot(
+        tmp_path / "source"
+    )
+    root = tmp_path / "published"
+    store = RepositoryDashboardArtifactStore(root)
+    store.publish(registry, verification, graph, health)
+    release = root / "releases" / expected.content_hash
+
+    (release / "health-report.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError, match="incomplete or invalid"):
+        store.snapshot()
+
+    root2 = tmp_path / "pointer"
+    valid = RepositoryDashboardArtifactStore(root2)
+    valid.publish(registry, verification, graph, health)
+    pointer = json.loads((root2 / "active.json").read_text(encoding="utf-8"))
+    pointer["source_revision"] = "r2"
+    (root2 / "active.json").write_text(json.dumps(pointer), encoding="utf-8")
+    with pytest.raises(ValueError, match="pointer is invalid"):
+        valid.snapshot()
+
+    stale = RepositoryDashboardArtifactStore(
+        root2, expected_revision="r2",
+    )
+    valid.publish(registry, verification, graph, health)
+    with pytest.raises(ValueError, match="revision is stale"):
+        stale.snapshot()
+
+    abandoned = root2 / "releases" / ".tmp-dashboard-abandoned"
+    abandoned.mkdir()
+    recovered = RepositoryDashboardArtifactStore(root2)
+    assert abandoned in recovered.recovered_temporary_entries
+    assert not abandoned.exists()
 
 
 def test_dashboard_has_no_runtime_storage_compliance_or_filesystem_dependency() -> None:

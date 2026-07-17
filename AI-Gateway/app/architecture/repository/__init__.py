@@ -50,6 +50,7 @@ from .dashboard_models import (
 )
 from .dashboard_projector import RepositoryDashboardProjector
 from .dashboard_service import RepositoryDashboardService, RepositoryDashboardSource
+from .dashboard_store import RepositoryDashboardArtifactStore
 
 __all__ = [
     "RepositoryClassifier",
@@ -85,6 +86,7 @@ __all__ = [
     "RepositoryHealthReport",
     "RepositoryDashboardFile",
     "RepositoryDashboardHealth",
+    "RepositoryDashboardArtifactStore",
     "RepositoryDashboardProjector",
     "RepositoryDashboardService",
     "RepositoryDashboardSnapshot",
