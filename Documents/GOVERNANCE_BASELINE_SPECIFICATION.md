@@ -2,12 +2,12 @@
 
 ## Status
 
-- Document status: specification draft for project-owner review
-- Version: 0.1 draft
+- Document status: project-owner-accepted working specification
+- Version: 0.1 working specification
 - Identifier: not assigned
-- Classification: project-governance specification draft
+- Classification: project-governance working specification
 - Working owner: ResearchOS project
-- Decision status: pending review of an exact repository revision
+- Decision status: accepted as bounded working direction
 - Formal ratification status: not defined by current repository governance
 - Enforcement status: not implemented
 - Recorded: 2026-07-18
@@ -15,11 +15,15 @@
   `Documents/GOVERNANCE_INSTRUMENT_STATUS_AND_DECISION_BOUNDARY.md`
 - Upstream revision: `8106ff6d621e0437b85be80b3bb4caf2f55a5566`
 
-This draft specifies the bounded responsibility of a future Governance
-Baseline artifact. It is not itself a Governance Baseline, does not create the
-first baseline snapshot, and does not declare itself canonical, ratified,
-published, active, approved, or binding. Its working title does not establish
-a document family, identifier convention, registry, lifecycle, or authority.
+This specification defines the bounded responsibility of a future Governance
+Baseline artifact. The project owner reviewed exact revision
+`8ef3dca0be41361f8663392a1222c4dd6b8fed5a` and recorded a bounded
+working-direction decision in pull request `#27`. This specification is not
+itself a Governance Baseline, does not create the first baseline snapshot, and
+does not declare itself canonical, ratified, published, active, approved as
+binding governance, or precedence-bearing. Its working title does not
+establish a document family, identifier convention, registry, lifecycle, or
+authority.
 
 ## 1. Purpose
 
@@ -41,7 +45,7 @@ The specification separates:
 
 ## 2. Scope
 
-This draft specifies:
+This specification defines:
 
 - the responsibility and decision boundary of a Governance Baseline;
 - minimum observation metadata;
@@ -61,7 +65,7 @@ This draft specifies:
 
 ## 3. Out of Scope
 
-This draft does not:
+This specification does not:
 
 - create a Governance Baseline Snapshot;
 - assign a Governance Baseline identifier or prefix;
@@ -90,8 +94,8 @@ The working architecture position is:
 | Governed artifact | Governance Baseline |
 | Governed responsibility | Reproducible observation of repository-evidenced governance state |
 | Runtime position | None |
-| Persistence authority | None established by this draft |
-| Decision authority | None established by this draft |
+| Persistence authority | None established by this specification |
+| Decision authority | None established by this specification |
 
 The Governance Baseline is cross-domain in observation scope but has no
 cross-domain decision authority. It may describe evidence from Scientific,
@@ -101,8 +105,8 @@ lifecycle or canonical contracts.
 
 ## 5. Upstream Contract
 
-This draft extends Section 17 of the upstream working specification. The
-following upstream constraints remain controlling working boundaries:
+This specification extends Section 17 of the upstream working specification.
+The following upstream constraints remain controlling working boundaries:
 
 1. a Governance Baseline is an immutable observational artifact;
 2. it records a repository-evidenced governance state within an explicit
@@ -120,9 +124,9 @@ following upstream constraints remain controlling working boundaries:
 10. availability of an upstream artifact does not authorize the next
     activity.
 
-If this draft conflicts with the upstream working specification, the conflict
-must be reported. This draft must not silently reinterpret the upstream
-contract.
+If this specification conflicts with the upstream working specification, the
+conflict must be reported. This specification must not silently reinterpret
+the upstream contract.
 
 ## 6. Definitions
 
@@ -219,8 +223,8 @@ or remain unresolved. It must not be resolved through assumption.
 ### 7.8 Stable identity principle
 
 The content and observation boundary must have a stable identity sufficient to
-distinguish exact baseline contents. This draft does not select the identity
-algorithm, identifier syntax, or registry.
+distinguish exact baseline contents. This specification does not select the
+identity algorithm, identifier syntax, or registry.
 
 ## 8. Required Observation Record
 
@@ -377,9 +381,9 @@ Confidence must be explained, not merely scored. The basis should consider:
 - known omissions; and
 - unresolved conflict.
 
-This draft does not require a numeric confidence scale. A future baseline may
-use qualitative or quantitative representation only when the method and
-meaning are explicit.
+This specification does not require a numeric confidence scale. A future
+baseline may use qualitative or quantitative representation only when the
+method and meaning are explicit.
 
 Limitations must be visible near affected findings or linked from them. A
 global limitation statement must not conceal a finding-specific weakness.
@@ -447,7 +451,7 @@ the latter and must not describe a factual correction as governance
 supersession.
 
 The authority, status, and format for a correction record remain unresolved.
-This draft specifies only the traceability boundary required to preserve
+This specification defines only the traceability boundary required to preserve
 history.
 
 ## 16. Material-Change Assessment Boundary
@@ -468,7 +472,7 @@ An assessment must compare the later evidence with the prior observation
 boundary and explain the effect. It must not infer that a new baseline is
 required solely because a repository revision changed.
 
-This draft deliberately leaves unresolved:
+This specification deliberately leaves unresolved:
 
 - the final materiality criteria;
 - who performs or approves the assessment;
@@ -674,9 +678,9 @@ The following remain intentionally unresolved:
 Their absence is a documented boundary, not permission for this specification
 to define them indirectly.
 
-## 24. Definition of Done for This Draft
+## 24. Definition of Done for This Specification
 
-This draft is ready for exact-revision review when:
+This specification satisfied its bounded exact-revision review when:
 
 1. upstream dependencies are explicit;
 2. observational and decision responsibilities are separated;
@@ -693,3 +697,74 @@ This draft is ready for exact-revision review when:
 13. repository checks report no formatting error; and
 14. the exact revision is available for a separate bounded project-owner
     decision.
+
+The reviewed revision and decision evidence are recorded in Section 25.
+
+## 25. Durable Working-Direction Decision Record
+
+### 25.1 Decision
+
+- Instrument: `Governance Baseline Specification`
+- Reviewed version: `0.1 draft`
+- Instrument location:
+  `Documents/GOVERNANCE_BASELINE_SPECIFICATION.md`
+- Claim class: working-direction claim
+- Decision maker: ResearchOS project owner
+- Authority basis: existing project-owner authority consistently recorded by
+  ResearchOS vision, governance, roadmap, architecture, and engineering
+  documents
+- Reviewed revision: `8ef3dca0be41361f8663392a1222c4dd6b8fed5a`
+- Decision date: 2026-07-18
+- Architecture Review evidence:
+  `https://github.com/jumadi03/ResearchOS/pull/27#issuecomment-5007050298`
+- Decision evidence:
+  `https://github.com/jumadi03/ResearchOS/pull/27#issuecomment-5007064507`
+- Scope: Governance Baseline specification and analysis
+
+### 25.2 Bounded effect
+
+The specification may guide:
+
+- later governance analysis;
+- Architecture Review of Governance Baseline artifacts;
+- specification work that depends on reproducible repository observation; and
+- preparation planning for a separately authorized First Governance Baseline
+  Snapshot.
+
+### 25.3 Non-effect
+
+This decision does not:
+
+- formally ratify the specification;
+- make it canonical, globally binding, or precedence-bearing;
+- create a Governance Baseline;
+- authorize the First Governance Baseline Snapshot;
+- create an identifier, registry, lifecycle, authority, publication rule, or
+  enforcement mechanism;
+- resolve material-change criteria, issuance authority, correction authority,
+  or documentation governance;
+- authorize source-code, runtime, persistence, or implementation changes; or
+- approve any later governance instrument or artifact.
+
+### 25.4 Supporting evidence
+
+- Stage 0 Dependency Verification and Phase Inventory;
+- Stage 1 Governance Architecture Review;
+- Stage 2 Governance Consolidation Review;
+- the upstream Governance Instrument Status and Decision Boundary
+  Specification;
+- the exact revision reviewed by the project owner;
+- the durable Architecture Review record;
+- the durable project-owner decision record; and
+- six successful Architecture Quality Gate jobs for the reviewed revision.
+
+### 25.5 Unresolved dependencies
+
+All dependencies in Section 23 remain unresolved. This decision does not
+reduce, replace, or implicitly satisfy them.
+
+### 25.6 Reconsideration condition
+
+This working-direction decision must be reviewed if a later authority model,
+documentation-governance specification, or conflicting higher-scope
+governance instrument is accepted.
