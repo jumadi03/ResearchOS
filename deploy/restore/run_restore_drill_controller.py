@@ -128,6 +128,7 @@ def execute(
     *,
     owner: str,
     lease_seconds: int,
+    scheduled: bool = False,
     run_command: Callable[..., subprocess.CompletedProcess[str]] = _run,
 ) -> dict:
     lease: dict | None = None
@@ -135,12 +136,17 @@ def execute(
     try:
         acquired = run_command(
             _coordinator_command(
-                "acquire",
+                "acquire-due" if scheduled else "acquire",
                 ["--owner", owner, "--lease-seconds", str(lease_seconds)],
             ),
             cwd=DEPLOY_ROOT,
         )
-        lease = _validated_lease(_json_receipt(acquired.stdout, stage))
+        acquisition = _json_receipt(acquired.stdout, stage)
+        if scheduled and acquisition.get("status") in {
+            "paused", "not_due", "running"
+        }:
+            return acquisition
+        lease = _validated_lease(acquisition)
         run_id = str(lease["run_id"])
         lease_token = str(lease["lease_token"])
         manifest_filename = str(lease["manifest_filename"])
@@ -250,9 +256,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--lease-seconds", type=int, default=7200)
+    parser.add_argument(
+        "--scheduled",
+        action="store_true",
+        help="Run only when the canonical PostgreSQL schedule is due",
+    )
     args = parser.parse_args()
     try:
-        receipt = execute(owner=args.owner, lease_seconds=args.lease_seconds)
+        receipt = execute(
+            owner=args.owner,
+            lease_seconds=args.lease_seconds,
+            scheduled=args.scheduled,
+        )
     except RestoreDrillControllerError as exc:
         print(f"restore drill controller: rejected: {exc}")
         return 1

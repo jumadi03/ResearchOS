@@ -262,6 +262,42 @@ Reports are retained below the ignored
 backup paths, target identifiers, report paths, database URLs, or key paths.
 It is not a scheduler and is not exposed through the API, UI, or worker.
 
+Phase 1F-D adds a canonical schedule that starts paused. Inspect it from
+`deploy`:
+
+```powershell
+docker compose --env-file stack.env -f compose.yaml `
+  --profile restore-coordinator run --rm restore-coordinator schedule-status
+```
+
+Configure a bounded cadence, then activate it with separate attributable
+decisions:
+
+```powershell
+docker compose --env-file stack.env -f compose.yaml `
+  --profile restore-coordinator run --rm restore-coordinator `
+  schedule-configure --cadence-seconds 604800 `
+  --actor "<operator identity>" --rationale "<reason>"
+
+docker compose --env-file stack.env -f compose.yaml `
+  --profile restore-coordinator run --rm restore-coordinator `
+  schedule-resume --actor "<operator identity>" --rationale "<reason>"
+```
+
+A host scheduler may invoke the controller frequently; PostgreSQL decides
+whether work is due:
+
+```powershell
+AI-Gateway\.venv\Scripts\python.exe `
+  deploy\restore\run_restore_drill_controller.py `
+  --owner "<host trigger identity>" --lease-seconds 7200 --scheduled
+```
+
+`paused`, `not_due`, and an already-running slot are successful no-op
+decisions. The host cannot provide a due time, backup, target, report, or key.
+To pause future slots, use `schedule-pause` with actor and rationale. An active
+slot must finish or fail before schedule configuration or status can change.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before

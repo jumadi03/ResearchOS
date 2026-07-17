@@ -328,3 +328,21 @@ and isolated Compose cleanup is attempted even when execution fails. Admission
 receipts provide the exact report content hash and verification ID used for
 completion. The controller is host-only, uses fixed argument arrays without a
 shell, and adds no API, UI, worker, scheduler, or container Docker socket.
+
+### Phase 1F-D implementation traceability
+
+Phase 1F-D adds Schema 32 canonical schedule governance without adding a
+scheduler daemon. The single schedule starts paused, has a server-owned
+one-to-thirty-one-day cadence bound, and retains its policy hash, revision,
+next due time, pending slot, and append-only actor-attributed events.
+
+Only PostgreSQL decides whether a host request is paused, not due, already
+running, or eligible to acquire a lease. Repeated triggers cannot create a
+second run or obtain the active lease token. Completion, failure, and expiry
+advance the schedule from its canonical slot rather than from client time.
+Configuration, pause, and resume require an actor and rationale and are blocked
+while a slot is active.
+
+The Phase 1F-C controller adds only a `--scheduled` request mode. It remains
+host-only, while the API and scientific worker receive no Docker authority,
+signing material, schedule mutation path, or restore target access.

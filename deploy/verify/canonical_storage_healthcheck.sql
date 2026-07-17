@@ -46,12 +46,13 @@ WHERE schemaname='public' AND tablename IN (
     'knowledge_nodes','knowledge_edges','research_artifacts',
     'artifact_lifecycle_events','publication_representations',
     'backup_restore_verifications','restore_drill_runs',
-    'restore_drill_run_events'
+    'restore_drill_run_events','restore_drill_schedule_state',
+    'restore_drill_schedule_events'
 );
 
 DO $$
 BEGIN
-IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 31 THEN
+IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 32 THEN
         RAISE EXCEPTION 'database schema version does not match application';
     END IF;
     IF NOT EXISTS (
@@ -89,6 +90,20 @@ IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 31 THEN
           AND NOT tgisinternal
     ) THEN
         RAISE EXCEPTION 'restore drill event immutability is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='restore_drill_schedule_state_guard'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'restore drill schedule state guard is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='restore_drill_schedule_events_immutable'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'restore drill schedule event immutability is missing';
     END IF;
 END;
 $$;
