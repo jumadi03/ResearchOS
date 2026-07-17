@@ -190,10 +190,10 @@ rollback plan, and independently accepted deliverable.
 
 ## Residual risks and follow-up
 
-1. Branch administration currently permits a privileged direct push while
-   required checks are still expected. The baseline is accepted because the
-   post-push run completed successfully, but pull-request enforcement is a
-   recommended operational hardening.
+1. At the baseline commit, branch administration permitted a privileged direct
+   push while required checks were still expected. The baseline was accepted
+   because the post-push run completed successfully, with pull-request
+   enforcement recorded as recommended operational hardening.
 2. Existing Starlette/httpx and naive-UTC deprecation warnings should be
    removed in a separate compatibility sprint.
 3. Symlink tests may skip on hosts that do not grant symlink creation
@@ -204,6 +204,28 @@ rollback plan, and independently accepted deliverable.
 
 These items do not represent a bypass in the accepted FMA architecture. They
 remain explicit constraints for future work.
+
+## Post-baseline operational hardening
+
+After acceptance of this baseline, the project owner approved and applied the
+recommended `main` branch hardening:
+
+- pull requests are required, including for repository administrators;
+- all six Architecture Quality Gate checks remain required and strict;
+- stale reviews are dismissed when a pull request changes;
+- linear history and conversation resolution remain required; and
+- force-push and branch deletion remain prohibited.
+
+The repository is owner-operated, so the required approving-review count is
+zero. This preserves the pull-request and CI boundary without making the
+repository impossible for its sole project owner to maintain. This operational
+hardening remediates residual risk 1 for future changes; the original baseline
+observation remains recorded above as historical evidence.
+
+FMA is frozen at this baseline. Future FMA changes require the complete change
+control process below. The isolated evolution and recovery executors remain
+disconnected from API, worker, deployment storage, and the ResearchOS source
+root.
 
 ## Change control
 
