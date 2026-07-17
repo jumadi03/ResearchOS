@@ -7,6 +7,10 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added Phase 1F-E Windows host-trigger contract with read-only planning and
+  status, disabled-by-default installation, limited interactive privilege,
+  single-instance execution, and explicit removal that preserves canonical
+  schedule and restore evidence.
 - Added Phase 1F-D Schema 32 canonical restore-drill schedule governance with
   a fail-closed paused default, bounded cadence, PostgreSQL due decisions,
   duplicate-trigger suppression, and append-only policy and slot provenance.

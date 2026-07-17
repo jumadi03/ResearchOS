@@ -298,6 +298,44 @@ decisions. The host cannot provide a due time, backup, target, report, or key.
 To pause future slots, use `schedule-pause` with actor and rationale. An active
 slot must finish or fail before schedule configuration or status can change.
 
+Phase 1F-E provides a Windows Task Scheduler contract. Previewing it changes
+nothing:
+
+```powershell
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+  -File Scripts\restore_drill_task.ps1 -Action Plan
+```
+
+Inspect installation status without mutation:
+
+```powershell
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+  -File Scripts\restore_drill_task.ps1 -Action Status
+```
+
+Installation is an explicit later operation:
+
+```powershell
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+  -File Scripts\restore_drill_task.ps1 -Action Install
+```
+
+The installed task is disabled. It runs only as the current interactive user
+with limited privilege, ignores overlapping triggers, and invokes the
+controller hourly in `--scheduled` mode. Enabling the task and resuming the
+database schedule are separate decisions.
+
+Removal also requires explicit confirmation:
+
+```powershell
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+  -File Scripts\restore_drill_task.ps1 `
+  -Action Remove -ConfirmRemoval
+```
+
+Removing the Windows task does not remove PostgreSQL schedule policy, audit
+events, reports, or restore evidence.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before
