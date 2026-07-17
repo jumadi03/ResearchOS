@@ -114,6 +114,7 @@ schema and persistence, and dependency-security gates.
 - [Architecture governance](Documents/ARCHITECTURE_GOVERNANCE.md)
 - [Architecture Law governance audit draft](Documents/ARCHITECTURE_LAW_GOVERNANCE_AUDIT.md)
 - [Governance instrument status and decision boundary](Documents/GOVERNANCE_INSTRUMENT_STATUS_AND_DECISION_BOUNDARY.md)
+- [Governance Baseline specification](Documents/GOVERNANCE_BASELINE_SPECIFICATION.md)
 - [File management architecture](Documents/FILE_MANAGEMENT_ARCHITECTURE.md)
 - [File management completion and safety baseline](Documents/FILE_MANAGEMENT_SAFETY_BASELINE.md)
 - [One File — One Architectural Responsibility audit](Documents/ONE_FILE_ONE_ARCHITECTURAL_RESPONSIBILITY.md)
