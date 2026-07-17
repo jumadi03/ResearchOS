@@ -2,10 +2,11 @@
 
 from .models import (
     MonitoringRun, ScientificChange, ScientificChangeKind, ScientificSourceWatch,
-    SourceWatchStatus,
+    SourceWatchStatus, SourceWatchTransition,
 )
 
 __all__ = [
     "MonitoringRun", "ScientificChange", "ScientificChangeKind",
     "ScientificSourceWatch", "SourceWatchStatus",
+    "SourceWatchTransition",
 ]

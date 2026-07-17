@@ -25,7 +25,9 @@
 - Completed: SCAN-001L Knowledge Intake
 - Completed: SCAN-001M Citation Snowballing
 - Completed: SCAN-001N Continuous Monitoring
-- Next deliverable: SCAN-001O Consolidation Review
+- Completed: SCAN-001O Consolidation Review
+- Roadmap delivery status: P0 and SCAN-001A through SCAN-001O implemented
+  and consolidation-verified
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,
@@ -399,6 +401,36 @@ failures remain explicit; and a missing result is never labeled unavailable
 without affirmative provider evidence. Detected changes remain discovery
 candidates and must pass normal screening, extraction, human review, and
 knowledge-intake gates.
+
+### SCAN-001O implementation traceability
+
+SCAN-001O closes the roadmap with an end-to-end consolidation review and
+hardens the continuous-monitoring boundary discovered during that review:
+
+- the monitoring executor depends on injected repository and provider ports,
+  while the worker remains the composition root:
+  `AI-Gateway/app/knowledge/monitoring/executor.py` and
+  `AI-Gateway/app/workers/main.py`;
+- owner-authorized, immutable pause/resume transitions and queryable
+  monitoring-run/change ledgers:
+  `AI-Gateway/app/knowledge/monitoring/models.py`,
+  `AI-Gateway/app/knowledge/repositories/postgres_monitoring.py`, and
+  `deploy/postgres/init/028_monitoring_lifecycle_and_reads.sql`;
+- authenticated lifecycle and read APIs:
+  `AI-Gateway/app/models/knowledge.py`,
+  `AI-Gateway/app/knowledge/service.py`, and
+  `AI-Gateway/app/router/knowledge.py`;
+- executable architecture and PostgreSQL integration checks:
+  `AI-Gateway/app/architecture/tests/test_ci_resilience.py` and
+  `deploy/verify/continuous_monitoring.py`; and
+- the path-verified capability matrix, safety proof, and residual-risk record:
+  `Documents/INTERNET_DISCOVERY_CONSOLIDATION_REPORT.md`.
+
+Monitoring changes remain discovery-only candidates. Lifecycle actions are
+actor-attributed, restricted to the watch owner, and stored as immutable
+events. The integration verifier proves idempotent persistence, read-model
+availability, acknowledgement provenance, and the absence of direct evidence
+or canonical-knowledge promotion.
 
 ## Canonical documentation review protocol
 

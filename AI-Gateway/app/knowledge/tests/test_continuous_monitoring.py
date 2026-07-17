@@ -4,8 +4,10 @@ import pytest
 
 from app.knowledge.models import ProviderFailure
 from app.knowledge.monitoring.engine import ScientificMonitoringEngine
+from app.knowledge.monitoring.executor import execute_source_watch
 from app.knowledge.monitoring.models import (
     ScientificChangeKind, ScientificSourceWatch, SourceWatchStatus,
+    SourceWatchTransition,
 )
 from app.knowledge.monitoring.serialization import (
     discovery_run_from_payload, discovery_run_payload,
@@ -135,3 +137,60 @@ def test_paused_or_tampered_watch_is_rejected():
     tampered = replace(watch, cadence_minutes=5)
     with pytest.raises(ValueError, match="integrity"):
         compare(tampered, run, run)
+
+
+def test_watch_transition_requires_valid_lifecycle_and_provenance():
+    valid = SourceWatchTransition(
+        "transition-1", "watch-1", SourceWatchStatus.ACTIVE,
+        SourceWatchStatus.PAUSED, "researcher@example", "Scope review",
+        "2026-07-17T00:30:00Z", None,
+    )
+    assert valid.verify()
+    assert not replace(
+        valid, from_status=SourceWatchStatus.EXPIRED,
+    ).verify()
+    assert not replace(
+        valid, from_status=SourceWatchStatus.PAUSED,
+        to_status=SourceWatchStatus.ACTIVE, next_run_at=None,
+    ).verify()
+
+
+def test_monitoring_executor_uses_injected_repository_and_providers(tmp_path):
+    watch, run = baseline()
+
+    class Provider:
+        name = "openalex"
+
+        def search(self, _plan):
+            from app.knowledge.discovery.providers import ProviderPage
+            return (ProviderPage(
+                ({"id": "W1", "title": "Seed"},),
+                "https://openalex.test/search",
+            ),)
+
+    class Repository:
+        def __init__(self):
+            self.discovery = []
+            self.monitoring = []
+
+        def load_source_watch(self, watch_id):
+            assert watch_id == watch.watch_id
+            return watch, run
+
+        def persist_discovery(self, current):
+            self.discovery.append(current)
+
+        def persist_monitoring_run(self, current_watch, monitoring, current):
+            self.monitoring.append((current_watch, monitoring, current))
+
+    repository = Repository()
+    execute_source_watch(
+        repository, (Provider(),), tmp_path,
+        {
+            "watch_id": watch.watch_id,
+            "scheduled_at": "2026-07-17T01:00:00Z",
+        },
+    )
+    assert len(repository.discovery) == 1
+    assert len(repository.monitoring) == 1
+    assert repository.monitoring[0][1].verify()

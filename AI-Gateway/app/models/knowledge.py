@@ -85,6 +85,14 @@ class ScientificChangeAcknowledgementRequest(BaseModel):
     occurred_at: str = Field(min_length=1)
 
 
+class SourceWatchTransitionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    to_status: Literal["active", "paused"]
+    rationale: str = Field(min_length=1)
+    occurred_at: str = Field(min_length=1)
+    next_run_at: str | None = None
+
+
 class DocumentAcquisitionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     record_id: str = Field(min_length=1)

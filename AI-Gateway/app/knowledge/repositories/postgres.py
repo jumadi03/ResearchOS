@@ -186,7 +186,8 @@ class _PostgresRepositoryCore:
                 document_id,canonical_doi,title,abstract,authors,journal,
                 publication_date,document_type,metadata_hash
             ) VALUES (%s,%s,%s,%s,%s,%s,
-                CASE WHEN %s IS NULL THEN NULL ELSE make_date(%s,1,1) END,%s,%s)
+                CASE WHEN %s::integer IS NULL THEN NULL
+                    ELSE make_date(%s::integer,1,1) END,%s,%s)
             ON CONFLICT(document_id) DO UPDATE SET
                 title=excluded.title, abstract=excluded.abstract,
                 authors=excluded.authors, journal=excluded.journal,

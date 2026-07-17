@@ -193,6 +193,11 @@ jobs:
           docker compose --env-file stack.env -f compose.yaml up --detach worker
           docker compose --env-file stack.env -f compose.yaml cp verify/resilient_worker.py api:/tmp/resilient_worker.py
           docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/resilient_worker.py
+      - name: Verify continuous monitoring lifecycle and safety
+        working-directory: deploy
+        run: |
+          docker compose --env-file stack.env -f compose.yaml cp verify/continuous_monitoring.py api:/tmp/continuous_monitoring.py
+          docker compose --env-file stack.env -f compose.yaml exec -T api python /tmp/continuous_monitoring.py
       - name: Show service logs after failure
         if: failure()
         working-directory: deploy

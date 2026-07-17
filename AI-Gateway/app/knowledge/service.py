@@ -140,6 +140,19 @@ class KnowledgeDiscoveryService:
     def list_source_watches(self, project_id: str):
         return self.repository_service.list_source_watches(project_id)
 
+    def transition_source_watch(self, watch_id: str, **options):
+        return self.repository_service.transition_source_watch(
+            watch_id, **options
+        )
+
+    def list_monitoring_runs(self, watch_id: str):
+        return self.repository_service.list_monitoring_runs(watch_id)
+
+    def list_scientific_changes(self, watch_id: str, **options):
+        return self.repository_service.list_scientific_changes(
+            watch_id, **options
+        )
+
     def acknowledge_scientific_change(self, change_id: str, **options):
         return self.repository_service.acknowledge_scientific_change(
             change_id, **options

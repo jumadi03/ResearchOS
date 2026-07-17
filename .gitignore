@@ -35,6 +35,7 @@ dist/
 
 # Runtime logs and temporary files
 *.log
+/logs/
 *.tmp
 *.temp
 AI-Gateway/tmp/

@@ -43,6 +43,14 @@ class ScientificDataRepository(Protocol):
         self, project_id: str,
     ) -> tuple[ScientificSourceWatch, ...]: ...
 
+    def transition_source_watch(self, watch_id: str, **options): ...
+
+    def list_monitoring_runs(self, watch_id: str) -> tuple[dict, ...]: ...
+
+    def list_scientific_changes(
+        self, watch_id: str, **options,
+    ) -> tuple[dict, ...]: ...
+
     def persist_monitoring_run(
         self, watch: ScientificSourceWatch, run: MonitoringRun,
         current: DiscoveryRun,

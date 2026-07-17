@@ -9,6 +9,7 @@ import json
 from app.knowledge.discovery.normalization import canonical_json
 from app.knowledge.monitoring.models import (
     MonitoringRun, ScientificSourceWatch, SourceWatchStatus,
+    SourceWatchTransition,
 )
 from app.knowledge.monitoring.serialization import (
     discovery_run_from_payload, discovery_run_payload,
@@ -103,6 +104,110 @@ class PostgresMonitoringRepositoryMixin:
             ids = tuple(row[0] for row in cursor.fetchall())
         return tuple(self.load_source_watch(item)[0] for item in ids)
 
+    def transition_source_watch(
+        self, watch_id: str, *, to_status: str, actor_id: str,
+        rationale: str, occurred_at: str, next_run_at: str | None = None,
+    ):
+        target = SourceWatchStatus(to_status)
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT s.status,w.owner_id
+                FROM scientific_source_watch_state s
+                JOIN scientific_source_watches w USING(watch_id)
+                WHERE s.watch_id=%s FOR UPDATE OF s
+            """, (watch_id,))
+            row = cursor.fetchone()
+            if row is None:
+                raise KeyError(f"Unknown scientific source watch: {watch_id}")
+            if row[1] != actor_id:
+                raise PermissionError(
+                    "Only the scientific source watch owner may change its lifecycle"
+                )
+            current = SourceWatchStatus(row[0])
+            identity = canonical_json({
+                "watch_id": watch_id, "from_status": current.value,
+                "to_status": target.value, "actor_id": actor_id,
+                "rationale": rationale, "occurred_at": occurred_at,
+                "next_run_at": next_run_at,
+            })
+            transition = SourceWatchTransition(
+                f"watch-transition-{sha256(identity.encode()).hexdigest()[:24]}",
+                watch_id, current, target, actor_id, rationale.strip(),
+                occurred_at, next_run_at,
+            )
+            if not transition.verify():
+                raise ValueError("Scientific source watch transition is invalid")
+            cursor.execute("""
+                INSERT INTO scientific_source_watch_transitions(
+                    transition_id,watch_id,from_status,to_status,actor_id,
+                    rationale,occurred_at,next_run_at
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT(transition_id) DO NOTHING
+            """, (
+                transition.transition_id, transition.watch_id,
+                transition.from_status.value, transition.to_status.value,
+                transition.actor_id, transition.rationale,
+                transition.occurred_at, transition.next_run_at,
+            ))
+            cursor.execute("""
+                UPDATE scientific_source_watch_state SET status=%s,
+                    next_run_at=CASE WHEN %s::timestamptz IS NULL
+                        THEN next_run_at ELSE %s::timestamptz END,
+                    updated_at=now()
+                WHERE watch_id=%s
+            """, (target.value, next_run_at, next_run_at, watch_id))
+        return transition
+
+    def list_monitoring_runs(self, watch_id: str):
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT monitoring_run_id,watch_id,scheduled_at,started_at,
+                    completed_at,previous_discovery_run_id,
+                    current_discovery_run_id,provider_failures,
+                    stopping_reason,manifest_hash,schema_version
+                FROM scientific_monitoring_runs WHERE watch_id=%s
+                ORDER BY scheduled_at DESC,monitoring_run_id
+            """, (watch_id,))
+            return tuple({
+                "monitoring_run_id": row[0], "watch_id": row[1],
+                "scheduled_at": str(row[2]), "started_at": str(row[3]),
+                "completed_at": str(row[4]),
+                "previous_discovery_run_id": row[5],
+                "current_discovery_run_id": row[6],
+                "provider_failures": row[7], "stopping_reason": row[8],
+                "manifest_hash": row[9], "schema_version": row[10],
+            } for row in cursor.fetchall())
+
+    def list_scientific_changes(
+        self, watch_id: str, *, unacknowledged_only: bool = False,
+    ):
+        condition = (
+            "AND NOT EXISTS(SELECT 1 FROM scientific_change_acknowledgements "
+            "a WHERE a.change_id=c.change_id)"
+            if unacknowledged_only else ""
+        )
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(f"""
+                SELECT c.change_id,c.monitoring_run_id,c.change_kind,
+                    c.record_key,c.provider,c.before_hash,c.after_hash,c.details,
+                    EXISTS(
+                        SELECT 1 FROM scientific_change_acknowledgements a
+                        WHERE a.change_id=c.change_id
+                    ) AS acknowledged
+                FROM scientific_changes c
+                JOIN scientific_monitoring_runs r
+                    ON r.monitoring_run_id=c.monitoring_run_id
+                WHERE r.watch_id=%s {condition}
+                ORDER BY r.scheduled_at DESC,c.change_id
+            """, (watch_id,))
+            return tuple({
+                "change_id": row[0], "monitoring_run_id": row[1],
+                "kind": row[2], "record_key": row[3], "provider": row[4],
+                "before_hash": row[5], "after_hash": row[6],
+                "details": row[7], "acknowledged": row[8],
+                "candidate_status": "discovery_only",
+            } for row in cursor.fetchall())
+
     def persist_monitoring_run(self, watch, run: MonitoringRun, current) -> None:
         if not watch.verify() or not run.verify() or run.watch_id != watch.watch_id:
             raise ValueError("Monitoring persistence integrity verification failed")
@@ -187,6 +292,12 @@ class PostgresMonitoringRepositoryMixin:
         })
         ack_id = f"ack-{sha256(identity.encode()).hexdigest()[:24]}"
         with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM scientific_changes WHERE change_id=%s",
+                (change_id,),
+            )
+            if cursor.fetchone() is None:
+                raise KeyError(f"Unknown scientific change: {change_id}")
             cursor.execute("""
                 INSERT INTO scientific_change_acknowledgements(
                     acknowledgement_id,change_id,actor_id,rationale,occurred_at

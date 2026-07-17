@@ -121,3 +121,35 @@ class MonitoringRun:
             and self.manifest_hash == self.expected_manifest_hash()
             and len({item.change_id for item in self.changes}) == len(self.changes)
         )
+
+
+@dataclass(frozen=True, slots=True)
+class SourceWatchTransition:
+    transition_id: str
+    watch_id: str
+    from_status: SourceWatchStatus
+    to_status: SourceWatchStatus
+    actor_id: str
+    rationale: str
+    occurred_at: str
+    next_run_at: str | None
+
+    def verify(self) -> bool:
+        allowed = {
+            (SourceWatchStatus.ACTIVE, SourceWatchStatus.PAUSED),
+            (SourceWatchStatus.PAUSED, SourceWatchStatus.ACTIVE),
+        }
+        return (
+            (self.from_status, self.to_status) in allowed
+            and bool(
+                self.transition_id.strip()
+                and self.watch_id.strip()
+                and self.actor_id.strip()
+                and self.rationale.strip()
+                and self.occurred_at.strip()
+            )
+            and (
+                self.to_status is not SourceWatchStatus.ACTIVE
+                or bool(self.next_run_at)
+            )
+        )

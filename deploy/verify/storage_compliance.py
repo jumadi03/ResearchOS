@@ -18,6 +18,7 @@ REQUIRED_RESOURCES = {
     "scientific_source_watches", "scientific_source_watch_state",
     "scientific_monitoring_runs", "scientific_changes",
     "scientific_change_acknowledgements",
+    "scientific_source_watch_transitions",
     "extraction_manifests", "knowledge_intake_manifests",
     "scientific_identifiers", "identity_resolution_events",
     "evidence_objects", "evidence_review_events",
@@ -75,6 +76,7 @@ def main() -> None:
                 "scientific_monitoring_runs_immutable",
                 "scientific_changes_immutable",
                 "scientific_change_acknowledgements_immutable",
+                "scientific_source_watch_transitions_immutable",
                 "identity_resolution_events_immutable",
                 "publication_representations_immutable",
             }

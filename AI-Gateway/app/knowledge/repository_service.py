@@ -38,6 +38,21 @@ class KnowledgeRepositoryService:
             project_id
         )
 
+    def transition_source_watch(self, watch_id, **options):
+        return self._required("continuous monitoring").transition_source_watch(
+            watch_id, **options
+        )
+
+    def list_monitoring_runs(self, watch_id):
+        return self._required("continuous monitoring").list_monitoring_runs(
+            watch_id
+        )
+
+    def list_scientific_changes(self, watch_id, **options):
+        return self._required("continuous monitoring").list_scientific_changes(
+            watch_id, **options
+        )
+
     def acknowledge_scientific_change(self, change_id, **options):
         return self._required(
             "scientific change acknowledgement"

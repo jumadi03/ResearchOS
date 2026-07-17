@@ -24,6 +24,7 @@ from app.models.knowledge import (
     TheoryTranslationGenerateRequest, TheoryTranslationReviewRequest,
     TheoryTranslationSubmissionRequest,
     SourceWatchRequest, ScientificChangeAcknowledgementRequest,
+    SourceWatchTransitionRequest,
 )
 from app.knowledge.ingestion.models import AccessStatus, DocumentCandidate
 from app.knowledge.retrieval.snowballing import CitationDirection
@@ -220,6 +221,61 @@ def list_source_watches(
     return {"items": [asdict(item) for item in watches]}
 
 
+@router.post("/source-watches/{watch_id}/transitions", status_code=201)
+def transition_source_watch(
+    watch_id: str, req: SourceWatchTransitionRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials)
+    try:
+        transition = request.app.state.knowledge_service.transition_source_watch(
+            watch_id, to_status=req.to_status, actor_id=principal.actor_id,
+            rationale=req.rationale, occurred_at=req.occurred_at,
+            next_run_at=req.next_run_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return asdict(transition)
+
+
+@router.get("/source-watches/{watch_id}/runs")
+def list_monitoring_runs(
+    watch_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, None)
+    try:
+        return {
+            "items": list(
+                request.app.state.knowledge_service.list_monitoring_runs(watch_id)
+            )
+        }
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/source-watches/{watch_id}/changes")
+def list_scientific_changes(
+    watch_id: str, request: Request, unacknowledged_only: bool = False,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, None)
+    try:
+        return {
+            "items": list(
+                request.app.state.knowledge_service.list_scientific_changes(
+                    watch_id, unacknowledged_only=unacknowledged_only,
+                )
+            )
+        }
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.post("/scientific-changes/{change_id}/acknowledgements", status_code=201)
 def acknowledge_scientific_change(
     change_id: str, req: ScientificChangeAcknowledgementRequest,
@@ -234,6 +290,8 @@ def acknowledge_scientific_change(
                 rationale=req.rationale, occurred_at=req.occurred_at,
             )
         )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {

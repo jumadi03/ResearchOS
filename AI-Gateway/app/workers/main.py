@@ -294,12 +294,27 @@ def execute(connection, job_type, payload):
         )
         ExtractionManifestStore(KNOWLEDGE_ROOT / "extractions").save(manifest)
     elif job_type == "run_source_watch":
+        from app.knowledge.discovery.providers import (
+            CrossrefProvider, OpenAlexProvider, SemanticScholarProvider,
+        )
         from app.knowledge.monitoring.executor import execute_source_watch
+        from app.knowledge.repositories.postgres import (
+            PostgresScientificDataRepository,
+        )
+        provider_options = {
+            "timeout": KNOWLEDGE_PROVIDER_TIMEOUT,
+            "max_attempts": KNOWLEDGE_PROVIDER_MAX_ATTEMPTS,
+        }
         execute_source_watch(
-            DATABASE_URL, KNOWLEDGE_ROOT, payload,
-            timeout=KNOWLEDGE_PROVIDER_TIMEOUT,
-            max_attempts=KNOWLEDGE_PROVIDER_MAX_ATTEMPTS,
-            semantic_scholar_api_key=SEMANTIC_SCHOLAR_API_KEY,
+            PostgresScientificDataRepository(DATABASE_URL),
+            (
+                OpenAlexProvider(**provider_options),
+                CrossrefProvider(**provider_options),
+                SemanticScholarProvider(
+                    api_key=SEMANTIC_SCHOLAR_API_KEY, **provider_options,
+                ),
+            ),
+            KNOWLEDGE_ROOT, payload,
         )
     else:
         raise ValueError(f"Unsupported job type: {job_type}")

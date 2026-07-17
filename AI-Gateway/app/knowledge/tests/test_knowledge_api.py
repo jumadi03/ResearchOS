@@ -17,6 +17,9 @@ from app.knowledge.extraction.models import (
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
 from app.knowledge.repositories.read_models import ObjectPage, ObjectSummary, ProjectSummary
+from app.knowledge.monitoring.models import (
+    ScientificSourceWatch, SourceWatchStatus, SourceWatchTransition,
+)
 from app.router.knowledge import router
 from app.router.workspace import router as workspace_router
 from app.router.session import router as session_router
@@ -66,12 +69,60 @@ class RecordingRepository:
         self.semantic_jobs = []
         self.object_title = "Governance matters"
         self.admission_states = {}
+        self.source_watches = []
+        self.watch_transitions = []
+        self.change_acknowledgements = []
 
     def persist_discovery(self, run): self.discovery_runs.append(run)
     def persist_metadata(self, run): self.metadata_runs.append(run)
     def persist_citation_traversal(self, run):
         assert run.verify()
         self.citation_traversals.append(run)
+    def create_source_watch(self, baseline, **values):
+        watch = ScientificSourceWatch(
+            "watch-1", baseline.discovery_contract.project_id,
+            baseline.discovery_contract.contract_id,
+            baseline.question.question_id, baseline.search_plan.plan_id,
+            values["cadence_minutes"], values["owner_id"],
+            baseline.discovery_contract.human_review_policy,
+            values["created_at"], values["next_run_at"],
+            maximum_runs=values["maximum_runs"], ends_at=values["ends_at"],
+        ).finalized()
+        self.source_watches.append(watch)
+        return watch
+    def list_source_watches(self, project_id):
+        return tuple(
+            item for item in self.source_watches if item.project_id == project_id
+        )
+    def transition_source_watch(self, watch_id, **values):
+        watch = next(item for item in self.source_watches if item.watch_id == watch_id)
+        if watch.owner_id != values["actor_id"]:
+            raise PermissionError(
+                "Only the scientific source watch owner may change its lifecycle"
+            )
+        transition = SourceWatchTransition(
+            "transition-1", watch_id, watch.status,
+            SourceWatchStatus(values["to_status"]), values["actor_id"],
+            values["rationale"], values["occurred_at"], values["next_run_at"],
+        )
+        if not transition.verify():
+            raise ValueError("Scientific source watch transition is invalid")
+        self.watch_transitions.append(transition)
+        return transition
+    def list_monitoring_runs(self, watch_id):
+        return ({"monitoring_run_id": "monitoring-1", "watch_id": watch_id},)
+    def list_scientific_changes(self, watch_id, **values):
+        items = ({
+            "change_id": "change-1", "monitoring_run_id": "monitoring-1",
+            "kind": "new_candidate", "record_key": "doi:10.1/new",
+            "acknowledged": False, "candidate_status": "discovery_only",
+        },)
+        return items if not values["unacknowledged_only"] else items
+    def acknowledge_scientific_change(self, change_id, **values):
+        if change_id != "change-1":
+            raise KeyError(f"Unknown scientific change: {change_id}")
+        self.change_acknowledgements.append((change_id, values))
+        return "ack-1"
     def persist_representation(self, record, result, storage_uri):
         self.representations.append((record, result, storage_uri))
         return "representation-1", 1
@@ -537,6 +588,100 @@ def test_acquisition_policy_cannot_be_replaced_by_client(
     assert response.json()["detail"] == (
         "Document license does not match enumerated source metadata"
     )
+
+
+def test_continuous_monitoring_api_is_readable_and_lifecycle_governed(
+    tmp_path: Path,
+) -> None:
+    repository = RecordingRepository()
+    api = client(tmp_path, repository=repository)
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    watch = api.post(
+        f"/knowledge/discovery/runs/{discovered['run_id']}/source-watches",
+        json={
+            "cadence_minutes": 60,
+            "created_at": "2026-07-17T00:00:00Z",
+            "next_run_at": "2026-07-17T01:00:00Z",
+            "maximum_runs": 10,
+        },
+    )
+    assert watch.status_code == 201
+    assert watch.json()["candidate_status"] == "discovery_only"
+    assert api.get(
+        "/knowledge/projects/researchos-default/source-watches"
+    ).json()["items"][0]["watch_id"] == "watch-1"
+    assert api.get(
+        "/knowledge/source-watches/watch-1/runs"
+    ).json()["items"][0]["monitoring_run_id"] == "monitoring-1"
+    changes = api.get(
+        "/knowledge/source-watches/watch-1/changes",
+        params={"unacknowledged_only": True},
+    ).json()["items"]
+    assert changes[0]["candidate_status"] == "discovery_only"
+
+    paused = api.post(
+        "/knowledge/source-watches/watch-1/transitions",
+        json={
+            "to_status": "paused", "rationale": "Research scope review",
+            "occurred_at": "2026-07-17T00:30:00Z",
+        },
+    )
+    assert paused.status_code == 201
+    assert paused.json()["actor_id"] == "researcher@example"
+    assert paused.json()["to_status"] == "paused"
+    assert client(tmp_path, "review", repository=repository).post(
+        "/knowledge/source-watches/watch-1/transitions",
+        json={
+            "to_status": "paused", "rationale": "Unauthorized takeover",
+            "occurred_at": "2026-07-17T00:31:00Z",
+        },
+    ).status_code == 403
+
+    acknowledged = client(
+        tmp_path, "review", repository=repository,
+    ).post(
+        "/knowledge/scientific-changes/change-1/acknowledgements",
+        json={
+            "rationale": "Candidate assigned for normal screening",
+            "occurred_at": "2026-07-17T00:40:00Z",
+        },
+    )
+    assert acknowledged.status_code == 201
+    assert repository.change_acknowledgements[0][1]["actor_id"] == (
+        "reviewer@example"
+    )
+
+
+def test_monitoring_transition_and_acknowledgement_fail_closed(
+    tmp_path: Path,
+) -> None:
+    repository = RecordingRepository()
+    api = client(tmp_path, repository=repository)
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    api.post(
+        f"/knowledge/discovery/runs/{discovered['run_id']}/source-watches",
+        json={
+            "cadence_minutes": 60,
+            "created_at": "2026-07-17T00:00:00Z",
+            "next_run_at": "2026-07-17T01:00:00Z",
+        },
+    )
+    invalid_resume = api.post(
+        "/knowledge/source-watches/watch-1/transitions",
+        json={
+            "to_status": "active", "rationale": "Resume",
+            "occurred_at": "2026-07-17T00:30:00Z",
+        },
+    )
+    assert invalid_resume.status_code == 422
+    missing = client(tmp_path, "review", repository=repository).post(
+        "/knowledge/scientific-changes/missing/acknowledgements",
+        json={
+            "rationale": "Cannot acknowledge unknown change",
+            "occurred_at": "2026-07-17T00:40:00Z",
+        },
+    )
+    assert missing.status_code == 404
 
 
 def test_acquired_document_uses_object_and_representation_ports(tmp_path: Path) -> None:
