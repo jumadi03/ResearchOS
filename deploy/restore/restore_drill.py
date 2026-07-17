@@ -15,6 +15,10 @@ import tempfile
 from typing import Any, Callable
 
 from recovery_coverage import RecoveryCoverageError, assess_recovery_coverage
+try:
+    from restore_attestation import sign_report
+except ModuleNotFoundError:  # Local contract tests use the installed application package.
+    from app.product.restore_attestation import sign_report
 
 
 COMPONENTS = {
@@ -34,6 +38,7 @@ MINIO_ENDPOINT = "http://restore-minio:9000"
 MINIO_BUCKET = "researchos-restore-drill"
 MINIO_USER = "researchos_restore"
 MINIO_PASSWORD = "isolated-restore-drill-only"
+PRIVATE_KEY_PATH = Path("/run/secrets/restore-attestation-private.pem")
 Run = Callable[..., subprocess.CompletedProcess[str]]
 
 
@@ -464,6 +469,12 @@ def main() -> int:
         args.manifest.resolve(),
         backup_root,
     )
+    if report["outcome"] == "verified":
+        try:
+            report = sign_report(report, PRIVATE_KEY_PATH.read_bytes())
+        except (OSError, ValueError) as exc:
+            report["outcome"] = "failed"
+            report["error"] = f"Restore attestation failed: {exc}"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(report, sort_keys=True, indent=2) + "\n",

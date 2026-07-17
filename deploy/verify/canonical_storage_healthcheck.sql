@@ -50,7 +50,7 @@ WHERE schemaname='public' AND tablename IN (
 
 DO $$
 BEGIN
-    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 29 THEN
+    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 30 THEN
         RAISE EXCEPTION 'database schema version does not match application';
     END IF;
     IF NOT EXISTS (
@@ -67,6 +67,13 @@ BEGIN
           AND NOT tgisinternal
     ) THEN
         RAISE EXCEPTION 'restore verification immutability is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='backup_restore_verifications_admission_guard'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'restore verification admission guard is missing';
     END IF;
 END;
 $$;
@@ -93,10 +100,28 @@ BEGIN
             outcome,checks,actor,started_at,completed_at,content_hash
         ) VALUES (
             test_backup_id,set_hash,'isolated','health-isolated-target',
-            ARRAY['postgresql','minio','knowledge'],'verified',
+            ARRAY['postgresql','minio','knowledge'],'failed',
             '[{"check":"contract","outcome":"passed"}]'::jsonb,
             'healthcheck',now(),now(),repeat('b', 64)
         ) RETURNING verification_id INTO test_verification_id;
+
+        BEGIN
+            INSERT INTO backup_restore_verifications(
+                backup_id,backup_set_hash,target_kind,target_identifier,
+                components,outcome,checks,actor,started_at,completed_at,content_hash
+            ) VALUES (
+                test_backup_id,set_hash,'isolated','health-isolated-target',
+                ARRAY['postgresql','minio','knowledge'],'verified',
+                '[{"check":"contract","outcome":"passed"}]'::jsonb,
+                'healthcheck',now(),now(),repeat('e', 64)
+            );
+            RAISE EXCEPTION 'partial verified restore evidence was not rejected';
+        EXCEPTION
+            WHEN raise_exception THEN
+                IF SQLERRM <> 'verified restore evidence requires six unique canonical components' THEN
+                    RAISE;
+                END IF;
+        END;
 
         BEGIN
             UPDATE backup_restore_verifications

@@ -78,9 +78,11 @@ services:
       REPOSITORY_DASHBOARD_EXPECTED_REVISION: ${REPOSITORY_DASHBOARD_EXPECTED_REVISION:-}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
       MODEL_NAME: ${MODEL_NAME:-qwen3:8b}
+      RESTORE_TRUST_ROOT: /restore-trust
     volumes:
       - knowledge_data:/data/knowledge
       - architecture_data:/data/architecture
+      - ./restore/trust:/restore-trust:ro
     ports: ["127.0.0.1:8080:8000"]
     depends_on:
       migrate: {condition: service_completed_successfully}
@@ -108,6 +110,29 @@ services:
     depends_on:
       migrate: {condition: service_completed_successfully}
       minio-init: {condition: service_completed_successfully}
+
+  restore-admission:
+    profiles: ["restore-admission"]
+    build: {context: ../AI-Gateway}
+    restart: "no"
+    env_file: ["stack.env"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
+    command:
+      - python
+      - /admission/admit_restore_report.py
+      - --report
+      - /report/restore-drill-report.json
+      - --trust-root
+      - /restore-trust
+      - --database-url
+      - postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
+    volumes:
+      - ${RESTORE_REPORT_PATH:-./restore/reports/restore-drill-report.json}:/report/restore-drill-report.json:ro
+      - ./restore/trust:/restore-trust:ro
+      - ./restore/admit_restore_report.py:/admission/admit_restore_report.py:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.17.1

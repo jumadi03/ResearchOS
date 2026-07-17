@@ -5,6 +5,8 @@
 deploy/stack.env
 deploy/local-access.env
 deploy/monitoring/prometheus.token
+deploy/restore/private/
+deploy/restore/reports/
 
 # Python bytecode and caches
 __pycache__/

@@ -1,0 +1,11 @@
+{
+  "keys": [
+    {
+      "algorithm": "ed25519",
+      "key_id": "restore-ed25519-24a827b8beb07e99",
+      "public_key_file": "restore-ed25519-24a827b8beb07e99.pem",
+      "status": "active"
+    }
+  ],
+  "schema_version": "1.0"
+}

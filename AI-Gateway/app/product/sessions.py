@@ -6,12 +6,17 @@ from hashlib import pbkdf2_hmac, sha256
 from hmac import compare_digest
 import base64
 import os
+from pathlib import Path
 import secrets
 
 import psycopg
 from psycopg.types.json import Jsonb
 
 from app.knowledge.authentication import KnowledgePrincipal, KnowledgeRole
+from app.product.restore_attestation import (
+    RestoreAttestationError,
+    verify_signed_report,
+)
 
 
 def _hash_secret(value: str) -> str:
@@ -26,6 +31,7 @@ def _password_hash(password: str, salt: bytes, iterations: int) -> str:
 @dataclass(slots=True)
 class WorkspaceSessionManager:
     database_url: str
+    restore_trust_root: str | None = None
     session_hours: int = 12
     password_iterations: int = 310_000
     max_failed_attempts: int = 5
@@ -213,7 +219,9 @@ class WorkspaceSessionManager:
             if row and row[9]:
                 cursor.execute("""
                     SELECT verification_id,target_kind,target_identifier,components,
-                           outcome,checks,actor,started_at,completed_at,content_hash
+                           outcome,checks,actor,started_at,completed_at,content_hash,
+                           report,attestation_algorithm,attestation_key_id,
+                           attestation_signature
                     FROM backup_restore_verifications
                     WHERE backup_id=%s AND backup_set_hash=%s
                     ORDER BY completed_at DESC LIMIT 1
@@ -232,7 +240,19 @@ class WorkspaceSessionManager:
             }
         legacy_ready = row[2] == "completed" and all(row[3:6])
         backup_integrity_ready = legacy_ready and bool(row[11]) and all(row[8:11])
-        restore_verified = bool(restore and restore[4] == "verified")
+        restore_trust_valid = False
+        if restore and restore[4] == "verified" and self.restore_trust_root:
+            try:
+                verify_signed_report(restore[10], Path(self.restore_trust_root))
+                restore_trust_valid = (
+                    restore[11] == restore[10]["attestation"]["algorithm"]
+                    and restore[12] == restore[10]["attestation"]["key_id"]
+                    and restore[13] == restore[10]["attestation"]["signature"]
+                    and restore[9] == restore[10]["content_hash"]
+                )
+            except (KeyError, TypeError, RestoreAttestationError):
+                restore_trust_valid = False
+        restore_verified = bool(restore and restore[4] == "verified" and restore_trust_valid)
         recovery_ready = backup_integrity_ready and restore_verified
         if recovery_ready:
             message = "Backup integrity and isolated restore are verified"
@@ -253,6 +273,7 @@ class WorkspaceSessionManager:
             "started_at": restore[7].isoformat(),
             "completed_at": restore[8].isoformat(),
             "content_hash": restore[9],
+            "trust_valid": restore_trust_valid,
         }
         return {
             # Compatibility alias for existing API consumers; it must not be used

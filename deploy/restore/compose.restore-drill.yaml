@@ -38,8 +38,8 @@ services:
   restore-drill:
     profiles: ["restore-drill"]
     build:
-      context: ..
-      dockerfile: restore/Dockerfile
+      context: ../..
+      dockerfile: deploy/restore/Dockerfile
     restart: "no"
     environment:
       PGPASSWORD: isolated-restore-drill-only
@@ -55,6 +55,7 @@ services:
     volumes:
       - researchos_backup_data:/backups:ro
       - ../backup/recovery-coverage-v1.json:/contract/recovery-coverage-v1.json:ro
+      - ./private/restore-attestation-v1.pem:/run/secrets/restore-attestation-private.pem:ro
       - ${RESTORE_REPORT_DIR:?set RESTORE_REPORT_DIR}:/reports
     tmpfs:
       - /work
