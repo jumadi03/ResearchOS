@@ -123,6 +123,9 @@ REPOSITORY_EVOLUTION_POST_RECOVERY_SCHEMA = SchemaPolicy(
 REPOSITORY_EVOLUTION_CLOSURE_SCHEMA = SchemaPolicy(
     "Repository Evolution Lifecycle Closure", "1.0", frozenset({"1.0"})
 )
+PUBLIC_CONTRACT_REGISTRY_SCHEMA = SchemaPolicy(
+    "Public Contract Registry", "1.0", frozenset({"1.0"})
+)
 COMPLIANCE_SCHEMA = SchemaPolicy(
     "Compliance Report", "1.0", frozenset({"0.9", "1.0"})
 )
