@@ -8,7 +8,7 @@ dependencies = [
     "python-dotenv==1.2.2",
     "pypdf==6.13.3",
     "psycopg[binary]==3.2.10",
-    "boto3==1.40.20",
+    "boto3==1.43.50",
     "cryptography==49.0.0",
     "requests==2.34.2",
     "reportlab==4.4.9",
