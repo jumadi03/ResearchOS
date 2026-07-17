@@ -26,6 +26,7 @@ REQUIRED_RESOURCES = {
     "research_artifacts", "artifact_lifecycle_events",
     "publication_representations", "embedding_index", "background_jobs",
     "researchos-documents", "researchos-backups", "knowledge_data",
+    "backup_runs", "backup_restore_verifications",
 }
 
 
@@ -77,6 +78,7 @@ def main() -> None:
                 "scientific_changes_immutable",
                 "scientific_change_acknowledgements_immutable",
                 "scientific_source_watch_transitions_immutable",
+                "backup_restore_verifications_immutable",
                 "identity_resolution_events_immutable",
                 "publication_representations_immutable",
             }

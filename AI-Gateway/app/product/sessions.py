@@ -204,14 +204,78 @@ class WorkspaceSessionManager:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute("""
                 SELECT backup_id,backup_stamp,status,database_verified,minio_verified,
-                       knowledge_verified,completed_at,error
+                       knowledge_verified,completed_at,error,backup_set_id,
+                       backup_set_hash,manifest_path,integrity_verified
                 FROM backup_runs ORDER BY started_at DESC LIMIT 1
             """)
             row = cursor.fetchone()
+            restore = None
+            if row and row[9]:
+                cursor.execute("""
+                    SELECT verification_id,target_kind,target_identifier,components,
+                           outcome,checks,actor,started_at,completed_at,content_hash
+                    FROM backup_restore_verifications
+                    WHERE backup_id=%s AND backup_set_hash=%s
+                    ORDER BY completed_at DESC LIMIT 1
+                """, (row[0], row[9]))
+                restore = cursor.fetchone()
         if not row:
-            return {"ready": False, "latest_backup": None, "message": "No verified backup has been recorded"}
-        ready = row[2] == "completed" and all(row[3:6])
-        return {"ready": ready, "latest_backup": {"backup_id": str(row[0]), "stamp": row[1],
-                "status": row[2], "database_verified": row[3], "minio_verified": row[4],
-                "knowledge_verified": row[5], "completed_at": row[6].isoformat() if row[6] else None,
-                "error": row[7]}, "message": "Backup set is verified" if ready else "Backup verification is incomplete"}
+            return {
+                "ready": False,
+                "ready_semantics": "deprecated_backup_integrity_alias",
+                "backup_integrity_ready": False,
+                "restore_verified": False,
+                "recovery_ready": False,
+                "latest_backup": None,
+                "latest_restore": None,
+                "message": "No verified backup has been recorded",
+            }
+        legacy_ready = row[2] == "completed" and all(row[3:6])
+        backup_integrity_ready = legacy_ready and bool(row[11]) and all(row[8:11])
+        restore_verified = bool(restore and restore[4] == "verified")
+        recovery_ready = backup_integrity_ready and restore_verified
+        if recovery_ready:
+            message = "Backup integrity and isolated restore are verified"
+        elif backup_integrity_ready:
+            message = "Backup integrity is verified; isolated restore is not verified"
+        elif legacy_ready:
+            message = "Legacy backup checks passed; portable backup-set integrity is not verified"
+        else:
+            message = "Backup verification is incomplete"
+        latest_restore = None if not restore else {
+            "verification_id": str(restore[0]),
+            "target_kind": restore[1],
+            "target_identifier": restore[2],
+            "components": list(restore[3]),
+            "outcome": restore[4],
+            "checks": restore[5],
+            "actor": restore[6],
+            "started_at": restore[7].isoformat(),
+            "completed_at": restore[8].isoformat(),
+            "content_hash": restore[9],
+        }
+        return {
+            # Compatibility alias for existing API consumers; it must not be used
+            # as a claim that an isolated restore has succeeded.
+            "ready": legacy_ready,
+            "ready_semantics": "deprecated_backup_integrity_alias",
+            "backup_integrity_ready": backup_integrity_ready,
+            "restore_verified": restore_verified,
+            "recovery_ready": recovery_ready,
+            "latest_backup": {
+                "backup_id": str(row[0]),
+                "stamp": row[1],
+                "status": row[2],
+                "database_verified": row[3],
+                "minio_verified": row[4],
+                "knowledge_verified": row[5],
+                "completed_at": row[6].isoformat() if row[6] else None,
+                "error": row[7],
+                "backup_set_id": row[8],
+                "backup_set_hash": row[9],
+                "manifest_path": row[10],
+                "integrity_verified": row[11],
+            },
+            "latest_restore": latest_restore,
+            "message": message,
+        }

@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added schema 29 portable backup-set manifests and an immutable,
+  isolated-target restore-verification contract; recovery readiness now
+  requires both manifest-bound archive integrity and matching restore evidence.
 - Added project-wide generation of missing Bahasa Indonesia object
   representations and switched graph node labels to available Indonesian text,
   while retaining bilingual source/translation detail views.

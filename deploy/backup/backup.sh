@@ -38,11 +38,13 @@ verify_archive() {
 
 run_backup() {
   local stamp="$1"
-  local work database minio knowledge
+  local work database minio knowledge manifest
+  local database_hash minio_hash knowledge_hash manifest_hash backup_set_id
   work="/backups/.work-${stamp}"
   database="/backups/researchos-${stamp}.dump"
   minio="/backups/minio-${stamp}.tar.gz"
   knowledge="/backups/knowledge-${stamp}.tar.gz"
+  manifest="/backups/backup-set-${stamp}.json"
   rm -rf "$work" || return 1
   mkdir -p "$work" || return 1
 
@@ -61,8 +63,27 @@ run_backup() {
   mv "${knowledge}.partial" "$knowledge" || return 1
   verify_archive "$knowledge" || return 1
 
+  database_hash="$(cut -d' ' -f1 "${database}.sha256")" || return 1
+  minio_hash="$(cut -d' ' -f1 "${minio}.sha256")" || return 1
+  knowledge_hash="$(cut -d' ' -f1 "${knowledge}.sha256")" || return 1
+  printf '%s\n' \
+    '{' \
+    '  "schema_version": "1.0",' \
+    "  \"backup_stamp\": \"${stamp}\"," \
+    '  "components": [' \
+    "    {\"name\":\"knowledge\",\"file\":\"$(basename "$knowledge")\",\"sha256\":\"${knowledge_hash}\"}," \
+    "    {\"name\":\"minio\",\"file\":\"$(basename "$minio")\",\"sha256\":\"${minio_hash}\"}," \
+    "    {\"name\":\"postgresql\",\"file\":\"$(basename "$database")\",\"sha256\":\"${database_hash}\"}" \
+    '  ]' \
+    '}' >"${manifest}.partial" || return 1
+  mv "${manifest}.partial" "$manifest" || return 1
+  sha256sum "$manifest" >"${manifest}.sha256" || return 1
+  sha256sum --check "${manifest}.sha256" >/dev/null || return 1
+  manifest_hash="$(cut -d' ' -f1 "${manifest}.sha256")" || return 1
+  backup_set_id="backup-set:${stamp}:${manifest_hash:0:16}"
+
   rm -rf "$work" || return 1
-  psql -v ON_ERROR_STOP=1 -c "UPDATE backup_runs SET status='completed',database_path='$database',minio_path='$minio',knowledge_path='$knowledge',database_verified=true,minio_verified=true,knowledge_verified=true,completed_at=now(),error=NULL WHERE backup_stamp='$stamp'"
+  psql -v ON_ERROR_STOP=1 -c "UPDATE backup_runs SET status='completed',database_path='$database',minio_path='$minio',knowledge_path='$knowledge',database_verified=true,minio_verified=true,knowledge_verified=true,backup_set_id='$backup_set_id',backup_set_hash='$manifest_hash',manifest_path='$manifest',integrity_verified=true,completed_at=now(),error=NULL WHERE backup_stamp='$stamp'"
 }
 
 while true; do
@@ -72,8 +93,17 @@ while true; do
     psql -v ON_ERROR_STOP=1 -c "UPDATE backup_runs SET status='failed',error='Backup command failed; inspect service logs',completed_at=now() WHERE backup_stamp='$stamp'"
     rm -rf "/backups/.work-${stamp}"
     rm -f /backups/*-"${stamp}".*.partial
+    rm -f \
+      "/backups/researchos-${stamp}.dump" \
+      "/backups/researchos-${stamp}.dump.sha256" \
+      "/backups/minio-${stamp}.tar.gz" \
+      "/backups/minio-${stamp}.tar.gz.sha256" \
+      "/backups/knowledge-${stamp}.tar.gz" \
+      "/backups/knowledge-${stamp}.tar.gz.sha256" \
+      "/backups/backup-set-${stamp}.json" \
+      "/backups/backup-set-${stamp}.json.sha256"
   fi
-  find /backups -type f \( -name 'researchos-*.dump' -o -name 'researchos-*.dump.sha256' -o -name 'minio-*.tar.gz' -o -name 'minio-*.tar.gz.sha256' -o -name 'knowledge-*.tar.gz' -o -name 'knowledge-*.tar.gz.sha256' \) -mtime "+${BACKUP_RETENTION_DAYS}" -delete
+  find /backups -type f \( -name 'researchos-*.dump' -o -name 'researchos-*.dump.sha256' -o -name 'minio-*.tar.gz' -o -name 'minio-*.tar.gz.sha256' -o -name 'knowledge-*.tar.gz' -o -name 'knowledge-*.tar.gz.sha256' -o -name 'backup-set-*.json' -o -name 'backup-set-*.json.sha256' \) -mtime "+${BACKUP_RETENTION_DAYS}" -delete
   if [[ "${BACKUP_RUN_ONCE:-false}" == "true" ]]; then
     break
   fi
