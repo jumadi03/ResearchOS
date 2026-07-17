@@ -15,7 +15,15 @@ from app.router.workspace import router as workspace_router
 from app.router.session import router as session_router
 from app.router.administration import router as administration_router
 from app.architecture.pipeline_service import ArchitecturePipelineService
+from app.architecture.repository import (
+    RepositoryDashboardArtifactStore,
+    RepositoryDashboardService,
+)
 from app.settings import ARCHITECTURE_OUTPUT_ROOT, ARCHITECTURE_PROJECT_ROOT
+from app.settings import (
+    REPOSITORY_DASHBOARD_EXPECTED_REVISION,
+    REPOSITORY_DASHBOARD_ROOT,
+)
 from app.settings import ARCHITECTURE_API_PRINCIPALS
 from app.architecture.authentication import BearerTokenAuthenticator
 from app.knowledge.authentication import KnowledgeAuthenticator
@@ -58,6 +66,12 @@ def create_app() -> FastAPI:
     )
     app.state.architecture_authenticator = BearerTokenAuthenticator(
         principals_by_token=ARCHITECTURE_API_PRINCIPALS,
+    )
+    app.state.repository_dashboard_service = RepositoryDashboardService(
+        RepositoryDashboardArtifactStore(
+            REPOSITORY_DASHBOARD_ROOT,
+            expected_revision=REPOSITORY_DASHBOARD_EXPECTED_REVISION,
+        )
     )
     app.mount(
         "/workspace-assets",

@@ -1,5 +1,7 @@
 """Administrator-only operational control plane."""
 
+import json
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
@@ -20,7 +22,10 @@ def _admin(request: Request, *, mutation: bool = False):
         if authorization:
             principal = request.app.state.knowledge_authenticator.authenticate(authorization)
         else:
-            principal, _ = request.app.state.workspace_sessions.authenticate(
+            sessions = request.app.state.workspace_sessions
+            if sessions is None:
+                raise PermissionError("A Bearer token is required")
+            principal, _ = sessions.authenticate(
                 request.cookies.get(COOKIE_NAME), request.headers.get("x-csrf-token"),
                 require_csrf=mutation,
             )
@@ -73,3 +78,16 @@ def audit(request: Request, limit: int = 50):
 def recovery(request: Request):
     _admin(request)
     return request.app.state.workspace_sessions.recovery_status()
+
+
+@router.get("/repository-dashboard")
+def repository_dashboard(request: Request):
+    _admin(request)
+    try:
+        snapshot = request.app.state.repository_dashboard_service.snapshot()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Repository dashboard unavailable: {exc}",
+        ) from exc
+    return json.loads(snapshot.to_json())

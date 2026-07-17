@@ -44,6 +44,15 @@ ARCHITECTURE_OUTPUT_ROOT = Path(
         str(PROJECT_DIRECTORY / "output" / "architecture"),
     )
 )
+REPOSITORY_DASHBOARD_ROOT = Path(
+    os.getenv(
+        "REPOSITORY_DASHBOARD_ROOT",
+        str(ARCHITECTURE_OUTPUT_ROOT / "repository-dashboard"),
+    )
+)
+REPOSITORY_DASHBOARD_EXPECTED_REVISION = (
+    os.getenv("REPOSITORY_DASHBOARD_EXPECTED_REVISION") or None
+)
 def _principal_mapping(variable: str) -> dict:
     raw = os.getenv(variable, "{}")
     try:

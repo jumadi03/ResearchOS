@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from app.architecture.repository import (
     RepositoryDashboardProjector,
@@ -14,6 +16,8 @@ from app.architecture.repository import (
     RepositoryHealthOutcome,
 )
 from app.architecture.tests.test_repository_health import _inputs
+from app.knowledge.authentication import KnowledgeAuthenticator
+from app.router.administration import router as administration_router
 
 
 def _snapshot(tmp_path: Path):
@@ -201,6 +205,96 @@ def test_dashboard_store_rejects_tamper_stale_pointer_and_partial_release(
     recovered = RepositoryDashboardArtifactStore(root2)
     assert abandoned in recovered.recovered_temporary_entries
     assert not abandoned.exists()
+
+
+def _admin_client(service, role: str = "admin") -> TestClient:
+    app = FastAPI()
+    app.state.knowledge_authenticator = KnowledgeAuthenticator({
+        "token": {"actor_id": role, "roles": [role]},
+    })
+    app.state.workspace_sessions = None
+    app.state.repository_dashboard_service = service
+    app.include_router(administration_router)
+    return TestClient(app)
+
+
+def test_dashboard_api_is_admin_only_read_only_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    expected, registry, verification, graph, health = _snapshot(
+        tmp_path / "source"
+    )
+
+    class Source:
+        def load(self):
+            return registry, verification, graph, health
+
+    service = RepositoryDashboardService(Source())
+    response = _admin_client(service).get(
+        "/admin/repository-dashboard",
+        headers={"Authorization": "Bearer token"},
+    )
+    assert response.status_code == 200
+    assert response.json()["snapshot_id"] == expected.snapshot_id
+    assert response.json()["is_compliance_decision"] is False
+
+    denied = _admin_client(service, "auditor").get(
+        "/admin/repository-dashboard",
+        headers={"Authorization": "Bearer token"},
+    )
+    assert denied.status_code == 403
+
+    unauthenticated = _admin_client(service).get(
+        "/admin/repository-dashboard",
+    )
+    assert unauthenticated.status_code == 401
+
+    class Missing:
+        def load(self):
+            raise ValueError("active pointer is unavailable")
+
+    unavailable = _admin_client(
+        RepositoryDashboardService(Missing())
+    ).get(
+        "/admin/repository-dashboard",
+        headers={"Authorization": "Bearer token"},
+    )
+    assert unavailable.status_code == 503
+    assert "unavailable" in unavailable.json()["detail"]
+
+
+def test_dashboard_ui_is_bilingual_provenance_bearing_and_fail_closed() -> None:
+    static = Path(__file__).resolve().parents[2] / "product" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    script = (static / "admin.js").read_text(encoding="utf-8")
+    catalog = (static / "i18n.js").read_text(encoding="utf-8")
+    styles = (static / "admin.css").read_text(encoding="utf-8")
+
+    assert 'id="repositoryDashboard"' in html
+    assert 'id="repositoryDashboardStatus"' in html
+    assert "api('/admin/repository-dashboard')" in script
+    assert "snapshot.inventory_counts" in script
+    assert "snapshot.health" in script
+    assert "snapshot.snapshot_id" in script
+    assert "snapshot.registry_id" in script
+    assert "snapshot.verification_report_id" in script
+    assert "snapshot.graph_id" in script
+    assert "snapshot.health_report_id" in script
+    assert "No missing or invalid snapshot is interpreted as passing." in script
+    assert '"Repository Dashboard":"Dasbor Repositori"' in catalog
+    assert '"Not evaluated":"Belum dievaluasi"' in catalog
+    assert (
+        '"No tracked generated or temporary files were detected.":'
+        '"Tidak ditemukan berkas yang dihasilkan atau sementara dalam pelacakan."'
+    ) in catalog
+    assert ".repository-health-item.repository-not_evaluated" in styles
+
+    root = Path(__file__).resolve().parents[4]
+    compose = (root / "deploy" / "compose.yaml").read_text(encoding="utf-8")
+    example = (root / "deploy" / "stack.env.example").read_text(encoding="utf-8")
+    assert "REPOSITORY_DASHBOARD_ROOT: /data/architecture/repository-dashboard" in compose
+    assert "architecture_data:/data/architecture" in compose
+    assert "REPOSITORY_DASHBOARD_EXPECTED_REVISION=" in example
 
 
 def test_dashboard_has_no_runtime_storage_compliance_or_filesystem_dependency() -> None:

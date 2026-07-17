@@ -74,9 +74,13 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_DOCUMENT_BUCKET: researchos-documents
       KNOWLEDGE_OUTPUT_ROOT: /data/knowledge
+      REPOSITORY_DASHBOARD_ROOT: /data/architecture/repository-dashboard
+      REPOSITORY_DASHBOARD_EXPECTED_REVISION: ${REPOSITORY_DASHBOARD_EXPECTED_REVISION:-}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
       MODEL_NAME: ${MODEL_NAME:-qwen3:8b}
-    volumes: ["knowledge_data:/data/knowledge"]
+    volumes:
+      - knowledge_data:/data/knowledge
+      - architecture_data:/data/architecture
     ports: ["127.0.0.1:8080:8000"]
     depends_on:
       migrate: {condition: service_completed_successfully}
@@ -164,3 +168,4 @@ volumes:
   grafana_data:
   backup_data:
   knowledge_data:
+  architecture_data:

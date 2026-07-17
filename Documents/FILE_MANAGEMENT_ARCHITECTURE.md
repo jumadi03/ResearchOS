@@ -661,6 +661,31 @@ verification, or choose which snapshot becomes scientifically or
 architecturally authoritative; it only publishes and rehydrates artifacts
 already validated by the canonical pipeline.
 
+### FMA-007 administration API and bilingual view
+
+The ResearchOS workspace exposes the active snapshot through the existing
+administrator control plane:
+
+- `GET /admin/repository-dashboard` in
+  `AI-Gateway/app/router/administration.py`;
+- runtime store and service wiring in `AI-Gateway/app/main.py`; and
+- the Repository Dashboard panel in the existing Administration view through
+  `AI-Gateway/app/product/static/index.html`, `admin.js`, `admin.css`, and
+  `i18n.js`.
+
+The endpoint accepts only the existing admin session or Knowledge API admin
+Bearer role. Unauthenticated access returns `401`, a non-admin principal
+returns `403`, and a missing, stale, incomplete, or invalid active bundle
+returns `503`. The endpoint is read-only and returns only a fully rehydrated
+dashboard snapshot.
+
+The browser renders inventory and governance counts, explicit health outcomes,
+affected counts, and provenance identifiers. `finding`, `advisory`,
+`not_evaluated`, and unavailable states remain visually distinct. Missing data
+is never rendered as zero, passing, observed, or compliant. Interface labels
+and deterministic health summaries follow the global Indonesian/source
+language selector; immutable identifiers and hashes remain unchanged.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;
