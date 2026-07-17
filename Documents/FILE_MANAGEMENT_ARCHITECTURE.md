@@ -326,6 +326,47 @@ migrations require a separate project-owner decision.
 | FMA-007 | Repository Dashboard | Provenance-bearing inventory, coverage, compliance, and health views |
 | FMA-008 | Repository Evolution | Impact-aware, reversible, verified structural migration workflow |
 
+## FMA-001 implementation traceability
+
+FMA-001 implements read-only repository classification inside the existing
+Architecture Engine:
+
+- immutable classification, file-record, and revision-bound inventory
+  contracts:
+  `AI-Gateway/app/architecture/repository/models.py`;
+- deterministic path classification with an explicit `unknown` state:
+  `AI-Gateway/app/architecture/repository/classifier.py`;
+- injected tracked-file scanning, normalized repository-relative paths,
+  byte-level SHA-256 hashes, duplicate rejection, path containment, symlink
+  rejection, and change-during-read detection:
+  `AI-Gateway/app/architecture/repository/scanner.py`; and
+- unit, integration, tamper, safety, and dependency-boundary tests:
+  `AI-Gateway/app/architecture/tests/test_repository_inventory.py`.
+
+The implementation does not modify Architecture Graph schema 1.0,
+`ArchitectureArtifact`, or the existing `ArchitectureInventory`. It does not
+infer ownership, claim compliance, assign `FILE-*` identities, or move any
+repository path.
+
+The first read-only working-tree observation, bound to local revision
+`5a81753`, classified 436 files:
+
+| Classification | Count |
+| --- | ---: |
+| Code | 277 |
+| Test | 72 |
+| Script | 34 |
+| Document | 31 |
+| Configuration | 21 |
+| Artifact | 1 |
+| Unknown | 0 |
+
+This observation included the uncommitted FMA-001 implementation and therefore
+uses the explicit revision label `working-tree:5a81753`. Its inventory identity
+was `repository-inventory:ResearchOS:b6d502615563c4a6`. It is audit evidence,
+not a persisted canonical snapshot or compliance decision. A post-commit scan
+must produce the final sprint inventory identity.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

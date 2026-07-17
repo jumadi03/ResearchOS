@@ -23,6 +23,13 @@ from .import_extractor import ImportExtractor
 from .class_extractor import ClassExtractor
 from .visitor import ArchitectureVisitor
 from .node_collector import NodeCollector
+from .repository import (
+    RepositoryClassifier,
+    RepositoryFileClassification,
+    RepositoryFileRecord,
+    RepositoryInventory,
+    RepositoryScanner,
+)
 
 
 __all__ = [
@@ -41,4 +48,9 @@ __all__ = [
     "ClassExtractor",
     "ArchitectureVisitor",
     "NodeCollector",
+    "RepositoryClassifier",
+    "RepositoryFileClassification",
+    "RepositoryFileRecord",
+    "RepositoryInventory",
+    "RepositoryScanner",
 ]
