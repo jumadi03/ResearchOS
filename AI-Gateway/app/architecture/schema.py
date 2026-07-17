@@ -96,6 +96,9 @@ REPOSITORY_HEALTH_SCHEMA = SchemaPolicy(
 REPOSITORY_DASHBOARD_SCHEMA = SchemaPolicy(
     "Repository Dashboard Snapshot", "1.0", frozenset({"1.0"})
 )
+REPOSITORY_EVOLUTION_SCHEMA = SchemaPolicy(
+    "Repository Evolution Plan", "1.0", frozenset({"1.0"})
+)
 COMPLIANCE_SCHEMA = SchemaPolicy(
     "Compliance Report", "1.0", frozenset({"0.9", "1.0"})
 )

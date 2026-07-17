@@ -686,6 +686,25 @@ is never rendered as zero, passing, observed, or compliant. Interface labels
 and deterministic health summaries follow the global Indonesian/source
 language selector; immutable identifiers and hashes remain unchanged.
 
+## FMA-008 implementation traceability
+
+FMA-008 begins with a planning-only Repository Evolution boundary inside the
+existing Architecture Engine:
+
+- immutable, content-addressed migration proposals record source revision,
+  canonical file-registry identity and hash, file identity, source and target
+  paths, content hash, rationale, and human decision provenance;
+- every proposed move has a deterministic inverse rollback move;
+- unknown identities, stale paths or hashes, occupied targets, duplicate
+  targets, incomplete rollback data, and unattributed decisions fail closed;
+- proposal artifacts are explicitly non-executable, including after human
+  approval; and
+- this increment does not move, rename, delete, or write repository files.
+
+Execution remains outside the contract until a later, separately reviewed
+increment defines preflight revalidation, transactional application,
+post-migration verification, and recovery behavior.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

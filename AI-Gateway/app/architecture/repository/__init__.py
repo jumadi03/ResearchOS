@@ -51,6 +51,12 @@ from .dashboard_models import (
 from .dashboard_projector import RepositoryDashboardProjector
 from .dashboard_service import RepositoryDashboardService, RepositoryDashboardSource
 from .dashboard_store import RepositoryDashboardArtifactStore
+from .evolution_models import (
+    RepositoryEvolutionDecision,
+    RepositoryEvolutionPlan,
+    RepositoryMove,
+)
+from .evolution_planner import RepositoryEvolutionPlanner
 
 __all__ = [
     "RepositoryClassifier",
@@ -91,4 +97,8 @@ __all__ = [
     "RepositoryDashboardService",
     "RepositoryDashboardSnapshot",
     "RepositoryDashboardSource",
+    "RepositoryEvolutionDecision",
+    "RepositoryEvolutionPlan",
+    "RepositoryEvolutionPlanner",
+    "RepositoryMove",
 ]
