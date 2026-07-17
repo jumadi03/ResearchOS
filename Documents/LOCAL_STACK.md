@@ -201,6 +201,46 @@ boundary or beyond the allowed future clock skew fails closed with an explicit
 reason. Changing the configured maximum age affects the live projection only;
 it never mutates or deletes the immutable signed evidence.
 
+Phase 1F-B adds Schema 31 exclusive restore-drill coordination. It does not
+schedule or execute a drill. PostgreSQL selects the latest eligible canonical
+backup, issues one bounded lease, and returns only its exact backup identity and
+safe manifest filename. A second acquisition is rejected while that lease is
+active. Expired leases are failed explicitly before a later run may begin.
+
+Acquire a one-hour lease from `deploy`:
+
+```powershell
+docker compose --env-file stack.env -f compose.yaml `
+  --profile restore-coordinator run --rm restore-coordinator `
+  acquire --owner manual-controller --lease-seconds 3600
+```
+
+Keep the returned `run_id` and `lease_token` only in the invoking process.
+After the isolated drill and Phase 1E admission succeed, complete the run:
+
+```powershell
+docker compose --env-file stack.env -f compose.yaml `
+  --profile restore-coordinator run --rm restore-coordinator `
+  complete --run-id <run-id> --lease-token <lease-token> `
+  --report-content-hash <content-hash> `
+  --verification-id <verification-id> --actor manual-controller
+```
+
+If any step fails, close the lease with an explicit reason:
+
+```powershell
+docker compose --env-file stack.env -f compose.yaml `
+  --profile restore-coordinator run --rm restore-coordinator `
+  fail --run-id <run-id> --lease-token <lease-token> `
+  --error "<explicit failure reason>" --actor manual-controller
+```
+
+The coordinator mounts only its command and receives only PostgreSQL access.
+It has no private key, backup volume, report volume, trust registry, Docker
+socket, API route, worker job, or active-storage target. The drill still has no
+database credential, and admission remains the only path to canonical restore
+evidence.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before

@@ -390,6 +390,19 @@ clock-skew allowance. Freshness policy changes do not rewrite the append-only
 restore ledger. This increment does not schedule a drill, add an orchestration
 service, or grant the application access to the private signing key.
 
+DATA maintenance Phase 1F-B introduces Schema 31 coordination without adding
+automatic execution. `restore_drill_runs` is mutable operational staging for
+one active bounded lease. `restore_drill_run_events` is its append-only
+lifecycle audit and does not replace the signed restore-evidence ledger.
+
+PostgreSQL selects the latest eligible backup and binds the lease to its exact
+backup ID and set hash. Completion requires the lease token plus a canonical
+verification ID whose backup identity and report content hash match that run.
+Expired leases fail explicitly; a partial unique index prevents concurrent
+active runs. The DB-only coordinator cannot read signing material, backup
+artifacts, reports, or active storage, while the isolated drill still cannot
+access PostgreSQL.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly

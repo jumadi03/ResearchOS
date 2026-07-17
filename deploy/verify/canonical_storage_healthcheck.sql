@@ -45,12 +45,13 @@ WHERE schemaname='public' AND tablename IN (
     'evidence_objects','provenance_events',
     'knowledge_nodes','knowledge_edges','research_artifacts',
     'artifact_lifecycle_events','publication_representations',
-    'backup_restore_verifications'
+    'backup_restore_verifications','restore_drill_runs',
+    'restore_drill_run_events'
 );
 
 DO $$
 BEGIN
-    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 30 THEN
+IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 31 THEN
         RAISE EXCEPTION 'database schema version does not match application';
     END IF;
     IF NOT EXISTS (
@@ -74,6 +75,20 @@ BEGIN
           AND NOT tgisinternal
     ) THEN
         RAISE EXCEPTION 'restore verification admission guard is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='restore_drill_runs_transition_guard'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'restore drill lifecycle guard is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='restore_drill_run_events_immutable'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'restore drill event immutability is missing';
     END IF;
 END;
 $$;
