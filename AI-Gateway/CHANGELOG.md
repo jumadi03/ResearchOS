@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Extended portable backup sets to stable, symlink-free snapshots of
+  architecture, allowlisted non-secret configuration, and versioned migration
+  sources, completing six-component coverage for a future isolated restore drill.
 - Added a versioned, report-only recovery coverage matrix and fail-closed
   verifier for PostgreSQL, MinIO, knowledge, architecture, configuration, and
   migration recovery paths without executing a restore or exposing secrets.

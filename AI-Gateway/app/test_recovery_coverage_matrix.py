@@ -26,7 +26,14 @@ def write_json(path: Path, payload: dict) -> None:
 
 def backup_fixture(tmp_path: Path):
     components = []
-    for name in ("knowledge", "minio", "postgresql"):
+    for name in (
+        "architecture",
+        "configuration",
+        "knowledge",
+        "migration",
+        "minio",
+        "postgresql",
+    ):
         filename = f"{name}.archive"
         content = f"{name}-content".encode()
         (tmp_path / filename).write_bytes(content)
@@ -67,31 +74,52 @@ def test_matrix_is_explicit_safe_and_complete_as_an_inventory():
     assert all("isolated" in item["restore_target"].lower() for item in matrix["components"])
 
 
-def test_current_backup_set_reports_known_gaps_without_claiming_restore(tmp_path):
+def test_complete_coverage_is_ready_for_drill_without_claiming_restore(tmp_path):
     manifest_path, _ = backup_fixture(tmp_path)
 
     report = coverage.assess_recovery_coverage(MATRIX, manifest_path, tmp_path)
 
-    assert report["status"] == "INCOMPLETE"
+    assert report["status"] == "COMPLETE"
     assert report["restore_executed"] is False
     assert report["active_target_touched"] is False
-    assert report["missing_or_partial"] == [
-        "architecture",
-        "configuration",
-        "migration",
-    ]
+    assert report["missing_or_partial"] == []
     readiness = {
         item["component"]: item["ready_for_restore_drill"]
         for item in report["components"]
     }
     assert readiness == {
-        "architecture": False,
-        "configuration": False,
+        "architecture": True,
+        "configuration": True,
         "knowledge": True,
-        "migration": False,
+        "migration": True,
         "minio": True,
         "postgresql": True,
     }
+
+
+def test_uncovered_component_keeps_matrix_incomplete(tmp_path):
+    manifest_path, manifest = backup_fixture(tmp_path)
+    matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
+    partial = deepcopy(matrix)
+    architecture = next(
+        item for item in partial["components"] if item["component"] == "architecture"
+    )
+    architecture["coverage"] = "missing"
+    architecture["backup_component"] = None
+    partial_path = tmp_path / "partial-matrix.json"
+    write_json(partial_path, partial)
+    manifest["components"] = [
+        item for item in manifest["components"] if item["name"] != "architecture"
+    ]
+    write_json(manifest_path, manifest)
+
+    report = coverage.assess_recovery_coverage(
+        partial_path, manifest_path, tmp_path
+    )
+
+    assert report["status"] == "INCOMPLETE"
+    assert report["missing_or_partial"] == ["architecture"]
+    assert report["restore_executed"] is False
 
 
 def test_tampered_backup_artifact_fails_closed(tmp_path):
@@ -165,7 +193,7 @@ def test_covered_component_requires_an_artifact_binding(tmp_path):
     architecture = next(
         item for item in unsafe["components"] if item["component"] == "architecture"
     )
-    architecture["coverage"] = "covered"
+    architecture["backup_component"] = None
     unsafe_path = tmp_path / "invalid-matrix.json"
     write_json(unsafe_path, unsafe)
 

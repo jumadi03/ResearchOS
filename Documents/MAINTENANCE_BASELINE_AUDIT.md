@@ -223,3 +223,23 @@ architecture and configuration as missing and migration as partial. Therefore
 Phase 1B does not complete Rule 13, write restore evidence, execute a restore,
 or authorize mutation of an active target. Its output determines the bounded
 coverage work required before an isolated restore drill can be implemented.
+
+### Phase 1C implementation traceability
+
+Phase 1C closes the three backup-coverage gaps identified by Phase 1B.
+Architecture, allowlisted non-secret configuration, and versioned migration
+sources join PostgreSQL, MinIO, and knowledge in the portable manifest. Stable
+filesystem snapshots reject symbolic links, compare tree manifests before and
+after copying, retry no more than three times, and retain the accepted manifest
+inside each archive.
+
+Configuration mounts are explicit and exclude the active `stack.env`, local
+access credentials, passwords, and tokens. Migration coverage contains the
+runner and complete ordered SQL set; the PostgreSQL dump retains the matching
+`schema_migrations` ledger. An empty architecture volume is represented by an
+explicit empty tree manifest rather than being inferred as missing.
+
+All six components may now be `covered` and the aggregate matrix may be
+`COMPLETE`. This is readiness for an isolated restore drill only. Phase 1C does
+not execute a restore, write `backup_restore_verifications`, mutate an active
+target, or complete Rule 13.

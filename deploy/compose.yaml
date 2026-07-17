@@ -157,6 +157,12 @@ services:
     volumes:
       - backup_data:/backups
       - knowledge_data:/source/knowledge:ro
+      - architecture_data:/source/architecture:ro
+      - ./compose.yaml:/source/configuration/compose.yaml:ro
+      - ./stack.env.example:/source/configuration/stack.env.example:ro
+      - ./backup/recovery-coverage-v1.json:/source/configuration/recovery-coverage-v1.json:ro
+      - ./migrate/migrate.sh:/source/migration/migrate.sh:ro
+      - ./postgres/init:/source/migration/sql:ro
     depends_on:
       migrate: {condition: service_completed_successfully}
       minio-init: {condition: service_completed_successfully}

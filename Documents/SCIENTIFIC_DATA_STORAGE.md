@@ -326,6 +326,21 @@ contains its migration ledger but the backup set does not yet carry the
 versioned migration files or forward-recovery evidence. This report is not a
 restore result and cannot populate `backup_restore_verifications`.
 
+DATA maintenance Phase 1C supersedes that coverage outcome for newly produced
+backup sets. Architecture state, an allowlisted non-secret configuration
+bundle, and the migration runner plus all versioned SQL files are now stable
+filesystem snapshots alongside PostgreSQL, MinIO, and knowledge. Each
+filesystem snapshot rejects symbolic links, compares source tree manifests
+before and after copying, retries at most three times, and preserves the
+accepted tree manifest inside its archive.
+
+The resulting six-component matrix can report `COMPLETE`, meaning ready for an
+isolated restore drill. Architecture may legitimately be an explicitly proven
+empty tree. Configuration contains reconstruction structure only and never the
+active environment or credential values. No restore is performed, the
+`backup_restore_verifications` ledger remains unchanged, and operational
+`recovery_ready` remains false until a later restore increment succeeds.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly

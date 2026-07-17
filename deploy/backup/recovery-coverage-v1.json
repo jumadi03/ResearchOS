@@ -48,8 +48,8 @@
       "component": "architecture",
       "required": true,
       "canonical_authority": "Rebuildable architecture and repository-governance snapshots",
-      "backup_component": null,
-      "coverage": "missing",
+      "backup_component": "architecture",
+      "coverage": "covered",
       "restore_target": "isolated filesystem root",
       "verification_checks": [
         "source revision",
@@ -61,8 +61,8 @@
       "component": "configuration",
       "required": true,
       "canonical_authority": "Versioned non-secret deployment reconstruction contract",
-      "backup_component": null,
-      "coverage": "missing",
+      "backup_component": "configuration",
+      "coverage": "covered",
       "restore_target": "isolated reconstruction workspace",
       "verification_checks": [
         "Compose configuration",
@@ -76,8 +76,8 @@
       "component": "migration",
       "required": true,
       "canonical_authority": "Versioned migration files and schema_migrations ledger",
-      "backup_component": null,
-      "coverage": "partial",
+      "backup_component": "migration",
+      "coverage": "covered",
       "restore_target": "isolated migration workspace",
       "verification_checks": [
         "migration file checksums",
