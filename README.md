@@ -117,6 +117,7 @@ schema and persistence, and dependency-security gates.
 - [Governance Authority boundary specification draft](Documents/GOVERNANCE_AUTHORITY_BOUNDARY_SPECIFICATION_DRAFT.md)
 - [Governance Authority boundary Architecture Review](Documents/GOVERNANCE_AUTHORITY_BOUNDARY_ARCHITECTURE_REVIEW.md)
 - [Governance Authority bounded working-direction decision](Documents/GOVERNANCE_AUTHORITY_BOUNDARY_WORKING_DIRECTION_DECISION.md)
+- [Formal Authority basis and identity evidence review](Documents/FORMAL_AUTHORITY_BASIS_AND_IDENTITY_EVIDENCE_REVIEW.md)
 - [Governance Baseline specification](Documents/GOVERNANCE_BASELINE_SPECIFICATION.md)
 - [File management architecture](Documents/FILE_MANAGEMENT_ARCHITECTURE.md)
 - [File management completion and safety baseline](Documents/FILE_MANAGEMENT_SAFETY_BASELINE.md)
