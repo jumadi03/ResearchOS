@@ -21,6 +21,7 @@ def test_restore_evidence_is_immutable_isolated_and_manifest_bound():
 def test_backup_producer_publishes_a_hash_bound_portable_manifest():
     script = BACKUP.read_text(encoding="utf-8")
 
+    assert b"\r\n" not in BACKUP.read_bytes()
     assert 'manifest="/backups/backup-set-${stamp}.json"' in script
     assert '"schema_version": "1.0"' in script
     assert r'\"name\":\"postgresql\"' in script
