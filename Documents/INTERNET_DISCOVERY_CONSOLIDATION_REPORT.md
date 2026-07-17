@@ -3,7 +3,8 @@
 ## Review status
 
 - Review: SCAN-001O Consolidation Review
-- Status: implementation-complete, pending project-owner acceptance
+- Status: project-owner-accepted and consolidation-verified
+- Acceptance recorded: 2026-07-17
 - Recorded: 2026-07-17
 - Owner: Scientific Knowledge Subsystem
 - Architectural position: Discovery Engine / Consolidation Review capability
@@ -116,8 +117,9 @@ Final acceptance requires:
 - `git diff --check` passes.
 
 Exact final counts and commit identity are reported in the sprint completion
-record after all checks finish. Project-owner acceptance and push remain
-separate explicit decisions.
+record after all checks finish. Project-owner acceptance was subsequently
+recorded after the implementation, consolidation evidence, and safety
+boundaries were reviewed.
 
 ## Validation record
 
