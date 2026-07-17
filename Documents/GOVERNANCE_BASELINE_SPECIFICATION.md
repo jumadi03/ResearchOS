@@ -390,7 +390,8 @@ The observation must be reproducible from a fixed repository revision.
 Evidence references must be sufficiently precise to locate the observed
 material at that revision.
 
-The stable content identity must cover:
+The stable content identity must be derived from an identity-bearing
+representation that covers:
 
 - the baseline content;
 - the observation boundary;
@@ -400,20 +401,24 @@ The stable content identity must cover:
 - unresolved conflicts; and
 - correction or predecessor references.
 
-The identity must change when any identity-bearing content changes. This draft
-does not choose hashing, signing, naming, serialization, or storage
+The identity value itself must be excluded from the representation used to
+derive that identity, so the contract does not become self-referential. The
+identity must change when any other identity-bearing content changes. This
+draft does not choose hashing, signing, naming, serialization, or storage
 technology.
 
-Generated timestamps, presentation-only formatting, or transport metadata
-must not make identical observation content appear substantively different
-unless the selected future identity contract explicitly includes them.
+The required observation timestamp is substantive observation-boundary
+content and must remain identity-bearing. A separate artifact-generation
+timestamp, presentation-only formatting, or transport metadata must not make
+otherwise identical observation content appear substantively different unless
+the selected future identity contract explicitly includes it.
 
 ## 15. Historical Preservation and Correction
 
 ### 15.1 Immutability
 
-Once a Governance Baseline has been used as historical evidence, its content
-must not be overwritten to:
+Once a Governance Baseline has been assigned its stable content identity, its
+identity-bearing content must not be overwritten to:
 
 - incorporate later repository changes;
 - change an analytical conclusion;
