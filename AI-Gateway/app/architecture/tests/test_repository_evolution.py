@@ -19,6 +19,8 @@ from app.architecture.repository import (
     RepositoryEvolutionPlanner,
     RepositoryEvolutionPreflight,
     RepositoryEvolutionPreflightEngine,
+    RepositoryEvolutionRecovery,
+    RepositoryEvolutionRecoveryPlanner,
     RepositoryFileClassification,
     RepositoryFileEntry,
     RepositoryFileRegistry,
@@ -27,6 +29,7 @@ from app.architecture.repository import (
     RepositoryPreflightOutcome,
     RepositoryExecutionStatus,
     RepositoryPostVerificationOutcome,
+    RepositoryRecoveryDecision,
     NoOverwriteFileMover,
 )
 
@@ -702,3 +705,131 @@ def test_post_verifier_blocks_non_completed_execution(tmp_path):
     assert "execution_completed" in {
         item.check_id for item in result.checks if not item.passed
     }
+
+
+def _verified_post_result(root):
+    plan, execution, registry, graph = _post_migration_state(root)
+    post = RepositoryEvolutionPostVerifier().verify(
+        plan, execution, registry, graph,
+    )
+    return plan, execution, post
+
+
+def _blocked_post_result(root):
+    plan, execution, registry, graph = _post_migration_state(root)
+    without_event = replace(registry, continuity_events=()).finalized()
+    project = replace(
+        graph.nodes[0],
+        metadata={
+            "repository_traceability": {
+                "registry_id": without_event.registry_id,
+                "registry_hash": without_event.content_hash,
+            },
+        },
+    )
+    updated_graph = replace(
+        graph, nodes=(project, *graph.nodes[1:]),
+    ).finalized()
+    post = RepositoryEvolutionPostVerifier().verify(
+        plan, execution, without_event, updated_graph,
+    )
+    return plan, execution, post
+
+
+def _source_registry_for_execution_plan():
+    contents = {"file:a": b"alpha\n", "file:b": b"bravo\n"}
+    return replace(
+        _registry(),
+        entries=tuple(
+            replace(
+                item,
+                content_hash=sha256(contents[item.file_id]).hexdigest(),
+                size=len(contents[item.file_id]),
+            )
+            for item in _registry().entries
+        ),
+    ).finalized()
+
+
+def test_recovery_decision_needs_no_action_after_verified_migration(tmp_path):
+    plan, execution, post = _verified_post_result(tmp_path)
+    preflight = _ready_preflight(plan, _source_registry_for_execution_plan())
+    dry_run = RepositoryEvolutionDryRunEngine().simulate(plan, preflight)
+
+    recovery = RepositoryEvolutionRecoveryPlanner().decide(
+        execution, dry_run, post,
+    )
+
+    assert recovery.decision is RepositoryRecoveryDecision.NO_ACTION
+    assert not recovery.rollback_steps
+    assert recovery.authorizes_recovery_execution is False
+    assert RepositoryEvolutionRecovery.from_json(
+        recovery.to_json()
+    ) == recovery
+
+
+def test_recovery_marks_blocked_post_verification_rollback_eligible(tmp_path):
+    plan, execution, post = _blocked_post_result(tmp_path)
+    registry = _source_registry_for_execution_plan()
+    preflight = _ready_preflight(plan, registry)
+    dry_run = RepositoryEvolutionDryRunEngine().simulate(plan, preflight)
+
+    recovery = RepositoryEvolutionRecoveryPlanner().decide(
+        execution, dry_run, post,
+    )
+
+    assert recovery.decision is (
+        RepositoryRecoveryDecision.AUTOMATIC_ROLLBACK_ELIGIBLE
+    )
+    assert recovery.rollback_steps == dry_run.rollback_steps
+    assert recovery.authorizes_recovery_execution is False
+
+
+@pytest.mark.parametrize(
+    "fail_calls,expected",
+    [
+        ({1}, RepositoryRecoveryDecision.CANONICAL_REVALIDATION_REQUIRED),
+        ({2}, RepositoryRecoveryDecision.CANONICAL_REVALIDATION_REQUIRED),
+        ({2, 3}, RepositoryRecoveryDecision.MANUAL_RECOVERY_REQUIRED),
+    ],
+)
+def test_recovery_routes_failed_execution_without_unsafe_automation(
+    tmp_path, fail_calls, expected,
+):
+    plan, preflight, dry_run = _execution_contract(tmp_path, two_moves=True)
+    execution = RepositoryEvolutionExecutor(
+        tmp_path, mover=_FailingMover(fail_calls),
+    ).execute(plan, preflight, dry_run)
+
+    recovery = RepositoryEvolutionRecoveryPlanner().decide(
+        execution, dry_run,
+    )
+
+    assert recovery.decision is expected
+    assert not recovery.rollback_steps
+    assert recovery.authorizes_recovery_execution is False
+
+
+def test_recovery_blocks_completed_execution_without_post_verification(tmp_path):
+    plan, preflight, dry_run = _execution_contract(tmp_path)
+    execution = RepositoryEvolutionExecutor(tmp_path).execute(
+        plan, preflight, dry_run,
+    )
+
+    recovery = RepositoryEvolutionRecoveryPlanner().decide(
+        execution, dry_run,
+    )
+
+    assert recovery.decision is RepositoryRecoveryDecision.BLOCKED
+    assert recovery.reasons == ("post_migration_verification_required",)
+
+
+def test_recovery_rejects_cross_execution_provenance(tmp_path):
+    plan, preflight, dry_run = _execution_contract(tmp_path)
+    execution = RepositoryEvolutionExecutor(tmp_path).execute(
+        plan, preflight, dry_run,
+    )
+    other = replace(dry_run, source_revision="other").finalized()
+
+    with pytest.raises(ValueError, match="provenance do not match"):
+        RepositoryEvolutionRecoveryPlanner().decide(execution, other)

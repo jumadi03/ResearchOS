@@ -781,6 +781,22 @@ execution:
 An execution audit alone is therefore insufficient to declare migration
 success. Canonical registry continuity and graph traceability must agree.
 
+### FMA-008 recovery governance
+
+The sixth FMA-008 increment adds a non-mutating recovery decision boundary:
+
+- `completed` plus `verified` requires no recovery;
+- `completed` plus `blocked` may produce an exact rollback plan marked
+  `automatic_rollback_eligible`, but this is not execution authorization;
+- `recovery_required` always produces `manual_recovery_required`;
+- `rolled_back` and `failed_safe` require canonical-state revalidation; and
+- a completed execution without post-migration verification is blocked.
+
+Every decision is content-addressed and bound to execution, dry-run, and,
+where available, post-verification identities and hashes. Recovery governance
+cannot invoke the filesystem executor. Automatic rollback execution and
+subsequent canonical revalidation remain separate controlled increments.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

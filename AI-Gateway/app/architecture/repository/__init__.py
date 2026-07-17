@@ -85,6 +85,11 @@ from .evolution_post_verification import (
     RepositoryPostVerificationCheck,
     RepositoryPostVerificationOutcome,
 )
+from .evolution_recovery import (
+    RepositoryEvolutionRecovery,
+    RepositoryEvolutionRecoveryPlanner,
+    RepositoryRecoveryDecision,
+)
 
 __all__ = [
     "RepositoryClassifier",
@@ -149,4 +154,7 @@ __all__ = [
     "RepositoryEvolutionPostVerifier",
     "RepositoryPostVerificationCheck",
     "RepositoryPostVerificationOutcome",
+    "RepositoryEvolutionRecovery",
+    "RepositoryEvolutionRecoveryPlanner",
+    "RepositoryRecoveryDecision",
 ]
