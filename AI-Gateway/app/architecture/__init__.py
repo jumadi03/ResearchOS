@@ -55,6 +55,12 @@ from .repository import (
     RepositoryHealthEngine,
     RepositoryHealthOutcome,
     RepositoryHealthReport,
+    RepositoryDashboardFile,
+    RepositoryDashboardHealth,
+    RepositoryDashboardProjector,
+    RepositoryDashboardService,
+    RepositoryDashboardSnapshot,
+    RepositoryDashboardSource,
 )
 
 
@@ -105,4 +111,10 @@ __all__ = [
     "RepositoryHealthEngine",
     "RepositoryHealthOutcome",
     "RepositoryHealthReport",
+    "RepositoryDashboardFile",
+    "RepositoryDashboardHealth",
+    "RepositoryDashboardProjector",
+    "RepositoryDashboardService",
+    "RepositoryDashboardSnapshot",
+    "RepositoryDashboardSource",
 ]

@@ -43,6 +43,13 @@ from .health_models import (
     RepositoryHealthReport,
 )
 from .health_engine import RepositoryHealthEngine
+from .dashboard_models import (
+    RepositoryDashboardFile,
+    RepositoryDashboardHealth,
+    RepositoryDashboardSnapshot,
+)
+from .dashboard_projector import RepositoryDashboardProjector
+from .dashboard_service import RepositoryDashboardService, RepositoryDashboardSource
 
 __all__ = [
     "RepositoryClassifier",
@@ -76,4 +83,10 @@ __all__ = [
     "RepositoryHealthEngine",
     "RepositoryHealthOutcome",
     "RepositoryHealthReport",
+    "RepositoryDashboardFile",
+    "RepositoryDashboardHealth",
+    "RepositoryDashboardProjector",
+    "RepositoryDashboardService",
+    "RepositoryDashboardSnapshot",
+    "RepositoryDashboardSource",
 ]

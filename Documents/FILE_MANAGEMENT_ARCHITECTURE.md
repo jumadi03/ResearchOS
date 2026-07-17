@@ -601,6 +601,39 @@ The transient working-tree report identity was
 no generated health report is committed, no file is moved or deleted, and no
 advisory authorizes repository mutation.
 
+## FMA-007 implementation traceability
+
+FMA-007 begins with a backend-first Repository Dashboard projection boundary:
+
+- immutable, content-addressed file, health, and dashboard snapshot contracts:
+  `AI-Gateway/app/architecture/repository/dashboard_models.py`;
+- fail-closed projection from the canonical File Registry, Repository
+  Verification Report, Architecture Graph 1.1, and Repository Health Report:
+  `AI-Gateway/app/architecture/repository/dashboard_projector.py`;
+- an injected, read-only service boundary that cannot bypass the projector:
+  `AI-Gateway/app/architecture/repository/dashboard_service.py`; and
+- determinism, provenance, mixed-revision, tamper, schema, dependency, and
+  direct-service tests:
+  `AI-Gateway/app/architecture/tests/test_repository_dashboard.py`.
+
+The dashboard snapshot projects inventory, ownership hierarchy, governance
+coverage, policy and exception references, repository verification outcomes,
+architecture node and edge counts, and every explicit health outcome. Each
+snapshot carries the exact identifiers and hashes of all four canonical source
+artifacts. It cannot combine different projects or revisions.
+
+The aggregate dashboard status preserves fail-safe semantics. Any
+`not_evaluated` health category yields `INCOMPLETE`; findings and advisories
+remain separately visible. The snapshot is always a read-only projection and
+`is_compliance_decision` is always false. It does not calculate a score,
+replace a source validator, read the repository filesystem, persist a
+competing registry, or authorize repository mutation.
+
+The browser dashboard remains a separate FMA-007 presentation increment. It
+must consume this validated service boundary and retain bilingual labels,
+provenance drill-down, and explicit unknown states. It must not reconstruct
+repository health or compliance in JavaScript.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;
