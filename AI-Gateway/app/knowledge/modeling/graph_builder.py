@@ -14,8 +14,14 @@ class ScientificKnowledgeGraphBuilder:
     def __init__(self, admission_gate: EvidenceAdmissionGate | None = None) -> None:
         self.admission_gate = admission_gate or EvidenceAdmissionGate()
 
-    def build(self, manifest: ExtractionManifest, admissions=None) -> ScientificKnowledgeGraph:
-        accepted = self.admission_gate.admit(manifest, admissions)
+    def build(
+        self, manifest: ExtractionManifest, admissions=None,
+        evidence_object_ids: tuple[str, ...] | None = None,
+    ) -> ScientificKnowledgeGraph:
+        accepted = self.admission_gate.admit(
+            manifest, admissions, evidence_object_ids,
+        )
+        selected_ids = set(accepted)
         document_node = KnowledgeNode(
             f"node:{manifest.document_id}", KnowledgeNodeType.SOURCE_DOCUMENT,
             manifest.document_id,
@@ -26,6 +32,8 @@ class ScientificKnowledgeGraphBuilder:
         results = []
         conclusions = []
         for item in manifest.objects:
+            if item.object_id not in selected_ids:
+                continue
             provenance = GraphProvenance(
                 manifest.extraction_id, manifest.document_id, item.object_id,
                 item.coordinates.page, item.coordinates.quote_hash,
@@ -50,7 +58,11 @@ class ScientificKnowledgeGraphBuilder:
         for conclusion, provenance in conclusions:
             for result, _ in results:
                 edges.append(self._edge(result.node_id, conclusion.node_id, KnowledgeEdgeType.SUPPORTS, provenance))
-        graph_identity = f"{manifest.extraction_id}:{manifest.document_content_hash}:1.0"
+        selection = ",".join(sorted(selected_ids))
+        graph_identity = (
+            f"{manifest.extraction_id}:{manifest.document_content_hash}:"
+            f"{selection}:1.0"
+        )
         graph = ScientificKnowledgeGraph(
             f"graph-{sha256(graph_identity.encode()).hexdigest()[:24]}",
             manifest.extraction_id,

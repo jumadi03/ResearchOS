@@ -11,6 +11,9 @@ from app.knowledge.extraction.models import (
     EvidenceAdmission, ExtractionReviewState,
 )
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
+from app.knowledge.intake.models import (
+    KnowledgeIntakeDecision, KnowledgeIntakeManifest,
+)
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
 from canonical_evidence import assessment, manifest
@@ -101,8 +104,32 @@ def main() -> None:
         in {method_review.provenance_id, limitation_review.provenance_id}
         for node in graph.nodes
     )
-    first = repository.persist_graph(graph, occurred_at=extraction.created_at)
-    assert repository.persist_graph(graph, occurred_at=extraction.created_at) == first
+    intake_ids = tuple(sorted(
+        item.object_id for item in graph_extraction.objects
+    ))
+    admission_by_id = {
+        item.evidence_object_id: item for item in accepted_admissions
+    }
+    intake = KnowledgeIntakeManifest(
+        "healthcheck-knowledge-intake-v2", extraction.extraction_id,
+        extraction.manifest_hash, graph.graph_id, graph.content_hash,
+        intake_ids, intake_ids,
+        tuple(
+            KnowledgeIntakeDecision(
+                object_id, True,
+                "Accepted human review verified",
+                admission_by_id[object_id].review_event.provenance_id,
+            )
+            for object_id in intake_ids
+        ),
+        "graph-reviewer@researchos.local", extraction.created_at,
+    ).finalized()
+    first = repository.persist_graph(
+        graph, occurred_at=extraction.created_at, intake=intake,
+    )
+    assert repository.persist_graph(
+        graph, occurred_at=extraction.created_at, intake=intake,
+    ) == first
     assert len(first) == len(graph.edges) == 2
 
     review_ids = (method_review.provenance_id, limitation_review.provenance_id)
@@ -128,6 +155,12 @@ def main() -> None:
                 WHERE p.event_payload->>'evidence_review_provenance_id' IN (%s,%s)
             """, review_ids)
             assert cursor.fetchone() == (2, 2, True, True)
+            cursor.execute("""
+                SELECT count(*),bool_and(content_hash=%s),
+                       bool_and(graph_content_hash=%s)
+                FROM knowledge_intake_manifests WHERE intake_key=%s
+            """, (intake.content_hash, graph.content_hash, intake.intake_id))
+            assert cursor.fetchone() == (1, True, True)
 
     theory_pipeline = KnowledgeTheoryPipeline(
         Path("/tmp/p0-theory"),

@@ -6,9 +6,12 @@ import json
 
 from app.knowledge.discovery.normalization import canonical_json
 from app.knowledge.extraction.models import (
+    DocumentCoordinates, ExtractedScientificObject,
     EpistemicClassification, EvidenceAdmission, EvidenceReviewAssessment,
     EvidenceReviewEvent, ExtractionManifest, ExtractionReviewState,
+    ScientificObjectType,
 )
+from app.knowledge.intake.models import KnowledgeIntakeManifest
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
 from app.knowledge.models import LiteratureRecord
 
@@ -90,7 +93,7 @@ class PostgresEvidenceRepositoryMixin:
                     ExtractionReviewState.ACCEPTED: "accepted",
                     ExtractionReviewState.REJECTED: "rejected",
                 }
-                for item in manifest.objects:
+                for ordinal, item in enumerate(manifest.objects):
                     cursor.execute("""
                         INSERT INTO canonical_objects(object_type,stable_key,lifecycle_status)
                         VALUES ('evidence',%s,'draft')
@@ -100,7 +103,8 @@ class PostgresEvidenceRepositoryMixin:
                     evidence_id = cursor.fetchone()[0]
                     cursor.execute("""
                         SELECT content_hash, document_id, representation_id,
-                               extraction_manifest_id
+                               extraction_manifest_id,page_text_hash,
+                               extraction_rule,extraction_ordinal
                         FROM evidence_objects WHERE evidence_id=%s
                     """, (evidence_id,))
                     existing = cursor.fetchone()
@@ -114,12 +118,31 @@ class PostgresEvidenceRepositoryMixin:
                             raise RuntimeError(
                                 f"Evidence extraction provenance conflict: {item.object_id}"
                             )
-                        if existing[3] is None:
+                        if (
+                            existing[4] not in (None, item.coordinates.page_text_hash)
+                            or existing[5] not in (None, item.extraction_rule)
+                            or existing[6] not in (None, ordinal)
+                        ):
+                            raise RuntimeError(
+                                f"Evidence intake provenance conflict: {item.object_id}"
+                            )
+                        if (
+                            existing[3] is None
+                            or existing[4] is None
+                            or existing[5] is None
+                            or existing[6] is None
+                        ):
                             cursor.execute("""
                                 UPDATE evidence_objects
-                                SET extraction_manifest_id=%s
+                                SET extraction_manifest_id=%s,
+                                    page_text_hash=%s,extraction_rule=%s,
+                                    extraction_ordinal=%s
                                 WHERE evidence_id=%s
-                            """, (extraction_manifest_id, evidence_id))
+                            """, (
+                                extraction_manifest_id,
+                                item.coordinates.page_text_hash,
+                                item.extraction_rule, ordinal, evidence_id,
+                            ))
                         evidence_ids.append(str(evidence_id))
                         continue
                     cursor.execute("""
@@ -128,10 +151,11 @@ class PostgresEvidenceRepositoryMixin:
                             statement, page, character_start, character_end,
                             section,paragraph,table_id,figure_id,
                             extraction_method, extraction_confidence,
-                            human_review_status, content_hash,extraction_manifest_id
+                            human_review_status, content_hash,extraction_manifest_id,
+                            page_text_hash,extraction_rule,extraction_ordinal
                         ) VALUES (
                             %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                            %s,%s,%s,%s,%s
+                            %s,%s,%s,%s,%s,%s,%s,%s
                         )
                     """, (
                         evidence_id, document_id, representation_id,
@@ -141,10 +165,72 @@ class PostgresEvidenceRepositoryMixin:
                         item.coordinates.table_id, item.coordinates.figure_id,
                         f"{item.extraction_method}@{item.parser_version}", item.confidence,
                         review_status[item.review_state], item.coordinates.quote_hash,
-                        extraction_manifest_id,
+                        extraction_manifest_id, item.coordinates.page_text_hash,
+                        item.extraction_rule, ordinal,
                     ))
                     evidence_ids.append(str(evidence_id))
                 return tuple(evidence_ids)
+
+    def load_extraction_manifest(self, extraction_id: str) -> ExtractionManifest:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT x.source_document_id,x.document_content_hash,x.created_at,
+                           x.parser_name,x.parser_version,x.inspection_manifest_hash,
+                           s.decision_key,s.decision_hash,x.configuration_hash,
+                           x.manifest_hash
+                    FROM extraction_manifests x
+                    JOIN screening_decisions s
+                      ON s.screening_decision_id=x.screening_decision_id
+                    WHERE x.extraction_key=%s
+                """, (extraction_id,))
+                row = cursor.fetchone()
+                if row is None:
+                    raise KeyError(f"Unknown canonical extraction: {extraction_id}")
+                cursor.execute("""
+                    SELECT c.stable_key,e.evidence_type,e.statement,e.page,
+                           e.character_start,e.character_end,e.content_hash,
+                           e.section,e.paragraph,e.table_id,e.figure_id,
+                           e.extraction_confidence,e.extraction_method,
+                           e.page_text_hash,e.extraction_rule
+                    FROM extraction_manifests x
+                    JOIN evidence_objects e
+                      ON e.extraction_manifest_id=x.extraction_manifest_id
+                    JOIN canonical_objects c ON c.object_id=e.evidence_id
+                    WHERE x.extraction_key=%s
+                    ORDER BY e.extraction_ordinal
+                """, (extraction_id,))
+                evidence_rows = cursor.fetchall()
+        objects = []
+        for item in evidence_rows:
+            method = item[12]
+            extraction_method, separator, parser_version = method.rpartition("@")
+            if not separator:
+                extraction_method, parser_version = method, row[4]
+            if not item[13] or not item[14]:
+                raise ValueError(
+                    "Canonical extraction lacks SCAN-001L intake provenance: "
+                    f"{item[0]}"
+                )
+            objects.append(ExtractedScientificObject(
+                item[0].removeprefix("evidence:"),
+                ScientificObjectType(item[1]), item[2],
+                DocumentCoordinates(
+                    item[3], item[4], item[5], item[6], item[7], item[8],
+                    item[9], item[10], item[13],
+                ),
+                item[11], ExtractionReviewState.PROVISIONAL,
+                extraction_method, parser_version, item[2], item[14],
+            ))
+        manifest = ExtractionManifest(
+            extraction_id, row[0], row[1],
+            row[2].isoformat().replace("+00:00", "Z"),
+            row[3], row[4], tuple(objects), "1.1", row[5], row[6], row[7],
+            row[8], row[9],
+        )
+        if not manifest.verify():
+            raise ValueError("Canonical extraction manifest integrity verification failed")
+        return manifest
 
     def review_evidence(
         self, evidence_object_id: str, *, decision: str, reviewer: str,
@@ -287,7 +373,7 @@ class PostgresEvidenceRepositoryMixin:
                                    assessment,assessment_hash
                             FROM evidence_review_events
                             WHERE evidence_id=e.evidence_id
-                            ORDER BY occurred_at DESC, created_at DESC LIMIT 1
+                            ORDER BY created_at DESC LIMIT 1
                         ) v ON true
                         WHERE c.stable_key=%s
                     """, (f"evidence:{object_id}",))
@@ -321,6 +407,7 @@ class PostgresEvidenceRepositoryMixin:
 
     def persist_graph(
         self, graph: ScientificKnowledgeGraph, *, occurred_at: str,
+        intake: KnowledgeIntakeManifest | None = None,
     ) -> tuple[str, ...]:
         graph.validate_evidence_admission()
         if not graph.verify():
@@ -341,15 +428,20 @@ class PostgresEvidenceRepositoryMixin:
                                e.statement, e.content_hash, e.human_review_status,
                                v.review_id, v.decision, v.reviewer_id,
                                v.rationale, v.occurred_at, v.provenance_id,
-                               v.from_status
+                               v.from_status,v.assessment,v.assessment_hash,
+                               v.reviewed_statement_hash,
+                               v.extraction_manifest_hash
                         FROM canonical_objects c
                         JOIN evidence_objects e ON e.evidence_id=c.object_id
                         LEFT JOIN LATERAL (
                             SELECT review_id, decision, reviewer_id, rationale,
-                                   occurred_at, provenance_id, from_status
+                                   occurred_at, provenance_id, from_status,
+                                   assessment,assessment_hash,
+                                   reviewed_statement_hash,
+                                   extraction_manifest_hash
                             FROM evidence_review_events
                             WHERE evidence_id=e.evidence_id
-                            ORDER BY occurred_at DESC, created_at DESC LIMIT 1
+                            ORDER BY created_at DESC LIMIT 1
                         ) v ON true
                         WHERE c.stable_key=%s
                         FOR UPDATE OF e
@@ -361,7 +453,8 @@ class PostgresEvidenceRepositoryMixin:
                         evidence_id, document_id, evidence_type, statement,
                         content_hash, status, review_id, decision, reviewer,
                         rationale, reviewed_at, review_provenance_id,
-                        previous_state,
+                        previous_state,review_assessment,assessment_hash,
+                        reviewed_statement_hash,review_manifest_hash,
                     ) = row
                     if status != "accepted" or decision != "accepted" or reviewer is None:
                         raise ValueError(f"Evidence is not accepted: {node.provenance.object_id}")
@@ -376,6 +469,15 @@ class PostgresEvidenceRepositoryMixin:
                         != reviewed_at.isoformat().replace("+00:00", "Z")
                         or event.provenance_id != str(review_provenance_id)
                         or event.previous_state != previous_state
+                        or event.assessment is None
+                        or asdict(event.assessment) != review_assessment
+                        or event.assessment_hash != assessment_hash
+                        or event.assessment.digest() != assessment_hash
+                        or event.assessment.reviewed_statement_hash
+                        != reviewed_statement_hash
+                        or event.assessment.extraction_manifest_hash
+                        != review_manifest_hash
+                        or reviewed_statement_hash != content_hash
                     ):
                         raise ValueError(
                             "Evidence review provenance is incomplete: "
@@ -489,4 +591,63 @@ class PostgresEvidenceRepositoryMixin:
                     else:
                         edge_id = persisted[0]
                     edge_ids.append(str(edge_id))
+                if intake is not None:
+                    if (
+                        not intake.verify()
+                        or intake.graph_id != graph.graph_id
+                        or intake.graph_content_hash != graph.content_hash
+                    ):
+                        raise ValueError("Knowledge intake manifest integrity verification failed")
+                    payload = asdict(intake)
+                    event_hash = sha256(canonical_json(payload).encode()).hexdigest()
+                    cursor.execute("""
+                        INSERT INTO provenance_events(
+                            execution_id,human_reviewer,event_type,event_payload,
+                            occurred_at,event_hash
+                        ) VALUES (%s,%s,'knowledge_intake',%s,%s,%s)
+                        ON CONFLICT(event_hash) DO NOTHING
+                        RETURNING provenance_id
+                    """, (
+                        intake.intake_id, intake.actor_id, json.dumps(payload),
+                        intake.occurred_at, event_hash,
+                    ))
+                    provenance = cursor.fetchone()
+                    if provenance is None:
+                        cursor.execute(
+                            "SELECT provenance_id FROM provenance_events WHERE event_hash=%s",
+                            (event_hash,),
+                        )
+                        provenance_id = cursor.fetchone()[0]
+                    else:
+                        provenance_id = provenance[0]
+                    cursor.execute("""
+                        INSERT INTO knowledge_intake_manifests(
+                            intake_key,extraction_key,extraction_manifest_hash,
+                            graph_key,graph_content_hash,requested_evidence_ids,
+                            admitted_evidence_ids,decisions,actor_id,occurred_at,
+                            provenance_id,content_hash,schema_version
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON CONFLICT(intake_key) DO NOTHING
+                        RETURNING intake_manifest_id
+                    """, (
+                        intake.intake_id, intake.extraction_id,
+                        intake.extraction_manifest_hash, intake.graph_id,
+                        intake.graph_content_hash,
+                        list(intake.requested_evidence_object_ids),
+                        list(intake.admitted_evidence_object_ids),
+                        json.dumps([asdict(item) for item in intake.decisions]),
+                        intake.actor_id, intake.occurred_at, provenance_id,
+                        intake.content_hash, intake.schema_version,
+                    ))
+                    if cursor.fetchone() is None:
+                        cursor.execute("""
+                            SELECT content_hash,provenance_id
+                            FROM knowledge_intake_manifests WHERE intake_key=%s
+                        """, (intake.intake_id,))
+                        existing_hash, existing_provenance = cursor.fetchone()
+                        if (
+                            existing_hash != intake.content_hash
+                            or existing_provenance != provenance_id
+                        ):
+                            raise RuntimeError("Knowledge intake integrity conflict")
                 return tuple(edge_ids)

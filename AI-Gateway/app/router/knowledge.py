@@ -16,7 +16,8 @@ from app.models.knowledge import (
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
     ArtifactTransitionRequest, EvidenceReviewRequest, PublicationPreviewRequest,
     PublicationRequest,
-    SemanticIndexRequest, SemanticSearchRequest, TheoryBuildRequest,
+    KnowledgeIntakeRequest, SemanticIndexRequest, SemanticSearchRequest,
+    TheoryBuildRequest,
     TheoryAlignmentDecisionRequest, TheoryAlignmentRequest, TheoryReviewRequest,
     TheoryValidationRequest,
     TheoryTranslationGenerateRequest, TheoryTranslationReviewRequest,
@@ -235,6 +236,36 @@ def build_knowledge_graph(
     result["snapshot"] = snapshot.name
     result["integrity_verified"] = graph.verify()
     return result
+
+
+@router.post("/extractions/{extraction_id}/intake", status_code=201)
+def intake_accepted_evidence(
+    extraction_id: str,
+    req: KnowledgeIntakeRequest,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.INDEXER)
+    try:
+        intake, graph, intake_snapshot, graph_snapshot = (
+            request.app.state.knowledge_service.intake_accepted_evidence(
+                extraction_id,
+                evidence_object_ids=tuple(req.evidence_object_ids),
+                actor_id=principal.actor_id,
+                occurred_at=req.occurred_at,
+            )
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "intake": asdict(intake),
+        "graph": asdict(graph),
+        "intake_snapshot": intake_snapshot.name,
+        "graph_snapshot": graph_snapshot.name,
+        "integrity_verified": intake.verify() and graph.verify(),
+    }
 
 
 @router.post("/evidence/{evidence_object_id}/reviews", status_code=201)

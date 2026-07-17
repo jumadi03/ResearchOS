@@ -12,6 +12,7 @@ from app.knowledge.extraction.models import (
     EvidenceAdmission, EvidenceReviewAssessment, EvidenceReviewEvent, ExtractionManifest,
 )
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
+from app.knowledge.intake.models import KnowledgeIntakeManifest
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
 from app.knowledge.repositories.read_models import ObjectPage, ProjectSummary
@@ -46,6 +47,8 @@ class ScientificDataRepository(Protocol):
         self, record: LiteratureRecord, manifest: ExtractionManifest,
     ) -> tuple[str, ...]: ...
 
+    def load_extraction_manifest(self, extraction_id: str) -> ExtractionManifest: ...
+
     def review_evidence(
         self, evidence_object_id: str, *, decision: str, reviewer: str,
         rationale: str, occurred_at: str, assessment: EvidenceReviewAssessment,
@@ -57,6 +60,7 @@ class ScientificDataRepository(Protocol):
 
     def persist_graph(
         self, graph: ScientificKnowledgeGraph, *, occurred_at: str,
+        intake: KnowledgeIntakeManifest | None = None,
     ) -> tuple[str, ...]: ...
 
     def persist_artifact(

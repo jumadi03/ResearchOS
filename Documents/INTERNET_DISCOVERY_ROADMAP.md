@@ -22,7 +22,8 @@
 - Completed: SCAN-001I Screening Engine
 - Completed: SCAN-001J Evidence Extraction
 - Completed: SCAN-001K Human Review
-- Next deliverable: SCAN-001L Knowledge Intake
+- Completed: SCAN-001L Knowledge Intake
+- Next deliverable: SCAN-001M Citation Snowballing
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,
@@ -281,6 +282,46 @@ P0 is implemented and verified through the following existing paths:
 Future SCAN deliverables must add verified traceability to their actual
 component specifications, implementation paths, tests, verifiers, and
 compliance closure. Paths must never be added from assumption.
+
+### SCAN-001L implementation traceability
+
+SCAN-001L registers only human-accepted evidence in the Knowledge Layer:
+
+- immutable intake contract and portable snapshot:
+  `AI-Gateway/app/knowledge/intake/models.py` and
+  `AI-Gateway/app/knowledge/intake/persistence.py`;
+- canonical extraction reconstruction and accepted-only orchestration:
+  `AI-Gateway/app/knowledge/ingestion_pipeline.py`;
+- admission, graph, and direct-persistence defense in depth:
+  `AI-Gateway/app/knowledge/modeling/admission.py`,
+  `AI-Gateway/app/knowledge/modeling/models.py`, and
+  `AI-Gateway/app/knowledge/modeling/graph_builder.py`;
+- repository port and PostgreSQL authority:
+  `AI-Gateway/app/knowledge/repositories/contracts.py` and
+  `AI-Gateway/app/knowledge/repositories/postgres_evidence.py`;
+- authenticated application and API boundary:
+  `AI-Gateway/app/knowledge/service.py`,
+  `AI-Gateway/app/models/knowledge.py`, and
+  `AI-Gateway/app/router/knowledge.py`;
+- schema and immutable intake ledger:
+  `deploy/postgres/init/023_knowledge_intake.sql` and
+  `deploy/postgres/init/024_extraction_object_order.sql`;
+- domain and API regression:
+  `AI-Gateway/app/knowledge/tests/test_knowledge_intake.py`,
+  `AI-Gateway/app/knowledge/tests/test_knowledge_graph.py`, and
+  `AI-Gateway/app/knowledge/tests/test_knowledge_api.py`; and
+- canonical reconstruction, intake, graph, and storage verification:
+  `deploy/verify/canonical_evidence.py`,
+  `deploy/verify/canonical_graph.py`,
+  `deploy/verify/canonical_storage_healthcheck.sql`, and
+  `deploy/verify/storage_compliance.py`.
+
+Knowledge Intake reloads the immutable extraction from PostgreSQL, records
+explicit admitted and excluded evidence decisions, revalidates structured
+human-review provenance, persists the accepted-only graph and intake ledger in
+one transaction, and writes filesystem snapshots only after canonical
+persistence succeeds. Extraction object ordinal is retained so reconstruction
+after restart remains byte-stable and content-hash verifiable.
 
 ## Canonical documentation review protocol
 

@@ -77,6 +77,12 @@ class TheoryBuildRequest(BaseModel):
     graph_ids: list[str] = Field(min_length=1)
 
 
+class KnowledgeIntakeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    evidence_object_ids: list[str] = Field(default_factory=list)
+    occurred_at: str = Field(min_length=1)
+
+
 class TheoryReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     theory_id: str = Field(min_length=1)

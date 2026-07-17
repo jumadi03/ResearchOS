@@ -148,7 +148,8 @@ def main() -> None:
             cursor.execute("""
                 SELECT e.evidence_type, e.page, e.character_start, e.character_end,
                        e.human_review_status, e.extraction_method,
-                       r.checksum_sha256
+                       r.checksum_sha256,e.page_text_hash,e.extraction_rule,
+                       e.extraction_ordinal
                 FROM evidence_objects e
                 JOIN canonical_objects c ON c.object_id=e.evidence_id
                 JOIN scientific_representations r ON r.representation_id=e.representation_id
@@ -172,10 +173,15 @@ def main() -> None:
     assert all(row[4] in {"pending", "accepted", "rejected"} for row in rows)
     assert all(row[5] == "healthcheck-parser@1.1.0" for row in rows)
     assert all(row[6] == source_representation.content_hash for row in rows)
+    assert all(row[7] == "d" * 64 for row in rows)
+    assert all(row[8] == "healthcheck_fixture" for row in rows)
+    assert {row[9] for row in rows} == {0, 1, 2}
     assert extraction_row[0] == 3
     assert extraction_row[1] == extraction.configuration_hash
     assert extraction_row[2] == extraction.manifest_hash
     assert extraction_row[3] is not None
+    restored = repository.load_extraction_manifest(extraction.extraction_id)
+    assert restored == extraction
 
     incomplete = EvidenceReviewAssessment(
         True, False, True, .8,

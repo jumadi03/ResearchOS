@@ -82,6 +82,11 @@ class RecordingRepository:
         assert manifest.verify()
         self.evidence_manifests.append((record, manifest))
         return tuple(f"evidence-{index}" for index, _ in enumerate(manifest.objects, 1))
+    def load_extraction_manifest(self, extraction_id):
+        return next(
+            manifest for _, manifest in self.evidence_manifests
+            if manifest.extraction_id == extraction_id
+        )
     def review_evidence(self, evidence_object_id, **values):
         self.evidence_reviews.append((evidence_object_id, values))
         assessment = values["assessment"]
@@ -102,9 +107,19 @@ class RecordingRepository:
             if existing is not None:
                 resolved.append(existing)
                 continue
+            manifest = next((
+                manifest for _, manifest in self.evidence_manifests
+                if any(item.object_id == evidence_object_id for item in manifest.objects)
+            ), None)
+            extracted = next((
+                item for item in manifest.objects
+                if item.object_id == evidence_object_id
+            ), None) if manifest is not None else None
             assessment = EvidenceReviewAssessment(
                 True, True, True, .9,
-                EpistemicClassification.OBSERVED_FACT, "a" * 64, "b" * 64,
+                EpistemicClassification.OBSERVED_FACT,
+                extracted.coordinates.quote_hash if extracted else "a" * 64,
+                manifest.manifest_hash if manifest else "b" * 64,
             )
             event = EvidenceReviewEvent(
                 f"review-{evidence_object_id}", evidence_object_id,
@@ -117,8 +132,10 @@ class RecordingRepository:
                 evidence_object_id, ExtractionReviewState.ACCEPTED, event,
             ))
         return tuple(resolved)
-    def persist_graph(self, graph, *, occurred_at):
+    def persist_graph(self, graph, *, occurred_at, intake=None):
         graph.validate_evidence_admission()
+        if intake is not None:
+            assert intake.verify()
         self.graphs.append((graph, occurred_at))
         return tuple(f"edge-{index}" for index, _ in enumerate(graph.edges, 1))
     def persist_artifact(self, **values):
@@ -589,6 +606,47 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
     assert publication_id == publication.json()["publication_id"]
     assert representation["representation_type"] == "markdown"
     assert representation["edition_type"] == "canonical"
+
+
+def test_knowledge_intake_requires_indexer_and_registers_canonical_evidence(
+    tmp_path: Path,
+) -> None:
+    repository = RecordingRepository()
+    object_store = RecordingObjectStore()
+    api = client(tmp_path, repository=repository, object_store=object_store)
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    record = discovered["records"][0]
+    source = record["source_records"][0]
+    acquired = api.post(
+        f"/knowledge/discovery/runs/{discovered['run_id']}/documents",
+        json={
+            "record_id": record["record_id"],
+            "url": "https://example.test/paper.pdf",
+            "access_status": "open", "license": "CC-BY-4.0",
+            "source_provider": source["provider"],
+            "source_response_hash": source["response_hash"],
+        },
+    ).json()
+    assert api.post(
+        f"/knowledge/documents/{acquired['document_id']}/screenings"
+    ).status_code == 201
+    extraction = api.post(
+        f"/knowledge/documents/{acquired['document_id']}/extractions"
+    ).json()
+    endpoint = f"/knowledge/extractions/{extraction['extraction_id']}/intake"
+    request = {"evidence_object_ids": [], "occurred_at": "2026-07-17T00:02:00Z"}
+    assert api.post(endpoint, json=request).status_code == 403
+
+    response = api.post(
+        endpoint, json=request, headers={"Authorization": "Bearer index"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["integrity_verified"] is True
+    assert body["intake"]["actor_id"] == "indexer@example"
+    assert body["intake"]["admitted_evidence_object_ids"]
+    assert all(item["admitted"] for item in body["intake"]["decisions"])
+    assert repository.graphs[-1][0].graph_id == body["graph"]["graph_id"]
 
 
 def test_extraction_fails_closed_for_corrupt_object(tmp_path: Path) -> None:

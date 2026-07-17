@@ -143,6 +143,15 @@ class KnowledgeDiscoveryService:
     def build_knowledge_graph(self, extraction_id: str):
         return self.ingestion_pipeline.build_knowledge_graph(extraction_id)
 
+    def intake_accepted_evidence(
+        self, extraction_id: str, *, evidence_object_ids: tuple[str, ...],
+        actor_id: str, occurred_at: str,
+    ):
+        return self.ingestion_pipeline.intake_accepted_evidence(
+            extraction_id, evidence_object_ids=evidence_object_ids,
+            actor_id=actor_id, occurred_at=occurred_at,
+        )
+
     def review_evidence(
         self, evidence_object_id: str, *, decision: str, reviewer: str,
         rationale: str, occurred_at: str, assessment,

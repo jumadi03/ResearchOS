@@ -12,6 +12,7 @@ class EvidenceAdmissionGate:
         self,
         manifest: ExtractionManifest,
         admissions: tuple[EvidenceAdmission, ...] | None,
+        evidence_object_ids: tuple[str, ...] | None = None,
     ) -> dict[str, EvidenceReviewEvent]:
         if admissions is None:
             raise ValueError(
@@ -20,8 +21,26 @@ class EvidenceAdmissionGate:
         by_id = {
             admission.evidence_object_id: admission for admission in admissions
         }
+        selected_ids = (
+            tuple(item.object_id for item in manifest.objects)
+            if evidence_object_ids is None else tuple(evidence_object_ids)
+        )
+        if not selected_ids:
+            raise ValueError("Knowledge intake requires at least one evidence object")
+        if len(set(selected_ids)) != len(selected_ids):
+            raise ValueError("Knowledge intake evidence selection contains duplicates")
+        manifest_ids = {item.object_id for item in manifest.objects}
+        unknown = sorted(set(selected_ids) - manifest_ids)
+        if unknown:
+            raise ValueError(
+                "Evidence does not belong to extraction manifest: "
+                + ", ".join(unknown)
+            )
+        selected = set(selected_ids)
         accepted = {}
         for item in manifest.objects:
+            if item.object_id not in selected:
+                continue
             admission = by_id.get(item.object_id)
             if admission is None or admission.review_state is None:
                 raise ValueError(
@@ -33,7 +52,17 @@ class EvidenceAdmissionGate:
                     f"(status={admission.review_state.value})"
                 )
             event = admission.review_event
-            if not self._complete_event(item.object_id, event):
+            if not self._complete_event(
+                item.object_id, event,
+                statement_hash=(
+                    item.coordinates.quote_hash
+                    if manifest.schema_version == "1.1" else None
+                ),
+                manifest_hash=(
+                    manifest.manifest_hash
+                    if manifest.schema_version == "1.1" else None
+                ),
+            ):
                 raise ValueError(
                     f"Evidence review provenance is incomplete: {item.object_id}"
                 )
@@ -85,7 +114,9 @@ class EvidenceAdmissionGate:
 
     @staticmethod
     def _complete_event(
-        object_id: str, event: EvidenceReviewEvent | None,
+        object_id: str, event: EvidenceReviewEvent | None, *,
+        statement_hash: str | None = None,
+        manifest_hash: str | None = None,
     ) -> bool:
         return bool(
             event is not None
@@ -100,4 +131,12 @@ class EvidenceAdmissionGate:
             and event.assessment is not None
             and event.assessment.permits_acceptance()
             and event.assessment_hash == event.assessment.digest()
+            and (
+                statement_hash is None
+                or event.assessment.reviewed_statement_hash == statement_hash
+            )
+            and (
+                manifest_hash is None
+                or event.assessment.extraction_manifest_hash == manifest_hash
+            )
         )

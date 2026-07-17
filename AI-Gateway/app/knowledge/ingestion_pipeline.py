@@ -1,5 +1,6 @@
 """Discovery through canonical graph ingestion orchestration."""
 
+from hashlib import sha256
 from pathlib import Path
 
 from app.knowledge.discovery.cache import CachedProvider
@@ -20,6 +21,10 @@ from app.knowledge.screening.engine import ScientificScreeningEngine
 from app.knowledge.screening.persistence import ScreeningDecisionStore
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
 from app.knowledge.modeling.persistence import KnowledgeGraphStore
+from app.knowledge.intake.models import (
+    KnowledgeIntakeDecision, KnowledgeIntakeManifest,
+)
+from app.knowledge.intake.persistence import KnowledgeIntakeStore
 from app.knowledge.models import (
     DiscoveryContract, DiscoveryRun, ScientificQuestion, SearchPlan,
 )
@@ -55,6 +60,7 @@ class KnowledgeIngestionPipeline:
         self.extraction_store = ExtractionManifestStore(output_root / "extractions")
         self.graph_builder = ScientificKnowledgeGraphBuilder()
         self.graph_store = KnowledgeGraphStore(output_root / "graphs")
+        self.intake_store = KnowledgeIntakeStore(output_root / "intakes")
         self.runs: dict[str, DiscoveryRun] = {}
         self.extractions = {}
         self.inspections = {}
@@ -217,3 +223,65 @@ class KnowledgeIngestionPipeline:
             self.data_repository.persist_graph(graph, occurred_at=manifest.created_at)
         self.graphs[graph.graph_id] = graph
         return graph, self.graph_store.save(graph)
+
+    def intake_accepted_evidence(
+        self, extraction_id: str, *, evidence_object_ids: tuple[str, ...],
+        actor_id: str, occurred_at: str,
+    ):
+        if self.data_repository is None:
+            raise ValueError(
+                "Canonical repository is required for knowledge intake"
+            )
+        manifest = self.data_repository.load_extraction_manifest(extraction_id)
+        manifest_ids = tuple(sorted(item.object_id for item in manifest.objects))
+        requested_ids = tuple(sorted(set(evidence_object_ids or manifest_ids)))
+        if not requested_ids:
+            raise ValueError("Knowledge intake requires at least one evidence object")
+        unknown = sorted(set(requested_ids) - set(manifest_ids))
+        if unknown:
+            raise ValueError(
+                "Evidence does not belong to extraction manifest: "
+                + ", ".join(unknown)
+            )
+        admissions = self.data_repository.resolve_evidence_admissions(requested_ids)
+        admitted_ids = []
+        decisions = []
+        for object_id in requested_ids:
+            try:
+                accepted = self.graph_builder.admission_gate.admit(
+                    manifest, admissions, (object_id,),
+                )
+            except ValueError as exc:
+                decisions.append(KnowledgeIntakeDecision(
+                    object_id, False, str(exc),
+                ))
+            else:
+                admitted_ids.append(object_id)
+                decisions.append(KnowledgeIntakeDecision(
+                    object_id, True, "Accepted human review verified",
+                    accepted[object_id].provenance_id,
+                ))
+        if not admitted_ids:
+            reasons = "; ".join(
+                f"{item.evidence_object_id}: {item.reason}" for item in decisions
+            )
+            raise ValueError(f"Knowledge intake admitted no evidence: {reasons}")
+        admitted = tuple(admitted_ids)
+        graph = self.graph_builder.build(manifest, admissions, admitted)
+        identity = (
+            f"{manifest.extraction_id}:{manifest.manifest_hash}:"
+            f"{','.join(requested_ids)}:{actor_id}:{occurred_at}"
+        )
+        intake = KnowledgeIntakeManifest(
+            f"intake-{sha256(identity.encode()).hexdigest()[:24]}",
+            manifest.extraction_id, manifest.manifest_hash,
+            graph.graph_id, graph.content_hash, requested_ids, admitted,
+            tuple(decisions), actor_id, occurred_at,
+        ).finalized()
+        self.data_repository.persist_graph(
+            graph, occurred_at=occurred_at, intake=intake,
+        )
+        self.graphs[graph.graph_id] = graph
+        graph_snapshot = self.graph_store.save(graph)
+        intake_snapshot = self.intake_store.save(intake)
+        return intake, graph, intake_snapshot, graph_snapshot

@@ -117,6 +117,9 @@ class ScientificKnowledgeGraph:
             or not event.occurred_at.strip()
             or not event.provenance_id.strip()
             or not event.previous_state.strip()
+            or event.assessment is None
+            or not event.assessment.permits_acceptance()
+            or event.assessment_hash != event.assessment.digest()
         ):
             raise ValueError(
                 f"Evidence review provenance is incomplete: {object_id}"
