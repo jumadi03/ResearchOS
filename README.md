@@ -95,6 +95,7 @@ schema and persistence, and dependency-security gates.
 
 - [ResearchOS vision](Documents/RESEARCHOS_VISION.md)
 - [Autonomous intelligence roadmap](Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md)
+- [Scientific interface vision](Documents/SCIENTIFIC_INTERFACE_VISION.md)
 - [ResearchOS in 5 Minutes](Documents/GETTING_STARTED.md)
 - [Your first ResearchOS workflow](Documents/FIRST_RESEARCH_WORKFLOW.md)
 - [End-to-end scientific workflow pilot](Documents/END_TO_END_PILOT.md)

@@ -11,6 +11,7 @@
 - Scope: long-term identity, direction, and success criteria
 - Related documents: `README.md`,
   `Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md`,
+  `Documents/SCIENTIFIC_INTERFACE_VISION.md`,
   `Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md`,
   `Documents/INTERNET_DISCOVERY_ROADMAP.md`,
   `Documents/SCIENTIFIC_DATA_STORAGE.md`, and
@@ -21,6 +22,11 @@ implementasi, spesifikasi komponen, klaim bahwa seluruh kemampuan sudah
 tersedia, atau pengganti kontrak dan kode kanonik. Roadmap dan sprint
 menentukan urutan realisasi; visi ini menentukan arah dan identitas yang tidak
 boleh hilang ketika implementasi berkembang.
+
+Visi interaksi dan evolusi workspace dicatat secara khusus dalam
+`Documents/SCIENTIFIC_INTERFACE_VISION.md`. Antarmuka ResearchOS diarahkan
+menjadi object-centric scientific workspace, bukan kumpulan halaman atau
+chatbot yang terpisah dari objek, provenance, lifecycle, dan human authority.
 
 ## Identitas
 
