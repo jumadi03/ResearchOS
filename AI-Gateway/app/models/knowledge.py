@@ -156,6 +156,15 @@ class EvidenceReviewRequest(BaseModel):
     decision: str
     rationale: str = Field(min_length=1)
     occurred_at: str = Field(min_length=1)
+    citation_fidelity: bool
+    context_preserved: bool
+    relevant: bool
+    confidence_assessment: float = Field(ge=0, le=1)
+    epistemic_classification: Literal[
+        "observed_fact", "source_author_interpretation", "mixed", "unclear"
+    ]
+    reviewed_statement_hash: str = Field(min_length=64, max_length=64)
+    extraction_manifest_hash: str = Field(min_length=64, max_length=64)
 
 
 class ArtifactTransitionRequest(BaseModel):

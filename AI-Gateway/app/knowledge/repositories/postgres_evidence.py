@@ -1,12 +1,13 @@
 """PostgreSQL evidence review and knowledge-graph persistence."""
 
+from dataclasses import asdict
 from hashlib import sha256
 import json
 
 from app.knowledge.discovery.normalization import canonical_json
 from app.knowledge.extraction.models import (
-    EvidenceAdmission, EvidenceReviewEvent, ExtractionManifest,
-    ExtractionReviewState,
+    EpistemicClassification, EvidenceAdmission, EvidenceReviewAssessment,
+    EvidenceReviewEvent, ExtractionManifest, ExtractionReviewState,
 )
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
 from app.knowledge.models import LiteratureRecord
@@ -147,26 +148,41 @@ class PostgresEvidenceRepositoryMixin:
 
     def review_evidence(
         self, evidence_object_id: str, *, decision: str, reviewer: str,
-        rationale: str, occurred_at: str,
+        rationale: str, occurred_at: str, assessment: EvidenceReviewAssessment,
     ) -> EvidenceReviewEvent:
         review_state = ExtractionReviewState(decision)
         if review_state is ExtractionReviewState.PROVISIONAL:
             raise ValueError("Evidence review decision must be accepted or rejected")
         if not reviewer.strip() or not rationale.strip():
             raise ValueError("Reviewer and rationale are required")
+        if not assessment.verify():
+            raise ValueError("Evidence review assessment is incomplete")
+        if (
+            review_state is ExtractionReviewState.ACCEPTED
+            and not assessment.permits_acceptance()
+        ):
+            raise ValueError("Accepted evidence requires every review criterion to pass")
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("""
-                    SELECT e.evidence_id, e.human_review_status
+                    SELECT e.evidence_id, e.human_review_status,e.content_hash,
+                           x.manifest_hash
                     FROM canonical_objects c
                     JOIN evidence_objects e ON e.evidence_id=c.object_id
+                    JOIN extraction_manifests x
+                      ON x.extraction_manifest_id=e.extraction_manifest_id
                     WHERE c.stable_key=%s
                     FOR UPDATE
                 """, (f"evidence:{evidence_object_id}",))
                 row = cursor.fetchone()
                 if row is None:
                     raise KeyError(f"Unknown canonical evidence: {evidence_object_id}")
-                evidence_id, previous_state = row
+                evidence_id, previous_state, statement_hash, manifest_hash = row
+                if (
+                    assessment.reviewed_statement_hash != statement_hash
+                    or assessment.extraction_manifest_hash != manifest_hash
+                ):
+                    raise ValueError("Evidence changed after the review context was opened")
                 payload = {
                     "evidence_object_id": evidence_object_id,
                     "previous_state": previous_state,
@@ -174,6 +190,8 @@ class PostgresEvidenceRepositoryMixin:
                     "reviewer": reviewer.strip(),
                     "rationale": rationale.strip(),
                     "occurred_at": occurred_at,
+                    "assessment": asdict(assessment),
+                    "assessment_hash": assessment.digest(),
                 }
                 event_identity = {
                     key: value for key, value in payload.items() if key != "previous_state"
@@ -202,13 +220,18 @@ class PostgresEvidenceRepositoryMixin:
                 cursor.execute("""
                     INSERT INTO evidence_review_events(
                         evidence_id, from_status, decision, reviewer_id,
-                        rationale, occurred_at, provenance_id
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                        rationale, occurred_at, provenance_id,assessment,
+                        assessment_hash,reviewed_statement_hash,
+                        extraction_manifest_hash
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     ON CONFLICT(provenance_id) DO NOTHING
                     RETURNING review_id
                 """, (
                     evidence_id, previous_state, review_state.value, reviewer.strip(),
                     rationale.strip(), occurred_at, provenance_id,
+                    json.dumps(asdict(assessment)), assessment.digest(),
+                    assessment.reviewed_statement_hash,
+                    assessment.extraction_manifest_hash,
                 ))
                 review = cursor.fetchone()
                 if review is None:
@@ -236,6 +259,7 @@ class PostgresEvidenceRepositoryMixin:
         return EvidenceReviewEvent(
             str(review_id), evidence_object_id, review_state, reviewer.strip(),
             rationale.strip(), occurred_at, str(provenance_id), previous_state,
+            assessment, assessment.digest(),
         )
 
     def resolve_evidence_admissions(
@@ -254,12 +278,13 @@ class PostgresEvidenceRepositoryMixin:
                         SELECT e.human_review_status,
                                v.review_id, v.decision, v.reviewer_id,
                                v.rationale, v.occurred_at, v.provenance_id,
-                               v.from_status
+                               v.from_status,v.assessment,v.assessment_hash
                         FROM canonical_objects c
                         JOIN evidence_objects e ON e.evidence_id=c.object_id
                         LEFT JOIN LATERAL (
                             SELECT review_id, decision, reviewer_id, rationale,
-                                   occurred_at, provenance_id, from_status
+                                   occurred_at, provenance_id, from_status,
+                                   assessment,assessment_hash
                             FROM evidence_review_events
                             WHERE evidence_id=e.evidence_id
                             ORDER BY occurred_at DESC, created_at DESC LIMIT 1
@@ -273,11 +298,23 @@ class PostgresEvidenceRepositoryMixin:
                     status = status_map.get(row[0])
                     event = None
                     if row[1] is not None:
+                        raw = row[8] or {}
+                        assessment = EvidenceReviewAssessment(
+                            bool(raw.get("citation_fidelity")),
+                            bool(raw.get("context_preserved")),
+                            bool(raw.get("relevant")),
+                            float(raw.get("confidence_assessment", 0)),
+                            EpistemicClassification(
+                                raw.get("epistemic_classification", "unclear")
+                            ),
+                            raw.get("reviewed_statement_hash", ""),
+                            raw.get("extraction_manifest_hash", ""),
+                        )
                         event = EvidenceReviewEvent(
                             str(row[1]), object_id,
                             ExtractionReviewState(row[2]), row[3], row[4],
                             row[5].isoformat().replace("+00:00", "Z"),
-                            str(row[6]), row[7],
+                            str(row[6]), row[7], assessment, row[9] or "",
                         )
                     admissions.append(EvidenceAdmission(object_id, status, event))
         return tuple(admissions)

@@ -145,11 +145,11 @@ class KnowledgeDiscoveryService:
 
     def review_evidence(
         self, evidence_object_id: str, *, decision: str, reviewer: str,
-        rationale: str, occurred_at: str,
+        rationale: str, occurred_at: str, assessment,
     ):
         return self.repository_service.review_evidence(
             evidence_object_id, decision=decision, reviewer=reviewer,
-            rationale=rationale, occurred_at=occurred_at,
+            rationale=rationale, occurred_at=occurred_at, assessment=assessment,
         )
 
     def build_theories(self, graph_ids: tuple[str, ...], *, generated_by: str = "researchos"):

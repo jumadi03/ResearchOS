@@ -7,7 +7,7 @@ from hashlib import sha256
 import os
 
 from app.knowledge.extraction.models import (
-    DocumentCoordinates,
+    DocumentCoordinates, EpistemicClassification, EvidenceReviewAssessment,
     ExtractedScientificObject,
     ExtractionManifest,
     ExtractionReviewState,
@@ -60,6 +60,14 @@ def manifest(
         screening_decision_hash=screening_hash,
         configuration_hash="e" * 64,
     ).finalized()
+
+
+def assessment(extraction: ExtractionManifest, index: int) -> EvidenceReviewAssessment:
+    return EvidenceReviewAssessment(
+        True, True, True, .95, EpistemicClassification.OBSERVED_FACT,
+        extraction.objects[index].coordinates.quote_hash,
+        extraction.manifest_hash,
+    )
 
 
 def main() -> None:
@@ -169,21 +177,59 @@ def main() -> None:
     assert extraction_row[2] == extraction.manifest_hash
     assert extraction_row[3] is not None
 
+    incomplete = EvidenceReviewAssessment(
+        True, False, True, .8,
+        EpistemicClassification.SOURCE_AUTHOR_INTERPRETATION,
+        extraction.objects[0].coordinates.quote_hash,
+        extraction.manifest_hash,
+    )
+    try:
+        repository.review_evidence(
+            "healthcheck-v11-method", decision="accepted",
+            reviewer="reviewer@researchos.local",
+            rationale="Context was not preserved.",
+            occurred_at="2026-07-15T14:25:00Z",
+            assessment=incomplete,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Incomplete structured assessment was accepted")
+    stale = EvidenceReviewAssessment(
+        True, True, True, .9, EpistemicClassification.OBSERVED_FACT,
+        "0" * 64, extraction.manifest_hash,
+    )
+    try:
+        repository.review_evidence(
+            "healthcheck-v11-method", decision="rejected",
+            reviewer="reviewer@researchos.local",
+            rationale="Stale review context.",
+            occurred_at="2026-07-15T14:26:00Z",
+            assessment=stale,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Stale evidence review context was accepted")
+
     accepted = repository.review_evidence(
         "healthcheck-v11-method", decision="accepted", reviewer="reviewer@researchos.local",
         rationale="Verified quotation and coordinates.",
         occurred_at="2026-07-15T14:30:00Z",
+        assessment=assessment(extraction, 0),
     )
     repeated = repository.review_evidence(
         "healthcheck-v11-method", decision="accepted", reviewer="reviewer@researchos.local",
         rationale="Verified quotation and coordinates.",
         occurred_at="2026-07-15T14:30:00Z",
+        assessment=assessment(extraction, 0),
     )
     assert repeated.review_id == accepted.review_id
     rejected = repository.review_evidence(
         "healthcheck-v11-method", decision="rejected", reviewer="reviewer@researchos.local",
         rationale="Superseding review: the statement is methodological context only.",
         occurred_at="2026-07-15T14:35:00Z",
+        assessment=assessment(extraction, 0),
     )
     assert rejected.previous_state == "accepted"
     with repository._connect() as connection:

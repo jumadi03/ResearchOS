@@ -11,7 +11,8 @@ from app.knowledge.service import KnowledgeDiscoveryService
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.repositories.models import StoredRepresentation
 from app.knowledge.extraction.models import (
-    EvidenceAdmission, EvidenceReviewEvent, ExtractionReviewState,
+    EpistemicClassification, EvidenceAdmission, EvidenceReviewAssessment,
+    EvidenceReviewEvent, ExtractionReviewState,
 )
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
@@ -83,10 +84,12 @@ class RecordingRepository:
         return tuple(f"evidence-{index}" for index, _ in enumerate(manifest.objects, 1))
     def review_evidence(self, evidence_object_id, **values):
         self.evidence_reviews.append((evidence_object_id, values))
+        assessment = values["assessment"]
         event = EvidenceReviewEvent(
             "review-1", evidence_object_id,
             ExtractionReviewState(values["decision"]), values["reviewer"],
             values["rationale"], values["occurred_at"], "provenance-1", "pending",
+            assessment, assessment.digest(),
         )
         self.admission_states[evidence_object_id] = EvidenceAdmission(
             evidence_object_id, event.decision, event,
@@ -99,11 +102,16 @@ class RecordingRepository:
             if existing is not None:
                 resolved.append(existing)
                 continue
+            assessment = EvidenceReviewAssessment(
+                True, True, True, .9,
+                EpistemicClassification.OBSERVED_FACT, "a" * 64, "b" * 64,
+            )
             event = EvidenceReviewEvent(
                 f"review-{evidence_object_id}", evidence_object_id,
                 ExtractionReviewState.ACCEPTED, "reviewer@example",
                 "Canonical evidence reviewed", "2026-07-16T00:00:00Z",
-                f"provenance-{evidence_object_id}", "pending",
+                f"provenance-{evidence_object_id}", "pending", assessment,
+                assessment.digest(),
             )
             resolved.append(EvidenceAdmission(
                 evidence_object_id, ExtractionReviewState.ACCEPTED, event,
@@ -609,6 +617,11 @@ def test_evidence_review_requires_reviewer_role_and_attributes_actor(tmp_path: P
     request = {
         "decision": "accepted", "rationale": "Coordinates and quotation verified.",
         "occurred_at": "2026-07-15T14:30:00Z",
+        "citation_fidelity": True, "context_preserved": True,
+        "relevant": True, "confidence_assessment": .9,
+        "epistemic_classification": "observed_fact",
+        "reviewed_statement_hash": "a" * 64,
+        "extraction_manifest_hash": "b" * 64,
     }
     assert client(tmp_path, repository=repository).post(
         "/knowledge/evidence/object-1/reviews", json=request,

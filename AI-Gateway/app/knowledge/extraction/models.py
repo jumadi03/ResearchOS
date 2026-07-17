@@ -25,6 +25,43 @@ class ExtractionReviewState(StrEnum):
     REJECTED = "rejected"
 
 
+class EpistemicClassification(StrEnum):
+    OBSERVED_FACT = "observed_fact"
+    SOURCE_AUTHOR_INTERPRETATION = "source_author_interpretation"
+    MIXED = "mixed"
+    UNCLEAR = "unclear"
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceReviewAssessment:
+    citation_fidelity: bool
+    context_preserved: bool
+    relevant: bool
+    confidence_assessment: float
+    epistemic_classification: EpistemicClassification
+    reviewed_statement_hash: str
+    extraction_manifest_hash: str
+
+    def verify(self) -> bool:
+        return bool(
+            0 <= self.confidence_assessment <= 1
+            and len(self.reviewed_statement_hash) == 64
+            and len(self.extraction_manifest_hash) == 64
+        )
+
+    def digest(self) -> str:
+        return sha256(json.dumps(
+            asdict(self), sort_keys=True, separators=(",", ":"),
+        ).encode()).hexdigest()
+
+    def permits_acceptance(self) -> bool:
+        return bool(
+            self.verify() and self.citation_fidelity
+            and self.context_preserved and self.relevant
+            and self.epistemic_classification is not EpistemicClassification.UNCLEAR
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceReviewEvent:
     review_id: str
@@ -35,6 +72,8 @@ class EvidenceReviewEvent:
     occurred_at: str
     provenance_id: str
     previous_state: str
+    assessment: EvidenceReviewAssessment | None = None
+    assessment_hash: str = ""
 
 
 @dataclass(frozen=True, slots=True)

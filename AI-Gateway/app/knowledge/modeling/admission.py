@@ -97,4 +97,7 @@ class EvidenceAdmissionGate:
             and event.occurred_at.strip()
             and event.provenance_id.strip()
             and event.previous_state.strip()
+            and event.assessment is not None
+            and event.assessment.permits_acceptance()
+            and event.assessment_hash == event.assessment.digest()
         )

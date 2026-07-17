@@ -9,6 +9,9 @@ import os
 from time import sleep
 
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
+from app.knowledge.extraction.models import (
+    EpistemicClassification, EvidenceReviewAssessment,
+)
 from app.workers.main import execute
 
 
@@ -36,14 +39,46 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     suffix = now.strftime("%Y%m%dT%H%M%S%f")
     model = f"health-model-{suffix}"
-    repository.review_evidence(
-        "healthcheck-method", decision="accepted", reviewer="index-reviewer@researchos.local",
-        rationale=f"Accepted for semantic indexing {suffix}.", occurred_at=iso(now),
+    with repository._connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT c.stable_key,e.content_hash,x.manifest_hash
+                FROM canonical_objects c
+                JOIN evidence_objects e ON e.evidence_id=c.object_id
+                JOIN extraction_manifests x
+                  ON x.extraction_manifest_id=e.extraction_manifest_id
+                WHERE c.stable_key IN (
+                    'evidence:healthcheck-v11-method',
+                    'evidence:healthcheck-v11-limitation'
+                )
+            """)
+            review_bindings = {
+                row[0]: (row[1], row[2]) for row in cursor.fetchall()
+            }
+    statement_hash, manifest_hash = review_bindings[
+        "evidence:healthcheck-v11-method"
+    ]
+    review_assessment = EvidenceReviewAssessment(
+        True, True, True, .95, EpistemicClassification.OBSERVED_FACT,
+        statement_hash, manifest_hash,
+    )
+    limitation_hash, limitation_manifest_hash = review_bindings[
+        "evidence:healthcheck-v11-limitation"
+    ]
+    limitation_assessment = EvidenceReviewAssessment(
+        True, True, False, .4, EpistemicClassification.OBSERVED_FACT,
+        limitation_hash, limitation_manifest_hash,
     )
     repository.review_evidence(
-        "healthcheck-limitation", decision="rejected", reviewer="index-reviewer@researchos.local",
+        "healthcheck-v11-method", decision="accepted", reviewer="index-reviewer@researchos.local",
+        rationale=f"Accepted for semantic indexing {suffix}.", occurred_at=iso(now),
+        assessment=review_assessment,
+    )
+    repository.review_evidence(
+        "healthcheck-v11-limitation", decision="rejected", reviewer="index-reviewer@researchos.local",
         rationale=f"Rejected for semantic indexing {suffix}.",
         occurred_at=iso(now + timedelta(seconds=1)),
+        assessment=limitation_assessment,
     )
     artifact_id = f"semantic-artifact-{suffix}"
     repository.persist_artifact(
@@ -55,11 +90,11 @@ def main() -> None:
     evidence_vector = tuple(0.01 if index == 0 else 0.0 for index in range(1536))
     artifact_vector = tuple(0.01 if index == 1 else 0.0 for index in range(1536))
     evidence_job = repository.enqueue_semantic_index(
-        object_type="evidence", object_id="healthcheck-method", model=model,
+        object_type="evidence", object_id="healthcheck-v11-method", model=model,
         embedding=evidence_vector, metadata={"source": "acceptance"},
     )
     repeated = repository.enqueue_semantic_index(
-        object_type="evidence", object_id="healthcheck-method", model=model,
+        object_type="evidence", object_id="healthcheck-v11-method", model=model,
         embedding=evidence_vector, metadata={"source": "acceptance"},
     )
     assert repeated.job_id == evidence_job.job_id
@@ -69,7 +104,7 @@ def main() -> None:
     )
     try:
         repository.enqueue_semantic_index(
-            object_type="evidence", object_id="healthcheck-limitation", model=model,
+            object_type="evidence", object_id="healthcheck-v11-limitation", model=model,
             embedding=evidence_vector, metadata={},
         )
     except ValueError as exc:
@@ -78,7 +113,7 @@ def main() -> None:
         raise AssertionError("Rejected evidence was enqueued")
 
     stale_payload = {
-        "object_type": "evidence", "object_id": "healthcheck-method", "model": model,
+        "object_type": "evidence", "object_id": "healthcheck-v11-method", "model": model,
         "embedding": evidence_vector, "metadata": {},
         "canonical_object_id": evidence_job.canonical_object_id,
         "content_hash": "0" * 64,
@@ -138,7 +173,7 @@ def main() -> None:
         object_types=("evidence",),
     )
     assert len(evidence_hits) == 1
-    assert evidence_hits[0].object_id == "healthcheck-method"
+    assert evidence_hits[0].object_id == "healthcheck-v11-method"
     assert evidence_hits[0].similarity > 0.999
     assert evidence_hits[0].provenance_id and evidence_hits[0].attributed_actor
     artifact_hits = repository.semantic_search(
@@ -148,9 +183,10 @@ def main() -> None:
     assert len(artifact_hits) == 1 and artifact_hits[0].object_id == artifact_id
 
     repository.review_evidence(
-        "healthcheck-method", decision="rejected", reviewer="index-reviewer@researchos.local",
+        "healthcheck-v11-method", decision="rejected", reviewer="index-reviewer@researchos.local",
         rationale=f"Revoked after semantic retrieval {suffix}.",
         occurred_at=iso(now + timedelta(seconds=2)),
+        assessment=review_assessment,
     )
     assert repository.semantic_search(
         model=model, query_embedding=evidence_vector, limit=5,

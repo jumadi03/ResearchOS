@@ -13,7 +13,7 @@ from app.knowledge.extraction.models import (
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.theory_pipeline import KnowledgeTheoryPipeline
-from canonical_evidence import manifest
+from canonical_evidence import assessment, manifest
 from canonical_repository import discovery_run
 from representation_repository import SECOND_CONTENT, result
 
@@ -71,11 +71,13 @@ def main() -> None:
     method_review = repository.review_evidence(
         "healthcheck-v11-method", decision="accepted", reviewer="graph-reviewer@researchos.local",
         rationale=f"Accepted for graph healthcheck {timestamp(now)}.", occurred_at=timestamp(now),
+        assessment=assessment(extraction, 0),
     )
     limitation_review = repository.review_evidence(
         "healthcheck-v11-limitation", decision="accepted", reviewer="graph-reviewer@researchos.local",
         rationale=f"Accepted for graph healthcheck {timestamp(now)}.",
         occurred_at=timestamp(now + timedelta(seconds=1)),
+        assessment=assessment(extraction, 1),
     )
     accepted_admissions = repository.resolve_evidence_admissions(
         tuple(item.object_id for item in graph_extraction.objects)
@@ -139,6 +141,7 @@ def main() -> None:
         reviewer="graph-reviewer@researchos.local",
         rationale=f"Revoked after graph healthcheck {timestamp(now)}.",
         occurred_at=timestamp(now + timedelta(seconds=2)),
+        assessment=assessment(extraction, 1),
     )
     mixed_admissions = repository.resolve_evidence_admissions(
         tuple(item.object_id for item in graph_extraction.objects)

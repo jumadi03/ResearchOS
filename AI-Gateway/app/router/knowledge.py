@@ -23,6 +23,9 @@ from app.models.knowledge import (
     TheoryTranslationSubmissionRequest,
 )
 from app.knowledge.ingestion.models import AccessStatus, DocumentCandidate
+from app.knowledge.extraction.models import (
+    EpistemicClassification, EvidenceReviewAssessment,
+)
 from app.runtime.models.runtime_request import RuntimeRequest
 from app.router.knowledge_dependencies import authorize, bearer
 from app.router.knowledge_workspace import router as workspace_router
@@ -246,6 +249,12 @@ def review_evidence(
         event = request.app.state.knowledge_service.review_evidence(
             evidence_object_id, decision=req.decision, reviewer=principal.actor_id,
             rationale=req.rationale, occurred_at=req.occurred_at,
+            assessment=EvidenceReviewAssessment(
+                req.citation_fidelity, req.context_preserved, req.relevant,
+                req.confidence_assessment,
+                EpistemicClassification(req.epistemic_classification),
+                req.reviewed_statement_hash, req.extraction_manifest_hash,
+            ),
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

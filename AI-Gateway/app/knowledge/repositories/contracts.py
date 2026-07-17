@@ -9,7 +9,7 @@ from app.knowledge.screening.models import ScreeningDecision
 from app.knowledge.retrieval.models import MetadataRun
 from app.knowledge.repositories.models import StoredRepresentation
 from app.knowledge.extraction.models import (
-    EvidenceAdmission, EvidenceReviewEvent, ExtractionManifest,
+    EvidenceAdmission, EvidenceReviewAssessment, EvidenceReviewEvent, ExtractionManifest,
 )
 from app.knowledge.modeling.models import ScientificKnowledgeGraph
 from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
@@ -48,7 +48,7 @@ class ScientificDataRepository(Protocol):
 
     def review_evidence(
         self, evidence_object_id: str, *, decision: str, reviewer: str,
-        rationale: str, occurred_at: str,
+        rationale: str, occurred_at: str, assessment: EvidenceReviewAssessment,
     ) -> EvidenceReviewEvent: ...
 
     def resolve_evidence_admissions(

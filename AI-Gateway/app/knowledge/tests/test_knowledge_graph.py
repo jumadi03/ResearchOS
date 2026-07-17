@@ -2,7 +2,8 @@ from pathlib import Path
 from dataclasses import replace
 
 from app.knowledge.extraction.models import (
-    DocumentCoordinates, EvidenceAdmission, EvidenceReviewEvent,
+    DocumentCoordinates, EpistemicClassification, EvidenceAdmission,
+    EvidenceReviewAssessment, EvidenceReviewEvent,
     ExtractedScientificObject, ExtractionManifest, ExtractionReviewState,
     ScientificObjectType,
 )
@@ -31,11 +32,16 @@ def manifest():
 
 
 def admission(identifier, state=ExtractionReviewState.ACCEPTED, *, event=True):
+    assessment = EvidenceReviewAssessment(
+        True, True, True, .9, EpistemicClassification.OBSERVED_FACT,
+        "a" * 64, "b" * 64,
+    )
     review = (
         EvidenceReviewEvent(
             f"review-{identifier}", identifier, state, "reviewer@example",
             "Source quotation and context reviewed", "review-time",
-            f"provenance-{identifier}", "pending",
+            f"provenance-{identifier}", "pending", assessment,
+            assessment.digest(),
         )
         if event else None
     )

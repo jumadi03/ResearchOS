@@ -6,7 +6,8 @@ import json
 import pytest
 
 from app.knowledge.extraction.models import (
-    EvidenceAdmission, EvidenceReviewEvent, ExtractionReviewState,
+    EpistemicClassification, EvidenceAdmission, EvidenceReviewAssessment,
+    EvidenceReviewEvent, ExtractionReviewState,
 )
 from app.knowledge.modeling.models import (
     GraphProvenance, KnowledgeEdge, KnowledgeEdgeType, KnowledgeNode,
@@ -25,11 +26,16 @@ from app.knowledge.validation.models import RiskOfBias, ValidationStatus
 
 def graph(identifier, conclusion, state=ExtractionReviewState.ACCEPTED, *, event=True):
     object_id = f"object-{identifier}"
+    assessment = EvidenceReviewAssessment(
+        True, True, True, .9, EpistemicClassification.OBSERVED_FACT,
+        "a" * 64, "b" * 64,
+    )
     review = (
         EvidenceReviewEvent(
             f"review-{identifier}", object_id, state, "reviewer@example",
             "Scientific evidence reviewed", "review-time",
-            f"provenance-{identifier}", "pending",
+            f"provenance-{identifier}", "pending", assessment,
+            assessment.digest(),
         )
         if event and state is not None else None
     )

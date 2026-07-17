@@ -155,10 +155,15 @@ class PostgresReadModelRepositoryMixin:
             with connection.cursor() as cursor:
                 cursor.execute("""
                     SELECT c.object_id,c.stable_key,e.statement,e.evidence_type,
-                           e.extraction_confidence,c.updated_at
+                           e.extraction_confidence,c.updated_at,e.page,e.section,
+                           e.character_start,e.character_end,e.content_hash,
+                           x.manifest_hash,d.title,d.canonical_doi
                     FROM project_objects po
                     JOIN canonical_objects c ON c.object_id=po.object_id
                     JOIN evidence_objects e ON e.evidence_id=c.object_id
+                    JOIN extraction_manifests x
+                      ON x.extraction_manifest_id=e.extraction_manifest_id
+                    JOIN scientific_documents d ON d.document_id=e.document_id
                     WHERE po.project_id=%s AND e.human_review_status='pending'
                     ORDER BY c.updated_at DESC LIMIT 100
                 """, (project_id,))
@@ -166,6 +171,17 @@ class PostgresReadModelRepositoryMixin:
                     "object_id": str(row[0]), "stable_key": row[1], "title": row[2],
                     "evidence_type": row[3], "confidence": row[4],
                     "updated_at": row[5].isoformat(),
+                    "coordinates": {
+                        "page": row[6], "section": row[7],
+                        "character_start": row[8], "character_end": row[9],
+                    },
+                    "reviewed_statement_hash": row[10],
+                    "extraction_manifest_hash": row[11],
+                    "source_document": {"title": row[12], "doi": row[13]},
+                    "required_assessments": (
+                        "citation_fidelity", "context_preserved", "relevance",
+                        "confidence", "epistemic_classification",
+                    ),
                 } for row in cursor.fetchall()]
                 cursor.execute("""
                     SELECT c.object_id,c.stable_key,a.title,a.artifact_type,a.status,
@@ -275,4 +291,3 @@ class PostgresReadModelRepositoryMixin:
         return {"project_id": project_id, "nodes": list(nodes.values()), "edges": edges,
                 "available_relationship_types": available_types,
                 "truncated": len(edges) == limit}
-
