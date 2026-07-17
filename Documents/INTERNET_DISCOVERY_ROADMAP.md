@@ -20,7 +20,8 @@
 - Completed: SCAN-001G Source Inspection
 - Completed: SCAN-001H Identity Resolution
 - Completed: SCAN-001I Screening Engine
-- Next deliverable: SCAN-001J Evidence Extraction
+- Completed: SCAN-001J Evidence Extraction
+- Next deliverable: SCAN-001K Human Review
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,

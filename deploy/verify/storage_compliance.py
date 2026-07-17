@@ -13,6 +13,7 @@ REQUIRED_RESOURCES = {
     "canonical_objects", "scientific_sources", "scientific_documents",
     "document_source_references", "metadata_observations",
     "scientific_representations", "source_inspections", "screening_decisions",
+    "extraction_manifests",
     "scientific_identifiers", "identity_resolution_events",
     "evidence_objects", "evidence_review_events",
     "provenance_events", "knowledge_nodes", "knowledge_edges",
@@ -58,6 +59,7 @@ def main() -> None:
                 "scientific_representations_immutable",
                 "source_inspections_immutable",
                 "screening_decisions_immutable",
+                "extraction_manifests_immutable",
                 "identity_resolution_events_immutable",
                 "publication_representations_immutable",
             }

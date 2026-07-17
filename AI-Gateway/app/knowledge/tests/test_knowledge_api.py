@@ -78,6 +78,7 @@ class RecordingRepository:
     def validate_screening_decision(self, decision):
         assert any(item[1] == decision for item in self.screening_decisions)
     def persist_evidence(self, record, manifest):
+        assert manifest.verify()
         self.evidence_manifests.append((record, manifest))
         return tuple(f"evidence-{index}" for index, _ in enumerate(manifest.objects, 1))
     def review_evidence(self, evidence_object_id, **values):

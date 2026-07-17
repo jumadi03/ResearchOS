@@ -18,6 +18,8 @@ class PostgresEvidenceRepositoryMixin:
     def persist_evidence(
         self, record: LiteratureRecord, manifest: ExtractionManifest,
     ) -> tuple[str, ...]:
+        if manifest.schema_version != "1.1" or not manifest.verify():
+            raise ValueError("Canonical extraction manifest integrity verification failed")
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("""
@@ -31,6 +33,56 @@ class PostgresEvidenceRepositoryMixin:
                 if source is None:
                     raise KeyError(f"Canonical representation missing for extraction: {manifest.extraction_id}")
                 document_id, representation_id = source
+                cursor.execute("""
+                    SELECT screening_decision_id FROM screening_decisions
+                    WHERE decision_key=%s AND decision_hash=%s
+                      AND status='eligible'
+                      AND source_document_id=%s
+                      AND document_content_hash=%s
+                      AND inspection_manifest_hash=%s
+                """, (
+                    manifest.screening_decision_id,
+                    manifest.screening_decision_hash,
+                    manifest.document_id,
+                    manifest.document_content_hash,
+                    manifest.inspection_manifest_hash,
+                ))
+                screening = cursor.fetchone()
+                if screening is None:
+                    raise ValueError(
+                        "Canonical eligible screening decision is required "
+                        "for evidence persistence"
+                    )
+                cursor.execute("""
+                    INSERT INTO extraction_manifests(
+                        extraction_key,document_id,representation_id,
+                        screening_decision_id,source_document_id,
+                        document_content_hash,inspection_manifest_hash,
+                        parser_name,parser_version,configuration_hash,
+                        object_count,created_at,manifest_hash
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(extraction_key) DO NOTHING
+                    RETURNING extraction_manifest_id
+                """, (
+                    manifest.extraction_id, document_id, representation_id,
+                    screening[0], manifest.document_id,
+                    manifest.document_content_hash,
+                    manifest.inspection_manifest_hash,
+                    manifest.parser_name, manifest.parser_version,
+                    manifest.configuration_hash, len(manifest.objects),
+                    manifest.created_at, manifest.manifest_hash,
+                ))
+                inserted_manifest = cursor.fetchone()
+                if inserted_manifest:
+                    extraction_manifest_id = inserted_manifest[0]
+                else:
+                    cursor.execute("""
+                        SELECT extraction_manifest_id,manifest_hash
+                        FROM extraction_manifests WHERE extraction_key=%s
+                    """, (manifest.extraction_id,))
+                    extraction_manifest_id, existing_hash = cursor.fetchone()
+                    if existing_hash != manifest.manifest_hash:
+                        raise RuntimeError("Extraction manifest integrity conflict")
                 evidence_ids = []
                 review_status = {
                     ExtractionReviewState.PROVISIONAL: "pending",
@@ -46,28 +98,49 @@ class PostgresEvidenceRepositoryMixin:
                     """, (f"evidence:{item.object_id}",))
                     evidence_id = cursor.fetchone()[0]
                     cursor.execute("""
-                        SELECT content_hash, document_id, representation_id
+                        SELECT content_hash, document_id, representation_id,
+                               extraction_manifest_id
                         FROM evidence_objects WHERE evidence_id=%s
                     """, (evidence_id,))
                     existing = cursor.fetchone()
                     if existing is not None:
-                        if existing != (item.coordinates.quote_hash, document_id, representation_id):
+                        if existing[:3] != (
+                            item.coordinates.quote_hash,
+                            document_id, representation_id,
+                        ):
                             raise RuntimeError(f"Evidence integrity conflict: {item.object_id}")
+                        if existing[3] not in (None, extraction_manifest_id):
+                            raise RuntimeError(
+                                f"Evidence extraction provenance conflict: {item.object_id}"
+                            )
+                        if existing[3] is None:
+                            cursor.execute("""
+                                UPDATE evidence_objects
+                                SET extraction_manifest_id=%s
+                                WHERE evidence_id=%s
+                            """, (extraction_manifest_id, evidence_id))
                         evidence_ids.append(str(evidence_id))
                         continue
                     cursor.execute("""
                         INSERT INTO evidence_objects(
                             evidence_id, document_id, representation_id, evidence_type,
                             statement, page, character_start, character_end,
+                            section,paragraph,table_id,figure_id,
                             extraction_method, extraction_confidence,
-                            human_review_status, content_hash
-                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                            human_review_status, content_hash,extraction_manifest_id
+                        ) VALUES (
+                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                            %s,%s,%s,%s,%s
+                        )
                     """, (
                         evidence_id, document_id, representation_id,
                         item.object_type.value, item.content, item.coordinates.page,
                         item.coordinates.start_char, item.coordinates.end_char,
+                        item.coordinates.section, item.coordinates.paragraph,
+                        item.coordinates.table_id, item.coordinates.figure_id,
                         f"{item.extraction_method}@{item.parser_version}", item.confidence,
                         review_status[item.review_state], item.coordinates.quote_hash,
+                        extraction_manifest_id,
                     ))
                     evidence_ids.append(str(evidence_id))
                 return tuple(evidence_ids)

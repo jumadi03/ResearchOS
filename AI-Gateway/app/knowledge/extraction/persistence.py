@@ -14,6 +14,8 @@ class ExtractionManifestStore:
         self.root = root
 
     def save(self, manifest: ExtractionManifest) -> Path:
+        if not manifest.verify():
+            raise ValueError("Extraction manifest integrity verification failed")
         payload = json.dumps(asdict(manifest), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
         digest = sha256(payload).hexdigest()
         path = self.root / manifest.document_id / f"v{manifest.schema_version}-{digest}.json"
