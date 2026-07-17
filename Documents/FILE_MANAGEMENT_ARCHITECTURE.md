@@ -830,6 +830,26 @@ Results are `recovered_verified`, `recovery_blocked`, or
 `manual_recovery_required`. Even `recovered_verified` does not close the
 migration lifecycle; closure remains a separate attributable audit decision.
 
+### FMA-008 migration lifecycle closure audit
+
+The ninth and final FMA-008 increment closes a migration lifecycle only through
+an attributable, content-addressed audit decision:
+
+- the normal path requires matching plan, completed execution, and a
+  `verified` post-migration result;
+- the recovery path requires the complete matching blocked-verification,
+  automatic-recovery, recovered-execution, and `recovered_verified` chain;
+- missing human identity, rationale, or timezone-bearing decision timestamp is
+  rejected before a closure artifact can be created;
+- stale provenance, blocked results, partial recovery artifacts, and
+  non-eligible final states produce `blocked` with explicit reasons; and
+- even a `closed` result neither mutates the repository nor authorizes
+  production activation.
+
+The closure auditor is an Architecture Engine service boundary. Direct service
+invocation performs the same artifact-integrity, provenance, eligibility, and
+attribution checks, so it cannot bypass the lifecycle gate.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

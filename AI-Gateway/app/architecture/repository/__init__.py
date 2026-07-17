@@ -99,6 +99,13 @@ from .evolution_post_recovery import (
     RepositoryPostRecoveryOutcome,
     RepositoryPostRecoveryVerification,
 )
+from .evolution_closure import (
+    RepositoryClosureCheck,
+    RepositoryClosureOutcome,
+    RepositoryClosurePath,
+    RepositoryEvolutionClosure,
+    RepositoryEvolutionClosureAuditor,
+)
 
 __all__ = [
     "RepositoryClassifier",
@@ -173,4 +180,9 @@ __all__ = [
     "RepositoryPostRecoveryCheck",
     "RepositoryPostRecoveryOutcome",
     "RepositoryPostRecoveryVerification",
+    "RepositoryClosureCheck",
+    "RepositoryClosureOutcome",
+    "RepositoryClosurePath",
+    "RepositoryEvolutionClosure",
+    "RepositoryEvolutionClosureAuditor",
 ]

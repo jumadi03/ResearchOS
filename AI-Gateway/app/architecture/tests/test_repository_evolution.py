@@ -9,6 +9,8 @@ from app.architecture.repository import (
     FileContinuityEvent,
     FileGovernanceState,
     RepositoryEvolutionDecision,
+    RepositoryEvolutionClosure,
+    RepositoryEvolutionClosureAuditor,
     RepositoryEvolutionDryRun,
     RepositoryEvolutionDryRunEngine,
     RepositoryEvolutionExecution,
@@ -30,6 +32,8 @@ from app.architecture.repository import (
     RepositoryMove,
     RepositoryPreflightOutcome,
     RepositoryExecutionStatus,
+    RepositoryClosureOutcome,
+    RepositoryClosurePath,
     RepositoryPostVerificationOutcome,
     RepositoryPostRecoveryOutcome,
     RepositoryRecoveryDecision,
@@ -1001,3 +1005,180 @@ def test_post_recovery_blocks_missing_continuity(tmp_path):
         plan, recovery, execution, registry, graph,
     )
     assert result.outcome is RepositoryPostRecoveryOutcome.RECOVERY_BLOCKED
+
+
+def _closure_decision():
+    return {
+        "decided_by": "project-owner",
+        "decision_rationale": (
+            "Canonical verification chain reviewed for lifecycle closure."
+        ),
+        "decided_at": "2026-07-17T20:00:00+08:00",
+    }
+
+
+def test_closure_audit_closes_verified_migration_without_activation(tmp_path):
+    plan, execution, post = _verified_post_result(tmp_path)
+
+    result = RepositoryEvolutionClosureAuditor().audit(
+        plan, execution, post, **_closure_decision(),
+    )
+
+    assert result.outcome is RepositoryClosureOutcome.CLOSED
+    assert result.closure_path is RepositoryClosurePath.MIGRATION
+    assert result.closes_migration_lifecycle is True
+    assert result.authorizes_production_activation is False
+    assert result.mutates_repository is False
+    assert all(item.passed for item in result.checks)
+    assert RepositoryEvolutionClosure.from_json(result.to_json()) == result
+
+
+def test_closure_audit_blocks_unverified_normal_path(tmp_path):
+    plan, execution, post = _blocked_post_result(tmp_path)
+
+    result = RepositoryEvolutionClosureAuditor().audit(
+        plan, execution, post, **_closure_decision(),
+    )
+
+    assert result.outcome is RepositoryClosureOutcome.BLOCKED
+    assert result.closes_migration_lifecycle is False
+    assert {
+        item.check_id for item in result.checks if not item.passed
+    } == {"final_state_eligible"}
+
+
+def test_closure_audit_rejects_missing_or_unzoned_human_provenance(tmp_path):
+    plan, execution, post = _verified_post_result(tmp_path)
+    auditor = RepositoryEvolutionClosureAuditor()
+
+    with pytest.raises(ValueError, match="Attributable closure decision"):
+        auditor.audit(
+            plan,
+            execution,
+            post,
+            decided_by="",
+            decision_rationale="Reviewed.",
+            decided_at="2026-07-17T20:00:00+08:00",
+        )
+    with pytest.raises(ValueError, match="Attributable closure decision"):
+        auditor.audit(
+            plan,
+            execution,
+            post,
+            decided_by="project-owner",
+            decision_rationale="Reviewed.",
+            decided_at="2026-07-17T20:00:00",
+        )
+
+
+def test_closure_audit_blocks_stale_verification_provenance(tmp_path):
+    plan, execution, post = _verified_post_result(tmp_path)
+    stale = replace(
+        post,
+        execution_hash="0" * 64,
+    ).finalized()
+    assert stale.verify()
+
+    result = RepositoryEvolutionClosureAuditor().audit(
+        plan, execution, stale, **_closure_decision(),
+    )
+
+    assert result.outcome is RepositoryClosureOutcome.BLOCKED
+    assert "verification_chain_current" in {
+        item.check_id for item in result.checks if not item.passed
+    }
+
+
+def _recovery_closure_contract(root):
+    plan, execution, post = _blocked_post_result(root)
+    source = _source_registry_for_execution_plan()
+    preflight = _ready_preflight(plan, source)
+    dry_run = RepositoryEvolutionDryRunEngine().simulate(plan, preflight)
+    recovery = RepositoryEvolutionRecoveryPlanner().decide(
+        execution, dry_run, post,
+    )
+    recovery_execution = RepositoryEvolutionRecoveryExecutor(root).recover(
+        recovery, execution, dry_run,
+    )
+    move = plan.moves[0]
+    entries = tuple(
+        replace(item, previous_paths=(move.target_path,))
+        if item.file_id == move.file_id else item
+        for item in source.entries
+    )
+    event = FileContinuityEvent(
+        "", move.file_id, move.target_path, move.source_path,
+        move.content_hash, move.content_hash, "r2", "r3",
+        "architecture", "Canonical recovery continuity.",
+        "2026-07-17T19:00:00+08:00",
+    ).finalized()
+    registry = RepositoryFileRegistry(
+        "", "ResearchOS", "r3", "inventory:r3", "9" * 64,
+        source.policy_bundle_id, source.policy_bundle_hash,
+        entries, (event,),
+    ).finalized()
+    project = ArchitectureNode(
+        "project:ResearchOS", "Project", "ResearchOS",
+        metadata={"repository_traceability": {
+            "registry_id": registry.registry_id,
+            "registry_hash": registry.content_hash,
+        }},
+    )
+    graph = ArchitectureGraph(
+        "", "ResearchOS",
+        (project, *(ArchitectureNode(
+            item.file_id, "File", item.current_path,
+            source_path=item.current_path,
+            metadata={"content_hash": item.content_hash},
+        ) for item in registry.entries)),
+        source_revision="r3",
+    ).finalized()
+    post_recovery = RepositoryEvolutionPostRecoveryVerifier().verify(
+        plan, recovery, recovery_execution, registry, graph,
+    )
+    return (
+        plan,
+        execution,
+        post,
+        recovery,
+        recovery_execution,
+        post_recovery,
+    )
+
+
+def test_closure_audit_closes_complete_verified_recovery_path(tmp_path):
+    (
+        plan, execution, post, recovery, recovery_execution, post_recovery,
+    ) = _recovery_closure_contract(tmp_path)
+
+    result = RepositoryEvolutionClosureAuditor().audit(
+        plan,
+        execution,
+        post,
+        recovery=recovery,
+        recovery_execution=recovery_execution,
+        post_recovery=post_recovery,
+        **_closure_decision(),
+    )
+
+    assert result.outcome is RepositoryClosureOutcome.CLOSED
+    assert result.closure_path is RepositoryClosurePath.RECOVERY
+    assert result.closes_migration_lifecycle is True
+    assert all(item.passed for item in result.checks)
+
+
+def test_direct_closure_service_cannot_bypass_incomplete_recovery(tmp_path):
+    (
+        plan, execution, post, recovery, recovery_execution, _post_recovery,
+    ) = _recovery_closure_contract(tmp_path)
+
+    with pytest.raises(ValueError, match="Complete recovery closure artifacts"):
+        RepositoryEvolutionClosureAuditor().audit(
+            plan,
+            execution,
+            post,
+            recovery=recovery,
+            recovery_execution=recovery_execution,
+            post_recovery=None,
+            **_closure_decision(),
+        )
