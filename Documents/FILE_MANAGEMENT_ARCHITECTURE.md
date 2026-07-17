@@ -448,6 +448,50 @@ not a committed generated registry or a compliance decision. The partial and
 unassigned counts are explicit input for later verification work; FMA-003 does
 not silently invent missing policy.
 
+## FMA-004 implementation traceability
+
+FMA-004 adds report-only placement and naming verification to Repository
+Management:
+
+- immutable policy-evaluation and repository-verification report contracts:
+  `AI-Gateway/app/architecture/repository/verification_models.py`;
+- placement, extension, naming, temporal-exception, and provenance evaluation:
+  `AI-Gateway/app/architecture/repository/placement_naming_verifier.py`; and
+- conformance, finding, uncovered-scope, multi-policy, exception, tamper,
+  direct-invocation, schema, and dependency-boundary tests:
+  `AI-Gateway/app/architecture/tests/test_repository_placement_naming_verifier.py`.
+
+Every evaluation is bound to the file identity, path, content hash, policy
+identity and version, source registry, policy bundle, revision, and evaluation
+date. All matching policies are evaluated. Missing placement or naming policy
+is recorded as `not_evaluated`; it is never silently converted to conformance.
+An active exception produces an attributable `excepted` outcome. A future or
+expired exception cannot suppress a finding.
+
+The report mode is permanently explicit as `report_only`, and
+`is_compliance_decision` is always false. FMA-004 does not construct an
+`ArchitectureViolation`, synthesize an `ArchitectureLaw`, register with the
+Compliance Engine, alter the Architecture Graph, or activate a blocking CI
+gate.
+
+The first read-only working-tree verification evaluated 446 files through 892
+domain evaluations:
+
+| Evaluation outcome | Count |
+| --- | ---: |
+| Naming conforms | 324 |
+| Naming not evaluated | 122 |
+| Placement conforms | 168 |
+| Placement finding | 2 |
+| Placement not evaluated | 276 |
+
+No exception was active. Two existing placement findings remain explicit:
+`deploy/backup/Dockerfile` and `deploy/stack.env.example` do not use extensions
+currently allowed by `FMA-PLACEMENT-DEPLOY-001`. FMA-004 does not weaken the
+policy or move those files. The working-tree report identity was
+`repository-verification:ResearchOS:703d612b12656c05`; it is transient audit
+evidence, not a committed generated report or compliance decision.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

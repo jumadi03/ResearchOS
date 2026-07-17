@@ -27,6 +27,14 @@ from .file_registry_models import (
     RepositoryFileRegistry,
 )
 from .file_registry_builder import RepositoryFileRegistryBuilder
+from .verification_models import (
+    RepositoryPolicyDomain,
+    RepositoryPolicyEvaluation,
+    RepositoryVerificationMode,
+    RepositoryVerificationOutcome,
+    RepositoryVerificationReport,
+)
+from .placement_naming_verifier import RepositoryPlacementNamingVerifier
 
 __all__ = [
     "RepositoryClassifier",
@@ -48,4 +56,10 @@ __all__ = [
     "RepositoryFileEntry",
     "RepositoryFileRegistry",
     "RepositoryFileRegistryBuilder",
+    "RepositoryPlacementNamingVerifier",
+    "RepositoryPolicyDomain",
+    "RepositoryPolicyEvaluation",
+    "RepositoryVerificationMode",
+    "RepositoryVerificationOutcome",
+    "RepositoryVerificationReport",
 ]

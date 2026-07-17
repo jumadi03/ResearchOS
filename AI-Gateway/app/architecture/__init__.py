@@ -43,6 +43,12 @@ from .repository import (
     RepositoryFileEntry,
     RepositoryFileRegistry,
     RepositoryFileRegistryBuilder,
+    RepositoryPlacementNamingVerifier,
+    RepositoryPolicyDomain,
+    RepositoryPolicyEvaluation,
+    RepositoryVerificationMode,
+    RepositoryVerificationOutcome,
+    RepositoryVerificationReport,
 )
 
 
@@ -81,4 +87,10 @@ __all__ = [
     "RepositoryFileEntry",
     "RepositoryFileRegistry",
     "RepositoryFileRegistryBuilder",
+    "RepositoryPlacementNamingVerifier",
+    "RepositoryPolicyDomain",
+    "RepositoryPolicyEvaluation",
+    "RepositoryVerificationMode",
+    "RepositoryVerificationOutcome",
+    "RepositoryVerificationReport",
 ]
