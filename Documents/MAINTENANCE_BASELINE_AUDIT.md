@@ -266,3 +266,19 @@ does not yet satisfy the operational recovery projection. The report explicitly
 states `ledger_written: false`; admission to the append-only
 `backup_restore_verifications` ledger requires a separate contract review and
 accepted increment.
+
+### Phase 1E implementation traceability
+
+Phase 1E closes the restore-evidence admission gap without coupling the
+isolated drill to the active application. The drill signs a canonical report
+with a local Ed25519 private key. A separate, manually invoked admission
+service receives only the report, public trust registry, and database
+connection; it verifies cryptographic and semantic integrity before calling
+the schema 30 admission function.
+
+Defense in depth remains active after admission. PostgreSQL rejects incomplete
+verified rows and preserves append-only evidence. The recovery projection
+revalidates the stored report and signature against the current trust registry,
+so direct insertion, tampering, key revocation, or stale admission state cannot
+produce operational readiness. Admission is idempotent by content hash and no
+API, UI, worker, scheduler, private-key mount, or active-target path is added.

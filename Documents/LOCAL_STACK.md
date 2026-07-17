@@ -139,6 +139,48 @@ therefore even a `verified` Phase 1D report does not make the operational
 `recovery_ready` projection true. Ledger admission belongs to a separately
 accepted increment.
 
+Phase 1E adds signed restore-evidence admission. A restore report can affect
+`recovery_ready` only after the isolated drill signs the canonical report with
+an Ed25519 private key, the admission command verifies its signature and
+invariants, PostgreSQL admits it through the schema 30 admission function, and
+the recovery projection revalidates it against the live trust registry.
+
+Generate the local signing key once from the repository root:
+
+```powershell
+AI-Gateway\.venv\Scripts\python.exe `
+  deploy\restore\bootstrap_attestation_key.py
+```
+
+The private key is written below `deploy/restore/private/` and must never be
+committed, copied into a report, mounted into the API, or mounted into the
+admission service. Only the public key and
+`deploy/restore/trust/trusted-restore-keys.json` belong in source control.
+
+Run the signed drill using the Phase 1D command above. Its report is written
+below the ignored `deploy/restore/reports/` directory by default. Admit a
+verified report from `deploy` with:
+
+```powershell
+$env:RESTORE_REPORT_PATH = "/restore-reports/restore-drill-report.json"
+docker compose --env-file stack.env -f compose.yaml --profile restore-admission `
+  run --rm restore-admission
+```
+
+Admission is idempotent by report content hash. Tampered reports, unknown or
+revoked keys, partial component sets, mutable target claims, failed cleanup,
+and mismatched backup manifests fail closed. The admission service receives
+only the selected report, public trust material, and database access. It has no
+private signing key, backup volume, active storage target, API route, worker,
+or scheduler.
+
+To revoke a signing key, change its registry status from `active` to `revoked`
+and deploy the updated public trust registry. Live recovery projection then
+withdraws trust from previously admitted evidence signed by that key. Generate
+a new key with a new private-key filename for rotation; the bootstrap command
+preserves existing registry entries and appends the new key. Never overwrite or
+reuse the old private key.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before

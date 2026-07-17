@@ -37,7 +37,7 @@ from app.settings import (
     DATABASE_URL, DATABASE_SCHEMA_VERSION, KNOWLEDGE_DOCUMENT_MAX_BYTES,
     SEMANTIC_SCHOLAR_API_KEY,
     MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_DOCUMENT_BUCKET,
-    READINESS_WORKER_MAX_AGE_SECONDS,
+    READINESS_WORKER_MAX_AGE_SECONDS, RESTORE_TRUST_ROOT,
 )
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
@@ -84,7 +84,10 @@ def create_app() -> FastAPI:
         from app.product.sessions import WorkspaceSessionManager
         from app.product.intelligence import IntelligenceLedger
 
-        app.state.workspace_sessions = WorkspaceSessionManager(DATABASE_URL)
+        app.state.workspace_sessions = WorkspaceSessionManager(
+            DATABASE_URL,
+            restore_trust_root=str(RESTORE_TRUST_ROOT) if RESTORE_TRUST_ROOT else None,
+        )
         app.state.intelligence_ledger = IntelligenceLedger(DATABASE_URL)
     else:
         app.state.workspace_sessions = None

@@ -140,7 +140,7 @@ jobs:
           RESTORE_REPORT_DIR: /tmp/researchos-restore-report
         run: |
           docker compose -f compose.restore-drill.yaml --profile restore-drill config --quiet
-          docker build --progress plain --tag researchos-restore-drill-ci --file Dockerfile ..
+          docker build --progress plain --tag researchos-restore-drill-ci --file Dockerfile ../..
 
   storage-integration:
     name: PostgreSQL and MinIO integration

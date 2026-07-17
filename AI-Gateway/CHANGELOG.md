@@ -7,6 +7,10 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added Phase 1E signed restore-evidence admission with Ed25519 report
+  attestations, a committed public-key trust registry, schema 30 guarded and
+  idempotent ledger admission, and live trust revalidation before
+  `recovery_ready` can become true.
 - Added the Phase 1D isolated restore-drill executor for all six manifest-bound
   backup components. The drill uses an internal-only network, executor-owned
   PostgreSQL database and MinIO bucket, tmpfs targets, read-only backup input,

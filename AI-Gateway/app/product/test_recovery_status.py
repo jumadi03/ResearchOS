@@ -65,7 +65,7 @@ class FakeManager(WorkspaceSessionManager):
 def manager_with_rows(*rows):
     connection = FakeConnection(rows)
     FakeManager.connection = connection
-    return FakeManager("unused"), connection.cursor_instance
+    return FakeManager("unused", restore_trust_root="trust"), connection.cursor_instance
 
 
 def backup_row(*, portable=True, completed=True):
@@ -86,17 +86,29 @@ def backup_row(*, portable=True, completed=True):
 
 
 def verified_restore():
+    report = {
+        "content_hash": "b" * 64,
+        "attestation": {
+            "algorithm": "ed25519",
+            "key_id": "restore-ed25519-test",
+            "signature": "signature",
+        },
+    }
     return (
         VERIFY_ID,
         "isolated",
-        "restore-drill-20260717",
-        ["postgresql", "minio", "knowledge"],
+        "researchos_restore_drill+researchos-restore-drill",
+        ["architecture", "configuration", "knowledge", "migration", "minio", "postgresql"],
         "verified",
         [{"check": "schema", "outcome": "passed"}],
         "operations",
         NOW,
         NOW,
         "b" * 64,
+        report,
+        "ed25519",
+        "restore-ed25519-test",
+        "signature",
     )
 
 
@@ -133,7 +145,11 @@ def test_portable_backup_without_restore_is_not_recovery_ready():
     assert result["recovery_ready"] is False
 
 
-def test_matching_isolated_restore_provides_recovery_provenance():
+def test_matching_isolated_restore_provides_recovery_provenance(monkeypatch):
+    monkeypatch.setattr(
+        "app.product.sessions.verify_signed_report",
+        lambda report, _root: report,
+    )
     manager, cursor = manager_with_rows(backup_row(), verified_restore())
 
     result = manager.recovery_status()
@@ -143,6 +159,7 @@ def test_matching_isolated_restore_provides_recovery_provenance():
     assert result["recovery_ready"] is True
     assert result["latest_restore"]["target_kind"] == "isolated"
     assert result["latest_restore"]["content_hash"] == "b" * 64
+    assert result["latest_restore"]["trust_valid"] is True
     assert cursor.executions[1][1] == (BACKUP_ID, SET_HASH)
 
 
@@ -155,3 +172,13 @@ def test_failed_restore_cannot_claim_recovery_readiness():
 
     assert result["restore_verified"] is False
     assert result["recovery_ready"] is False
+
+
+def test_untrusted_verified_row_cannot_claim_recovery_readiness():
+    manager, _ = manager_with_rows(backup_row(), verified_restore())
+
+    result = manager.recovery_status()
+
+    assert result["restore_verified"] is False
+    assert result["recovery_ready"] is False
+    assert result["latest_restore"]["trust_valid"] is False

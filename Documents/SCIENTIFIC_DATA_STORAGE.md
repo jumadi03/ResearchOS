@@ -363,6 +363,21 @@ component checks, outcome, cleanup result, and a content hash. Phase 1D does
 not insert that report into `backup_restore_verifications`, expose an API,
 schedule execution, or assert operational recovery readiness.
 
+DATA maintenance Phase 1E introduces the separately reviewed admission
+boundary. The drill signs its canonical report with a local Ed25519 private
+key. Admission verifies that signature against a versioned public trust
+registry, revalidates the fixed isolated target, exact six-component evidence,
+successful cleanup, backup identity, manifest binding, and content hash, and
+then calls the schema 30 admission function. Replay of the same report is
+idempotent by content hash.
+
+The database guard rejects partial or structurally forged `verified` rows.
+Cryptographic trust is also revalidated by the live recovery projection, so a
+raw database insert, stale trust decision, revoked key, or modified report
+cannot produce `recovery_ready`. The signing key is available only to the
+isolated drill; the API and admission service mount public trust material only.
+No admission API, UI action, worker job, or scheduler is introduced.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly
