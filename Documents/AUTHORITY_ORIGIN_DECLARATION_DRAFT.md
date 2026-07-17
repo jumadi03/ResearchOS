@@ -3,7 +3,7 @@
 ## Status
 
 - Document status: draft awaiting exact project-owner review
-- Version: 0.1 draft
+- Version: 0.2 corrected draft
 - Identifier: not assigned
 - Classification: authority-origin evidence declaration draft
 - Declarant: Jumadi
@@ -15,6 +15,10 @@
 - Recorded: 2026-07-18
 - Repository basis revision:
   `8345375b9d5eb94fcd116b171c6ecf5fa41d91c8`
+- Predecessor normalized UTF-8/LF SHA-256:
+  `1713e227a52828bee40fc86e9b54e796854523a01307b9bdf0a1fc9198352a5a`
+- Correction basis:
+  `Documents/AUTHORITY_ORIGIN_DECLARATION_ARCHITECTURE_REVIEW.md`
 
 This draft records factual statements supplied by Jumadi concerning the origin,
 ownership, maintenance, and present decision scope of ResearchOS. It does not
@@ -53,6 +57,9 @@ Subject to exact review and confirmation of this draft, Jumadi declares:
    about science, technology, and artificial intelligence.
 10. ChatGPT and Codex assist me with analysis, writing, implementation, and
     verification.
+11. I am not aware of any actual conflict of interest concerning my present
+    work on ResearchOS.
+12. An independent reviewer is not currently available.
 
 These statements describe the declarant's current factual account. They do not
 by themselves determine the legal or normative effect of ownership,
@@ -182,12 +189,16 @@ As a result, the same person may presently:
 This concentration is disclosed as an operating fact. It creates:
 
 - an independence limitation;
-- a conflict-of-interest risk;
 - a continuity risk;
 - a key-person risk; and
 - a review-concentration risk.
 
-The declaration does not conceal or resolve these risks.
+No actual conflict of interest is known. The limitation is that independent
+human review is not currently available because ResearchOS has one owner and
+maintainer and no formal team.
+
+The declaration does not conceal or resolve the review-independence or
+continuity risks.
 
 AI assistance does not change the sole-owner and sole-maintainer status because
 the assisting systems do not independently own, accept, or govern the project.
@@ -223,17 +234,23 @@ Accordingly:
 This absence is a recorded continuity gap, not an implicit transfer to a
 maintainer, contributor, administrator, AI system, or service account.
 
-## 11. Conflict-of-Interest and Recusal Status
+## 11. Review Independence and Recusal Status
+
+No actual conflict of interest is known.
+
+An independent human reviewer is not currently available. ResearchOS has no
+formal team, and sole ownership and sole maintenance combine proposal,
+analytical review, operational control, and project-direction functions in
+Jumadi.
 
 No formal project-governance conflict-of-interest or recusal mechanism
-currently exists.
+currently exists. This statement records a review-independence limitation; it
+does not assert that an actual conflict exists or create a recusal procedure.
 
-The declarant acknowledges that sole ownership and sole maintenance can combine
-proposal, review, operational control, and project-direction functions in one
-person.
-
-This acknowledgment does not create a recusal procedure. Later governance must
-address how decisions requiring independence are handled.
+If a decision later requires independent human review, its independence must
+be recorded as unavailable until a qualified independent reviewer actually
+participates. ChatGPT, Codex, another AI system, automation, or a runtime role
+must not be represented as that reviewer.
 
 ## 12. Account and Credential Boundary
 
@@ -296,7 +313,7 @@ The declaration has the following limitations:
   included;
 - no legal-entity structure is declared;
 - no jurisdictional claim is made;
-- no independent reviewer is presently identified; and
+- an independent reviewer is not currently available; and
 - no delegation, succession, recusal, or appeal governance exists.
 
 ## 16. Source of Factual Statements
@@ -313,7 +330,9 @@ collaboration session on 2026-07-18:
 - formal delegation or successor: none;
 - ResearchOS is a hobby project motivated by curiosity about science,
   technology, and AI; and
-- ChatGPT and Codex assist with the work.
+- ChatGPT and Codex assist with the work;
+- no actual conflict of interest is known; and
+- an independent reviewer is not currently available.
 
 The active collaboration session is the immediate source of these statements.
 No immutable external URL for that interaction is represented by this draft.
@@ -332,6 +351,8 @@ evidence, Jumadi must review the exact draft and confirm:
 - absence of formal delegation;
 - absence of a formal successor;
 - the project motivation and AI-assistance statements;
+- the absence of any known actual conflict of interest;
+- the unavailability of an independent reviewer;
 - disclosure of role concentration and limitations; and
 - every stated non-effect.
 
@@ -353,7 +374,7 @@ Confirmation would not:
 - make it canonical or binding;
 - create an authority office;
 - create delegation or succession;
-- resolve conflict of interest;
+- create conflict-of-interest or recusal governance;
 - authorize implementation or activation;
 - establish precedence; or
 - permit self-ratification by a later authority instrument.
@@ -369,19 +390,22 @@ This declaration must be reconsidered if:
 - the presently exercised scope changes;
 - an identity statement is corrected;
 - formal authority governance is established;
-- independent identity evidence becomes available; or
+- independent identity evidence becomes available;
+- an independent reviewer becomes available;
+- an actual conflict of interest is identified; or
 - any declared fact is disputed.
 
 ## 20. Next Dependency
 
-After exact factual confirmation, the declaration may become evidence for an
-Architecture Review of authority origin and identity.
+After exact factual confirmation, the declaration may be recorded as confirmed
+authority-origin evidence with all limitations preserved.
 
 The later sequence remains:
 
 ```text
-Authority Origin Declaration
-  -> evidence and Architecture Review
+corrected Authority Origin Declaration
+  -> exact factual confirmation
+  -> confirmed origin evidence record
   -> authority-governance proposal
   -> independent decision-boundary review
 ```
@@ -398,6 +422,9 @@ The draft is ready for exact project-owner review when:
 - sole-owner concentration is disclosed;
 - project motivation and AI assistance are recorded without transferring
   ownership or authority;
+- no known actual conflict is distinguished from review-independence
+  limitation;
+- independent-reviewer unavailability is explicit;
 - delegation and succession absence are explicit;
 - authority laundering and self-ratification are prohibited;
 - evidence limitations are recorded;
