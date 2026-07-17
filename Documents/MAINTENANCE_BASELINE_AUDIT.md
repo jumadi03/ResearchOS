@@ -282,3 +282,18 @@ revalidates the stored report and signature against the current trust registry,
 so direct insertion, tampering, key revocation, or stale admission state cannot
 produce operational readiness. Admission is idempotent by content hash and no
 API, UI, worker, scheduler, private-key mount, or active-target path is added.
+
+### Phase 1F-A implementation traceability
+
+Phase 1F-A prevents indefinitely old restore evidence from sustaining an
+operational readiness claim. The live recovery projection now separates
+cryptographic validity (`restore_verified`) from bounded temporal validity
+(`restore_fresh`). `recovery_ready` requires both, along with the matching
+portable backup-set integrity proof.
+
+The maximum age and future clock-skew allowance are positive, server-owned
+configuration. Exact-boundary evidence is accepted; stale evidence and
+timestamps beyond the allowed future skew fail closed with explicit reasons.
+The immutable evidence remains unchanged, and this increment introduces no
+scheduler, worker job, orchestration service, private-key exposure, database
+migration, or direct admission path.

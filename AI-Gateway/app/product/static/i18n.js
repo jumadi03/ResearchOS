@@ -22,6 +22,10 @@ const UI_TRANSLATIONS={
 const UI_PHRASES={
 "Portable backup-set integrity verified":"Integritas paket cadangan portabel terverifikasi",
 "Isolated restore verified":"Pemulihan terisolasi terverifikasi",
+"Restore evidence is fresh":"Bukti pemulihan masih mutakhir",
+"Backup integrity and fresh isolated restore evidence are verified":"Integritas cadangan dan bukti pemulihan terisolasi yang mutakhir telah terverifikasi",
+"Verified restore evidence is stale; run a new isolated restore":"Bukti pemulihan terverifikasi telah kedaluwarsa; jalankan pemulihan terisolasi yang baru",
+"Verified restore evidence timestamp is too far in the future":"Waktu bukti pemulihan terverifikasi terlalu jauh di masa depan",
 "Backup integrity and isolated restore are verified":"Integritas cadangan dan pemulihan terisolasi telah terverifikasi",
 "Backup integrity is verified; isolated restore is not verified":"Integritas cadangan terverifikasi; pemulihan terisolasi belum terverifikasi",
 "Legacy backup checks passed; portable backup-set integrity is not verified":"Pemeriksaan cadangan lama lulus; integritas paket cadangan portabel belum terverifikasi",

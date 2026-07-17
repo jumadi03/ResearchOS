@@ -62,10 +62,23 @@ class FakeManager(WorkspaceSessionManager):
         return type(self).connection
 
 
-def manager_with_rows(*rows):
+def manager_with_rows(
+    *rows,
+    max_age_seconds=604_800,
+    clock_skew_seconds=300,
+):
     connection = FakeConnection(rows)
     FakeManager.connection = connection
-    return FakeManager("unused", restore_trust_root="trust"), connection.cursor_instance
+    return (
+        FakeManager(
+            "unused",
+            restore_trust_root="trust",
+            restore_evidence_max_age_seconds=max_age_seconds,
+            restore_evidence_clock_skew_seconds=clock_skew_seconds,
+            clock=lambda: NOW,
+        ),
+        connection.cursor_instance,
+    )
 
 
 def backup_row(*, portable=True, completed=True):
@@ -85,7 +98,7 @@ def backup_row(*, portable=True, completed=True):
     )
 
 
-def verified_restore():
+def verified_restore(*, completed_at=NOW):
     report = {
         "content_hash": "b" * 64,
         "attestation": {
@@ -102,8 +115,8 @@ def verified_restore():
         "verified",
         [{"check": "schema", "outcome": "passed"}],
         "operations",
-        NOW,
-        NOW,
+        completed_at,
+        completed_at,
         "b" * 64,
         report,
         "ed25519",
@@ -156,10 +169,13 @@ def test_matching_isolated_restore_provides_recovery_provenance(monkeypatch):
 
     assert result["backup_integrity_ready"] is True
     assert result["restore_verified"] is True
+    assert result["restore_fresh"] is True
     assert result["recovery_ready"] is True
     assert result["latest_restore"]["target_kind"] == "isolated"
     assert result["latest_restore"]["content_hash"] == "b" * 64
     assert result["latest_restore"]["trust_valid"] is True
+    assert result["latest_restore"]["fresh"] is True
+    assert result["latest_restore"]["age_seconds"] == 0
     assert cursor.executions[1][1] == (BACKUP_ID, SET_HASH)
 
 
@@ -182,3 +198,67 @@ def test_untrusted_verified_row_cannot_claim_recovery_readiness():
     assert result["restore_verified"] is False
     assert result["recovery_ready"] is False
     assert result["latest_restore"]["trust_valid"] is False
+
+
+def test_stale_signed_restore_cannot_claim_recovery_readiness(monkeypatch):
+    monkeypatch.setattr(
+        "app.product.sessions.verify_signed_report",
+        lambda report, _root: report,
+    )
+    stale = NOW.replace(day=9)
+    manager, _ = manager_with_rows(
+        backup_row(),
+        verified_restore(completed_at=stale),
+    )
+
+    result = manager.recovery_status()
+
+    assert result["restore_verified"] is True
+    assert result["restore_fresh"] is False
+    assert result["recovery_ready"] is False
+    assert result["latest_restore"]["fresh"] is False
+    assert result["latest_restore"]["age_seconds"] == 691_200
+    assert result["latest_restore"]["fresh_until"].startswith("2026-07-16")
+    assert result["message"] == (
+        "Verified restore evidence is stale; run a new isolated restore"
+    )
+
+
+def test_restore_at_exact_freshness_boundary_is_accepted(monkeypatch):
+    monkeypatch.setattr(
+        "app.product.sessions.verify_signed_report",
+        lambda report, _root: report,
+    )
+    boundary = NOW.replace(day=10)
+    manager, _ = manager_with_rows(
+        backup_row(),
+        verified_restore(completed_at=boundary),
+    )
+
+    result = manager.recovery_status()
+
+    assert result["latest_restore"]["age_seconds"] == 604_800
+    assert result["restore_fresh"] is True
+    assert result["recovery_ready"] is True
+
+
+def test_restore_timestamp_beyond_clock_skew_is_rejected(monkeypatch):
+    monkeypatch.setattr(
+        "app.product.sessions.verify_signed_report",
+        lambda report, _root: report,
+    )
+    future = NOW.replace(minute=6)
+    manager, _ = manager_with_rows(
+        backup_row(),
+        verified_restore(completed_at=future),
+    )
+
+    result = manager.recovery_status()
+
+    assert result["restore_verified"] is True
+    assert result["restore_fresh"] is False
+    assert result["recovery_ready"] is False
+    assert result["latest_restore"]["age_seconds"] == -360
+    assert result["message"] == (
+        "Verified restore evidence timestamp is too far in the future"
+    )

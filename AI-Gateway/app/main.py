@@ -38,6 +38,7 @@ from app.settings import (
     SEMANTIC_SCHOLAR_API_KEY,
     MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_DOCUMENT_BUCKET,
     READINESS_WORKER_MAX_AGE_SECONDS, RESTORE_TRUST_ROOT,
+    RESTORE_EVIDENCE_MAX_AGE_SECONDS, RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS,
 )
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.repositories.postgres import PostgresScientificDataRepository
@@ -87,6 +88,8 @@ def create_app() -> FastAPI:
         app.state.workspace_sessions = WorkspaceSessionManager(
             DATABASE_URL,
             restore_trust_root=str(RESTORE_TRUST_ROOT) if RESTORE_TRUST_ROOT else None,
+            restore_evidence_max_age_seconds=RESTORE_EVIDENCE_MAX_AGE_SECONDS,
+            restore_evidence_clock_skew_seconds=RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS,
         )
         app.state.intelligence_ledger = IntelligenceLedger(DATABASE_URL)
     else:

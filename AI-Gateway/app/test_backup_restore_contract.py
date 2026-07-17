@@ -61,6 +61,8 @@ def test_administration_ui_uses_restore_verified_recovery_semantics():
     assert "ready=r.recovery_ready===true" in script
     assert "Portable backup-set integrity verified" in script
     assert "Isolated restore verified" in script
+    assert "r.restore_fresh" in script
+    assert "Restore evidence is fresh" in script
     assert "${r.ready?" not in script
 
 

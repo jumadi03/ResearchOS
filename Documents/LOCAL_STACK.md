@@ -181,6 +181,26 @@ a new key with a new private-key filename for rotation; the bootstrap command
 preserves existing registry entries and appends the new key. Never overwrite or
 reuse the old private key.
 
+Phase 1F-A adds a live freshness gate without introducing a scheduler.
+`restore_verified` continues to mean that the matching evidence is
+cryptographically valid and currently trusted. `restore_fresh` separately
+means its completion time is no older than
+`RESTORE_EVIDENCE_MAX_AGE_SECONDS` and is not farther into the future than
+`RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS`. Operational `recovery_ready` requires
+both values plus portable backup integrity.
+
+The defaults are seven days and five minutes respectively:
+
+```dotenv
+RESTORE_EVIDENCE_MAX_AGE_SECONDS=604800
+RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS=300
+```
+
+Evidence at the exact maximum-age boundary remains fresh. Evidence beyond that
+boundary or beyond the allowed future clock skew fails closed with an explicit
+reason. Changing the configured maximum age affects the live projection only;
+it never mutates or deletes the immutable signed evidence.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before
