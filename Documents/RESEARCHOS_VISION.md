@@ -10,6 +10,7 @@
 - Recorded: 2026-07-17
 - Scope: long-term identity, direction, and success criteria
 - Related documents: `README.md`,
+  `Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md`,
   `Documents/SCIENTIFIC_KNOWLEDGE_ROADMAP.md`,
   `Documents/INTERNET_DISCOVERY_ROADMAP.md`,
   `Documents/SCIENTIFIC_DATA_STORAGE.md`, and
@@ -151,6 +152,13 @@ AI juga harus dapat diganti tanpa mengubah scientific authority. AI membantu
 discovery, extraction, analysis, explanation, dan drafting, tetapi tidak
 meratifikasi evidence, menetapkan kebenaran, atau melewati governance.
 
+Kemandirian jangka panjang ResearchOS tidak bergantung pada pembangunan model
+bahasa sendiri. Model bahasa diposisikan sebagai Language Layer yang dapat
+diganti, sedangkan discovery, evidence, provenance, knowledge, deterministic
+reasoning, validation, measurement, workflow, dan governance berkembang
+sebagai kemampuan asli ResearchOS. Tahapan evolusi ini dicatat dalam
+`Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md`.
+
 ## Architecture as an Inspectable System
 
 ResearchOS juga memandang arsitektur perangkat lunak sebagai objek yang dapat
@@ -231,4 +239,3 @@ Identitas ResearchOS tidak ditentukan oleh penggunaan AI. Identitasnya
 ditentukan oleh kemampuannya membuat proses lahirnya pengetahuan ilmiah
 menjadi eksplisit, dapat diaudit, reproducible, governed, dan tetap berada di
 bawah otoritas manusia.
-
