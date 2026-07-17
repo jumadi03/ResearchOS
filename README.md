@@ -114,6 +114,7 @@ schema and persistence, and dependency-security gates.
 - [Architecture governance](Documents/ARCHITECTURE_GOVERNANCE.md)
 - [File management architecture](Documents/FILE_MANAGEMENT_ARCHITECTURE.md)
 - [File management completion and safety baseline](Documents/FILE_MANAGEMENT_SAFETY_BASELINE.md)
+- [One File — One Architectural Responsibility audit](Documents/ONE_FILE_ONE_ARCHITECTURAL_RESPONSIBILITY.md)
 - [Storage compliance report](Documents/STORAGE_COMPLIANCE_REPORT.md)
 - [AI Gateway details](AI-Gateway/README.md)
 
