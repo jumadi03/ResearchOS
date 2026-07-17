@@ -266,11 +266,19 @@ class RepositoryTraceabilityGraphBuilder:
                 {"exact_path": node.source_path},
             ))
 
-        registered_file_ids = {item.file_id for item in registry.entries}
+        registered_files = {item.file_id: item for item in registry.entries}
         for evaluation in verification.evaluations:
-            if evaluation.file_id not in registered_file_ids:
+            registered = registered_files.get(evaluation.file_id)
+            if registered is None:
                 raise ValueError(
                     "Repository evaluation references an unknown file identity"
+                )
+            if (
+                evaluation.path != registered.current_path
+                or evaluation.content_hash != registered.content_hash
+            ):
+                raise ValueError(
+                    "Repository evaluation file provenance does not match"
                 )
             add_node(ArchitectureNode(
                 node_id=evaluation.evaluation_id,

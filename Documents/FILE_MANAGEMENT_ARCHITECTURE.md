@@ -548,6 +548,59 @@ and source is guessed from names, no roadmap or vision relationship is
 invented, and Repository Evaluation remains distinct from Architecture
 Compliance.
 
+## FMA-006 implementation traceability
+
+FMA-006 adds deterministic, report-only Repository Health assessment:
+
+- content-addressed health category, outcome, check, and report contracts:
+  `AI-Gateway/app/architecture/repository/health_models.py`;
+- fail-safe aggregation with registry, policy-evaluation, and graph provenance
+  gates:
+  `AI-Gateway/app/architecture/repository/health_engine.py`; and
+- leakage, governance, policy coverage, duplication, structural test
+  presence, unavailable evidence, tamper, serialization, and dependency-
+  boundary tests:
+  `AI-Gateway/app/architecture/tests/test_repository_health.py`.
+
+Health outcomes are explicit: `observed`, `finding`, `advisory`, and
+`not_evaluated`. A report containing any `not_evaluated` category has aggregate
+status `INCOMPLETE`; finding counts and affected evidence remain visible.
+Repository Health does not produce a score or Architecture Compliance
+decision.
+
+Tracked generated or temporary content, unknown classification, incomplete
+governance, repository-policy findings, and missing policy coverage are
+deterministic findings. Non-empty byte-identical content and capabilities with
+code but no owned test file are advisory observations only. Empty files are
+excluded from substantive duplicate detection.
+
+Dead-file analysis, staleness, execution or branch coverage, and documentation
+coverage remain `not_evaluated` until revision-bound canonical evidence exists.
+An absent import edge does not prove a dead file; structural test presence does
+not prove execution coverage; a `deprecate` lifecycle policy does not prove
+that a file is stale or already deprecated.
+
+The first read-only working-tree assessment covered 451 files and produced:
+
+| Health outcome | Categories |
+| --- | ---: |
+| Finding | 3 |
+| Advisory | 1 |
+| Observed | 4 |
+| Not evaluated | 4 |
+
+Deterministic findings covered 145 files with partial or unassigned
+governance, 347 distinct files outside one or both placement/naming policy
+domains, and two existing placement-policy findings. There was no tracked
+generated/temporary leakage, unknown classification, active policy exception,
+or non-empty exact duplicate. Structural test presence remained advisory for
+`Runtime Execution` and `Deployment and Operations`.
+
+The transient working-tree report identity was
+`repository-health:ResearchOS:415f891f4767532b`. It is audit evidence only:
+no generated health report is committed, no file is moved or deleted, and no
+advisory authorizes repository mutation.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

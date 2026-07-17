@@ -90,6 +90,9 @@ FILE_REGISTRY_SCHEMA = SchemaPolicy(
 REPOSITORY_VERIFICATION_SCHEMA = SchemaPolicy(
     "Repository Verification Report", "1.0", frozenset({"1.0"})
 )
+REPOSITORY_HEALTH_SCHEMA = SchemaPolicy(
+    "Repository Health Report", "1.0", frozenset({"1.0"})
+)
 COMPLIANCE_SCHEMA = SchemaPolicy(
     "Compliance Report", "1.0", frozenset({"0.9", "1.0"})
 )

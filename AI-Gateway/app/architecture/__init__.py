@@ -50,6 +50,11 @@ from .repository import (
     RepositoryVerificationOutcome,
     RepositoryVerificationReport,
     RepositoryTraceabilityGraphBuilder,
+    RepositoryHealthCategory,
+    RepositoryHealthCheck,
+    RepositoryHealthEngine,
+    RepositoryHealthOutcome,
+    RepositoryHealthReport,
 )
 
 
@@ -95,4 +100,9 @@ __all__ = [
     "RepositoryVerificationOutcome",
     "RepositoryVerificationReport",
     "RepositoryTraceabilityGraphBuilder",
+    "RepositoryHealthCategory",
+    "RepositoryHealthCheck",
+    "RepositoryHealthEngine",
+    "RepositoryHealthOutcome",
+    "RepositoryHealthReport",
 ]

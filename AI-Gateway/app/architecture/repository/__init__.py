@@ -36,6 +36,13 @@ from .verification_models import (
 )
 from .placement_naming_verifier import RepositoryPlacementNamingVerifier
 from .traceability_graph_builder import RepositoryTraceabilityGraphBuilder
+from .health_models import (
+    RepositoryHealthCategory,
+    RepositoryHealthCheck,
+    RepositoryHealthOutcome,
+    RepositoryHealthReport,
+)
+from .health_engine import RepositoryHealthEngine
 
 __all__ = [
     "RepositoryClassifier",
@@ -64,4 +71,9 @@ __all__ = [
     "RepositoryVerificationOutcome",
     "RepositoryVerificationReport",
     "RepositoryTraceabilityGraphBuilder",
+    "RepositoryHealthCategory",
+    "RepositoryHealthCheck",
+    "RepositoryHealthEngine",
+    "RepositoryHealthOutcome",
+    "RepositoryHealthReport",
 ]
