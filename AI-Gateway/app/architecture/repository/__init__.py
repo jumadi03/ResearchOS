@@ -79,6 +79,12 @@ from .evolution_executor import (
     RepositoryEvolutionExecutor,
     RepositoryFileMover,
 )
+from .evolution_post_verification import (
+    RepositoryEvolutionPostVerification,
+    RepositoryEvolutionPostVerifier,
+    RepositoryPostVerificationCheck,
+    RepositoryPostVerificationOutcome,
+)
 
 __all__ = [
     "RepositoryClassifier",
@@ -139,4 +145,8 @@ __all__ = [
     "RepositoryExecutionStatus",
     "RepositoryFileMover",
     "NoOverwriteFileMover",
+    "RepositoryEvolutionPostVerification",
+    "RepositoryEvolutionPostVerifier",
+    "RepositoryPostVerificationCheck",
+    "RepositoryPostVerificationOutcome",
 ]

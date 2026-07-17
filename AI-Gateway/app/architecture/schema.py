@@ -108,6 +108,9 @@ REPOSITORY_EVOLUTION_DRY_RUN_SCHEMA = SchemaPolicy(
 REPOSITORY_EVOLUTION_EXECUTION_SCHEMA = SchemaPolicy(
     "Repository Evolution Execution", "1.0", frozenset({"1.0"})
 )
+REPOSITORY_EVOLUTION_POST_VERIFICATION_SCHEMA = SchemaPolicy(
+    "Repository Evolution Post Verification", "1.0", frozenset({"1.0"})
+)
 COMPLIANCE_SCHEMA = SchemaPolicy(
     "Compliance Report", "1.0", frozenset({"0.9", "1.0"})
 )

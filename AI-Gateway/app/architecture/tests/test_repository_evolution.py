@@ -4,14 +4,17 @@ import os
 
 import pytest
 
-from app.architecture.models import ArchitectureGraph
+from app.architecture.models import ArchitectureGraph, ArchitectureNode
 from app.architecture.repository import (
+    FileContinuityEvent,
     FileGovernanceState,
     RepositoryEvolutionDecision,
     RepositoryEvolutionDryRun,
     RepositoryEvolutionDryRunEngine,
     RepositoryEvolutionExecution,
     RepositoryEvolutionExecutor,
+    RepositoryEvolutionPostVerification,
+    RepositoryEvolutionPostVerifier,
     RepositoryEvolutionPlan,
     RepositoryEvolutionPlanner,
     RepositoryEvolutionPreflight,
@@ -23,6 +26,7 @@ from app.architecture.repository import (
     RepositoryMove,
     RepositoryPreflightOutcome,
     RepositoryExecutionStatus,
+    RepositoryPostVerificationOutcome,
     NoOverwriteFileMover,
 )
 
@@ -508,3 +512,193 @@ def test_executor_rejects_cross_contract_provenance_before_mutation(tmp_path):
             other_plan, preflight, dry_run,
         )
     assert (tmp_path / "docs/a.md").read_bytes() == b"alpha\n"
+
+
+def _post_migration_state(root):
+    plan, preflight, dry_run = _execution_contract(root)
+    execution = RepositoryEvolutionExecutor(root).execute(
+        plan, preflight, dry_run,
+    )
+    before = _registry()
+    moved = plan.moves[0]
+    entries = tuple(
+        replace(
+            entry,
+            current_path=moved.target_path,
+            content_hash=moved.content_hash,
+            size=len(b"alpha\n"),
+            previous_paths=(moved.source_path,),
+        )
+        if entry.file_id == moved.file_id
+        else entry
+        for entry in before.entries
+    )
+    continuity = FileContinuityEvent(
+        "", moved.file_id, moved.source_path, moved.target_path,
+        moved.content_hash, moved.content_hash, "r1", "r2",
+        "architecture", "Verified isolated repository migration.",
+        "2026-07-17T18:00:00+08:00",
+    ).finalized()
+    registry = RepositoryFileRegistry(
+        "", "ResearchOS", "r2", "inventory:r2", "e" * 64,
+        before.policy_bundle_id, before.policy_bundle_hash,
+        entries, (continuity,),
+    ).finalized()
+    project = ArchitectureNode(
+        "project:ResearchOS", "Project", "ResearchOS",
+        metadata={
+            "repository_traceability": {
+                "registry_id": registry.registry_id,
+                "registry_hash": registry.content_hash,
+            },
+        },
+    )
+    file_nodes = tuple(
+        ArchitectureNode(
+            entry.file_id, "File", entry.current_path,
+            source_path=entry.current_path,
+            metadata={"content_hash": entry.content_hash},
+        )
+        for entry in registry.entries
+    )
+    graph = ArchitectureGraph(
+        "", "ResearchOS", (project, *file_nodes),
+        source_revision="r2",
+    ).finalized()
+    return plan, execution, registry, graph
+
+
+def test_post_verifier_proves_canonical_continuity_and_graph_provenance(
+    tmp_path,
+):
+    plan, execution, registry, graph = _post_migration_state(tmp_path)
+
+    result = RepositoryEvolutionPostVerifier().verify(
+        plan, execution, registry, graph,
+    )
+
+    assert result.outcome is RepositoryPostVerificationOutcome.VERIFIED
+    assert result.verify()
+    assert all(item.passed for item in result.checks)
+    assert result.registry_hash == registry.content_hash
+    assert result.graph_hash == graph.content_hash
+    assert result.authorizes_production_activation is False
+    assert RepositoryEvolutionPostVerification.from_json(
+        result.to_json()
+    ) == result
+
+
+def test_post_verifier_blocks_missing_continuity_event(tmp_path):
+    plan, execution, registry, graph = _post_migration_state(tmp_path)
+    without_event = replace(registry, continuity_events=()).finalized()
+    project = graph.nodes[0]
+    updated_project = replace(
+        project,
+        metadata={
+            "repository_traceability": {
+                "registry_id": without_event.registry_id,
+                "registry_hash": without_event.content_hash,
+            },
+        },
+    )
+    updated_graph = replace(
+        graph, nodes=(updated_project, *graph.nodes[1:]),
+    ).finalized()
+
+    result = RepositoryEvolutionPostVerifier().verify(
+        plan, execution, without_event, updated_graph,
+    )
+
+    assert result.outcome is RepositoryPostVerificationOutcome.BLOCKED
+    failed = {item.check_id for item in result.checks if not item.passed}
+    assert failed == {"continuity_complete"}
+
+
+@pytest.mark.parametrize(
+    "mutation,expected_check",
+    [
+        ("stale_graph_revision", "graph_revision_current"),
+        ("missing_file_node", "graph_file_traceability_current"),
+        ("stale_registry_provenance", "graph_registry_provenance_current"),
+    ],
+)
+def test_post_verifier_blocks_stale_or_incomplete_graph(
+    tmp_path, mutation, expected_check,
+):
+    plan, execution, registry, graph = _post_migration_state(tmp_path)
+    if mutation == "stale_graph_revision":
+        graph = replace(graph, source_revision="r1").finalized()
+    elif mutation == "missing_file_node":
+        graph = replace(
+            graph,
+            nodes=tuple(
+                node for node in graph.nodes
+                if node.node_id != plan.moves[0].file_id
+            ),
+        ).finalized()
+    else:
+        project = graph.nodes[0]
+        graph = replace(
+            graph,
+            nodes=(
+                replace(
+                    project,
+                    metadata={
+                        "repository_traceability": {
+                            "registry_id": registry.registry_id,
+                            "registry_hash": "0" * 64,
+                        },
+                    },
+                ),
+                *graph.nodes[1:],
+            ),
+        ).finalized()
+
+    result = RepositoryEvolutionPostVerifier().verify(
+        plan, execution, registry, graph,
+    )
+
+    assert result.outcome is RepositoryPostVerificationOutcome.BLOCKED
+    assert expected_check in {
+        item.check_id for item in result.checks if not item.passed
+    }
+
+
+def test_post_verifier_blocks_non_completed_execution(tmp_path):
+    plan, preflight, dry_run = _execution_contract(tmp_path, two_moves=True)
+    execution = RepositoryEvolutionExecutor(
+        tmp_path, mover=_FailingMover({1}),
+    ).execute(plan, preflight, dry_run)
+    registry = _registry()
+    graph = ArchitectureGraph(
+        "", "ResearchOS",
+        nodes=(
+            ArchitectureNode(
+                "project:ResearchOS", "Project", "ResearchOS",
+                metadata={
+                    "repository_traceability": {
+                        "registry_id": registry.registry_id,
+                        "registry_hash": registry.content_hash,
+                    },
+                },
+            ),
+            *(
+                ArchitectureNode(
+                    item.file_id, "File", item.current_path,
+                    source_path=item.current_path,
+                    metadata={"content_hash": item.content_hash},
+                )
+                for item in registry.entries
+            ),
+        ),
+        source_revision="r1",
+    ).finalized()
+
+    result = RepositoryEvolutionPostVerifier().verify(
+        plan, execution, registry, graph,
+    )
+
+    assert result.outcome is RepositoryPostVerificationOutcome.BLOCKED
+    assert "execution_completed" in {
+        item.check_id for item in result.checks if not item.passed
+    }

@@ -763,6 +763,24 @@ wired to an API, worker, deployment volume, or the ResearchOS source root.
 Production activation remains prohibited until post-migration verification
 and recovery governance are separately implemented and accepted.
 
+### FMA-008 post-migration verification
+
+The fifth FMA-008 increment adds canonical-state verification after isolated
+execution:
+
+- only verified execution, plan, File Registry, and Architecture Graph inputs
+  with matching project and execution provenance are accepted;
+- `completed` execution status, advanced revision, stable file identity and
+  content hash, retired source paths, and exact continuity events are checked;
+- the result graph must use the result revision, expose matching File nodes,
+  and carry the exact new registry identity and hash;
+- every check has an explicit reason and any failure produces `blocked`; and
+- a `verified` result remains non-mutating and explicitly does not authorize
+  production activation.
+
+An execution audit alone is therefore insufficient to declare migration
+success. Canonical registry continuity and graph traceability must agree.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;
