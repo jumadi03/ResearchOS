@@ -28,7 +28,18 @@ def main() -> None:
     source_representation = result(
         SECOND_CONTENT, "2026-07-15T13:05:00Z"
     )
-    extraction = manifest(source_representation.content_hash)
+    with repository._connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT decision_key,decision_hash,inspection_manifest_hash
+                FROM screening_decisions
+                WHERE decision_key='screening-repository-healthcheck'
+            """)
+            screening_id, screening_hash, inspection_hash = cursor.fetchone()
+    extraction = manifest(
+        source_representation.content_hash, inspection_hash,
+        screening_id, screening_hash,
+    )
     builder = ScientificKnowledgeGraphBuilder()
     pending_admissions = repository.resolve_evidence_admissions(
         tuple(item.object_id for item in extraction.objects)
@@ -58,11 +69,11 @@ def main() -> None:
         raise AssertionError("Graph builder accepted missing review provenance")
     now = datetime.now(timezone.utc)
     method_review = repository.review_evidence(
-        "healthcheck-method", decision="accepted", reviewer="graph-reviewer@researchos.local",
+        "healthcheck-v11-method", decision="accepted", reviewer="graph-reviewer@researchos.local",
         rationale=f"Accepted for graph healthcheck {timestamp(now)}.", occurred_at=timestamp(now),
     )
     limitation_review = repository.review_evidence(
-        "healthcheck-limitation", decision="accepted", reviewer="graph-reviewer@researchos.local",
+        "healthcheck-v11-limitation", decision="accepted", reviewer="graph-reviewer@researchos.local",
         rationale=f"Accepted for graph healthcheck {timestamp(now)}.",
         occurred_at=timestamp(now + timedelta(seconds=1)),
     )
@@ -101,7 +112,8 @@ def main() -> None:
                 JOIN canonical_objects c ON c.object_id=n.object_id
                 WHERE c.stable_key IN (
                     'doi:10.0000/researchos.repository-healthcheck',
-                    'evidence:healthcheck-method', 'evidence:healthcheck-limitation'
+                    'evidence:healthcheck-v11-method',
+                    'evidence:healthcheck-v11-limitation'
                 )
             """)
             assert cursor.fetchone()[0] == 3
@@ -123,7 +135,7 @@ def main() -> None:
         (graph.graph_id,), generated_by="graph-reviewer@researchos.local",
     )
     repository.review_evidence(
-        "healthcheck-limitation", decision="rejected",
+        "healthcheck-v11-limitation", decision="rejected",
         reviewer="graph-reviewer@researchos.local",
         rationale=f"Revoked after graph healthcheck {timestamp(now)}.",
         occurred_at=timestamp(now + timedelta(seconds=2)),
@@ -162,8 +174,8 @@ def main() -> None:
             """, review_ids)
             states = dict(cursor.fetchall())
     assert states == {
-        "healthcheck-limitation": "rejected",
-        "healthcheck-method": "accepted",
+        "healthcheck-v11-limitation": "rejected",
+        "healthcheck-v11-method": "accepted",
     }, states
     print("canonical graph healthcheck: passed")
 
