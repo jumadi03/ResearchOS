@@ -92,6 +92,23 @@ The optional `--require-complete` flag returns exit code 2 for an incomplete
 matrix. It is intended for a future release gate after all six components are
 implemented; it is not enabled as a passing claim during Phase 1B.
 
+Phase 1C completes backup coverage by adding architecture, configuration, and
+migration archives to every new backup set. Knowledge, architecture,
+configuration, and migration use a bounded three-attempt stable-tree snapshot:
+symbolic links are rejected, source manifests before and after the copy must
+match, and the accepted tree manifest is stored inside the archive.
+
+Configuration backup is allowlisted through explicit read-only mounts and
+contains only `compose.yaml`, `stack.env.example`, and
+`recovery-coverage-v1.json`. The real `stack.env`, local access credentials,
+passwords, and tokens are never mounted into the snapshot source. Migration
+backup contains the migration runner and the versioned SQL directory.
+
+A `COMPLETE` recovery coverage report now means only that all six artifacts are
+present, hash-verified, and ready for an isolated restore drill. It does not
+mean a restore occurred, does not write restore evidence, and does not make
+`recovery_ready` true.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before

@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "deploy/postgres/init/029_backup_restore_contracts.sql"
 BACKUP = ROOT / "deploy/backup/backup.sh"
+COMPOSE = ROOT / "deploy/compose.yaml"
 ADMIN = ROOT / "AI-Gateway/app/product/static/admin.js"
 
 
@@ -27,8 +28,31 @@ def test_backup_producer_publishes_a_hash_bound_portable_manifest():
     assert r'\"name\":\"postgresql\"' in script
     assert r'\"name\":\"minio\"' in script
     assert r'\"name\":\"knowledge\"' in script
+    assert r'\"name\":\"architecture\"' in script
+    assert r'\"name\":\"configuration\"' in script
+    assert r'\"name\":\"migration\"' in script
+    assert "snapshot_tree()" in script
+    assert "write_tree_manifest()" in script
+    assert 'write_tree_manifest "$destination" "$copied"' in script
+    assert 'cmp --silent "$before" "$copied"' in script
+    assert 'cmp --silent "$before" "$after"' in script
+    assert "Symbolic links are prohibited" in script
+    assert "Filesystem did not reach a stable snapshot after 3 attempts" in script
     assert "backup_set_hash='$manifest_hash'" in script
     assert "integrity_verified=true" in script
+
+
+def test_backup_mounts_only_explicit_non_secret_recovery_sources():
+    compose = COMPOSE.read_text(encoding="utf-8")
+
+    assert "architecture_data:/source/architecture:ro" in compose
+    assert "./compose.yaml:/source/configuration/compose.yaml:ro" in compose
+    assert "./stack.env.example:/source/configuration/stack.env.example:ro" in compose
+    assert "recovery-coverage-v1.json:/source/configuration/recovery-coverage-v1.json:ro" in compose
+    assert "./migrate/migrate.sh:/source/migration/migrate.sh:ro" in compose
+    assert "./postgres/init:/source/migration/sql:ro" in compose
+    assert "./stack.env:/source" not in compose
+    assert "local-access.env:/source" not in compose
 
 
 def test_administration_ui_uses_restore_verified_recovery_semantics():
