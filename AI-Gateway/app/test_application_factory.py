@@ -28,3 +28,17 @@ def test_runtime_configuration_rejects_invalid_limits(monkeypatch):
 
     with pytest.raises(RuntimeError, match="timeout and attempts"):
         settings.validate_runtime_configuration()
+
+
+def test_runtime_configuration_rejects_invalid_restore_freshness(monkeypatch):
+    monkeypatch.setattr(settings, "RESTORE_EVIDENCE_MAX_AGE_SECONDS", 0)
+
+    with pytest.raises(RuntimeError, match="MAX_AGE_SECONDS must be positive"):
+        settings.validate_runtime_configuration()
+
+
+def test_runtime_configuration_rejects_negative_restore_clock_skew(monkeypatch):
+    monkeypatch.setattr(settings, "RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS", -1)
+
+    with pytest.raises(RuntimeError, match="CLOCK_SKEW_SECONDS cannot be negative"):
+        settings.validate_runtime_configuration()

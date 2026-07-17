@@ -378,6 +378,18 @@ cannot produce `recovery_ready`. The signing key is available only to the
 isolated drill; the API and admission service mount public trust material only.
 No admission API, UI action, worker job, or scheduler is introduced.
 
+DATA maintenance Phase 1F-A adds freshness as another independent live
+admission condition. A trusted signature remains `restore_verified`, preserving
+the historical fact and its provenance, while `restore_fresh` is calculated
+from the signed completion timestamp and configured maximum age. The
+operational `recovery_ready` projection requires backup integrity, trusted
+verification, and freshness simultaneously.
+
+The projection also rejects completion timestamps beyond a bounded future
+clock-skew allowance. Freshness policy changes do not rewrite the append-only
+restore ledger. This increment does not schedule a drill, add an orchestration
+service, or grant the application access to the private signing key.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly

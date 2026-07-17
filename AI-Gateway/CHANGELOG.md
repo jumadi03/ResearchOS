@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added Phase 1F-A live restore-evidence freshness enforcement, separating
+  trusted cryptographic verification from bounded evidence age and requiring
+  both before `recovery_ready` can become true.
 - Added Phase 1E signed restore-evidence admission with Ed25519 report
   attestations, a committed public-key trust registry, schema 30 guarded and
   idempotent ledger admission, and live trust revalidation before

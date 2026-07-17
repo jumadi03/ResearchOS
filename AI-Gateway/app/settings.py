@@ -85,6 +85,12 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY") or os.getenv("MINIO_ROOT_PASSWO
 MINIO_DOCUMENT_BUCKET = os.getenv("MINIO_DOCUMENT_BUCKET", "researchos-documents")
 _RESTORE_TRUST_ROOT = os.getenv("RESTORE_TRUST_ROOT")
 RESTORE_TRUST_ROOT = Path(_RESTORE_TRUST_ROOT) if _RESTORE_TRUST_ROOT else None
+RESTORE_EVIDENCE_MAX_AGE_SECONDS = int(
+    os.getenv("RESTORE_EVIDENCE_MAX_AGE_SECONDS", "604800")
+)
+RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS = int(
+    os.getenv("RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS", "300")
+)
 
 
 def validate_runtime_configuration() -> None:
@@ -96,6 +102,10 @@ def validate_runtime_configuration() -> None:
         raise RuntimeError("KNOWLEDGE_DOCUMENT_MAX_BYTES must be positive")
     if READINESS_WORKER_MAX_AGE_SECONDS <= 0:
         raise RuntimeError("READINESS_WORKER_MAX_AGE_SECONDS must be positive")
+    if RESTORE_EVIDENCE_MAX_AGE_SECONDS <= 0:
+        raise RuntimeError("RESTORE_EVIDENCE_MAX_AGE_SECONDS must be positive")
+    if RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS < 0:
+        raise RuntimeError("RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS cannot be negative")
     minio_values = (MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY)
     if any(minio_values) and not all(minio_values):
         raise RuntimeError(

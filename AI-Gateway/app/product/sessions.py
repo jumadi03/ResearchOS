@@ -8,6 +8,7 @@ import base64
 import os
 from pathlib import Path
 import secrets
+from typing import Callable
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -28,10 +29,17 @@ def _password_hash(password: str, salt: bytes, iterations: int) -> str:
     return base64.b64encode(digest).decode()
 
 
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 @dataclass(slots=True)
 class WorkspaceSessionManager:
     database_url: str
     restore_trust_root: str | None = None
+    restore_evidence_max_age_seconds: int = 604_800
+    restore_evidence_clock_skew_seconds: int = 300
+    clock: Callable[[], datetime] = _utcnow
     session_hours: int = 12
     password_iterations: int = 310_000
     max_failed_attempts: int = 5
@@ -233,7 +241,9 @@ class WorkspaceSessionManager:
                 "ready_semantics": "deprecated_backup_integrity_alias",
                 "backup_integrity_ready": False,
                 "restore_verified": False,
+                "restore_fresh": False,
                 "recovery_ready": False,
+                "restore_evidence_max_age_seconds": self.restore_evidence_max_age_seconds,
                 "latest_backup": None,
                 "latest_restore": None,
                 "message": "No verified backup has been recorded",
@@ -253,9 +263,30 @@ class WorkspaceSessionManager:
             except (KeyError, TypeError, RestoreAttestationError):
                 restore_trust_valid = False
         restore_verified = bool(restore and restore[4] == "verified" and restore_trust_valid)
-        recovery_ready = backup_integrity_ready and restore_verified
+        restore_age_seconds = None
+        restore_fresh_until = None
+        restore_fresh = False
+        if restore_verified:
+            current_time = self.clock()
+            if current_time.tzinfo is None:
+                current_time = current_time.replace(tzinfo=timezone.utc)
+            completed_at = restore[8]
+            restore_age_seconds = (current_time - completed_at).total_seconds()
+            restore_fresh_until = completed_at + timedelta(
+                seconds=self.restore_evidence_max_age_seconds
+            )
+            restore_fresh = (
+                restore_age_seconds >= -self.restore_evidence_clock_skew_seconds
+                and restore_age_seconds <= self.restore_evidence_max_age_seconds
+            )
+        recovery_ready = backup_integrity_ready and restore_verified and restore_fresh
         if recovery_ready:
-            message = "Backup integrity and isolated restore are verified"
+            message = "Backup integrity and fresh isolated restore evidence are verified"
+        elif backup_integrity_ready and restore_verified and restore_age_seconds is not None:
+            if restore_age_seconds < -self.restore_evidence_clock_skew_seconds:
+                message = "Verified restore evidence timestamp is too far in the future"
+            else:
+                message = "Verified restore evidence is stale; run a new isolated restore"
         elif backup_integrity_ready:
             message = "Backup integrity is verified; isolated restore is not verified"
         elif legacy_ready:
@@ -274,6 +305,11 @@ class WorkspaceSessionManager:
             "completed_at": restore[8].isoformat(),
             "content_hash": restore[9],
             "trust_valid": restore_trust_valid,
+            "fresh": restore_fresh,
+            "age_seconds": restore_age_seconds,
+            "fresh_until": (
+                restore_fresh_until.isoformat() if restore_fresh_until else None
+            ),
         }
         return {
             # Compatibility alias for existing API consumers; it must not be used
@@ -282,7 +318,9 @@ class WorkspaceSessionManager:
             "ready_semantics": "deprecated_backup_integrity_alias",
             "backup_integrity_ready": backup_integrity_ready,
             "restore_verified": restore_verified,
+            "restore_fresh": restore_fresh,
             "recovery_ready": recovery_ready,
+            "restore_evidence_max_age_seconds": self.restore_evidence_max_age_seconds,
             "latest_backup": {
                 "backup_id": str(row[0]),
                 "stamp": row[1],
