@@ -367,6 +367,37 @@ was `repository-inventory:ResearchOS:b6d502615563c4a6`. It is audit evidence,
 not a persisted canonical snapshot or compliance decision. A post-commit scan
 must produce the final sprint inventory identity.
 
+## FMA-002 implementation traceability
+
+FMA-002 adds an immutable Repository Policy Registry without converting policy
+declarations into Architecture Laws or compliance outcomes:
+
+- typed ownership, placement, naming, lifecycle, exception, and content-
+  addressed bundle contracts:
+  `AI-Gateway/app/architecture/repository/policy_models.py`;
+- read-only path resolution with explicit ownership and lifecycle conflict
+  errors:
+  `AI-Gateway/app/architecture/repository/policy_registry.py`;
+- schema compatibility and a verified baseline policy bundle:
+  `AI-Gateway/app/architecture/schema.py` and
+  `.github/researchos/repository-policy-v1.json`; and
+- contract, tamper, conflict, exception-provenance, canonical-bundle,
+  dependency-boundary, and schema tests:
+  `AI-Gateway/app/architecture/tests/test_repository_policy_registry.py`.
+
+The version 1.0 baseline contains 14 policies: six ownership policies, three
+placement policies, one naming policy, and four lifecycle policies. It carries
+no active exception. Its content-addressed identity is
+`repository-policy:1.0:a778690b312ac90b`.
+
+Policy resolution returns every matching declaration. Conflicting ownership or
+lifecycle declarations fail explicitly instead of using file order or
+first-match semantics. A repository policy exception requires a known policy,
+path scope, rationale, approving actor, approval date, and an expiry or review
+condition. Even a valid exception cannot approve an Architecture finding or
+produce a compliance `PASS`; those authorities remain with the existing
+Compliance and Review Engines.
+
 ## FMA-000 Definition of Done
 
 - the governing philosophy and architectural position are explicit;

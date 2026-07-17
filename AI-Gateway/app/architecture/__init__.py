@@ -29,6 +29,15 @@ from .repository import (
     RepositoryFileRecord,
     RepositoryInventory,
     RepositoryScanner,
+    RepositoryLifecycle,
+    RepositoryLifecyclePolicy,
+    RepositoryNamingPolicy,
+    RepositoryOwnershipPolicy,
+    RepositoryPlacementPolicy,
+    RepositoryPolicyBundle,
+    RepositoryPolicyConflict,
+    RepositoryPolicyException,
+    RepositoryPolicyRegistry,
 )
 
 
@@ -53,4 +62,13 @@ __all__ = [
     "RepositoryFileRecord",
     "RepositoryInventory",
     "RepositoryScanner",
+    "RepositoryLifecycle",
+    "RepositoryLifecyclePolicy",
+    "RepositoryNamingPolicy",
+    "RepositoryOwnershipPolicy",
+    "RepositoryPlacementPolicy",
+    "RepositoryPolicyBundle",
+    "RepositoryPolicyConflict",
+    "RepositoryPolicyException",
+    "RepositoryPolicyRegistry",
 ]

@@ -1,0 +1,207 @@
+{
+  "bundle_id": "repository-policy:1.0:a778690b312ac90b",
+  "content_hash": "a778690b312ac90b735be82e78911299488c3b20c4eb350ce829d635c0d2f9e9",
+  "exceptions": [],
+  "lifecycle_policies": [
+    {
+      "lifecycle": "deprecate",
+      "path_patterns": [
+        "AI-Gateway/app/**"
+      ],
+      "policy_id": "FMA-LIFECYCLE-APP-001",
+      "rationale": "Runtime source is retired only through compatibility review.",
+      "review_condition": "Replacement verification and project-owner approval are required.",
+      "version": "1.0"
+    },
+    {
+      "lifecycle": "archive",
+      "path_patterns": [
+        "Documents/**"
+      ],
+      "policy_id": "FMA-LIFECYCLE-DOCUMENTS-001",
+      "rationale": "Governance and scientific documents retain revision history.",
+      "review_condition": "Superseded documents remain traceable to their replacement.",
+      "version": "1.0"
+    },
+    {
+      "lifecycle": "retain",
+      "path_patterns": [
+        "deploy/**"
+      ],
+      "policy_id": "FMA-LIFECYCLE-DEPLOY-001",
+      "rationale": "Deployment contracts remain until a verified migration retires them.",
+      "review_condition": "Removal requires deployment and recovery verification.",
+      "version": "1.0"
+    },
+    {
+      "lifecycle": "local_only",
+      "path_patterns": [
+        "workspace/**"
+      ],
+      "policy_id": "FMA-LIFECYCLE-WORKSPACE-001",
+      "rationale": "Workspace content is local, non-canonical, and deletable.",
+      "review_condition": "Workspace content must never become tracked canonical source.",
+      "version": "1.0"
+    }
+  ],
+  "naming_policies": [
+    {
+      "examples": [
+        "scanner.py",
+        "test_repository_inventory.py",
+        "__init__.py"
+      ],
+      "name_pattern": "^(__init__|test_[a-z][a-z0-9_]*|[a-z][a-z0-9_]*)\\.py$",
+      "path_patterns": [
+        "AI-Gateway/**/*.py"
+      ],
+      "policy_id": "FMA-NAMING-PYTHON-001",
+      "rationale": "Python modules and tests use deterministic snake_case names.",
+      "version": "1.0"
+    }
+  ],
+  "ownership_policies": [
+    {
+      "capability": "Repository Management",
+      "engine": "Architecture Engine",
+      "owner": "Architecture Engine",
+      "path_patterns": [
+        "AI-Gateway/app/architecture/**"
+      ],
+      "policy_id": "FMA-OWNER-ARCHITECTURE-001",
+      "rationale": "Architecture contracts and repository governance are owned by the Architecture Engine.",
+      "subsystem": "Architecture",
+      "version": "1.0"
+    },
+    {
+      "capability": "Scientific Knowledge",
+      "engine": "Discovery and Knowledge Engines",
+      "owner": "Scientific Knowledge Subsystem",
+      "path_patterns": [
+        "AI-Gateway/app/knowledge/**"
+      ],
+      "policy_id": "FMA-OWNER-KNOWLEDGE-001",
+      "rationale": "Scientific discovery, evidence, knowledge, and theory contracts share scientific ownership.",
+      "subsystem": "Scientific Knowledge",
+      "version": "1.0"
+    },
+    {
+      "capability": "Runtime Execution",
+      "engine": "Runtime Engine",
+      "owner": "Runtime Engine",
+      "path_patterns": [
+        "AI-Gateway/app/runtime/**"
+      ],
+      "policy_id": "FMA-OWNER-RUNTIME-001",
+      "rationale": "Runtime execution contracts are owned by the Runtime Engine.",
+      "subsystem": "Runtime",
+      "version": "1.0"
+    },
+    {
+      "capability": "Governance Documentation",
+      "engine": "Architecture Engine",
+      "owner": "Governance Capability",
+      "path_patterns": [
+        "Documents/**"
+      ],
+      "policy_id": "FMA-OWNER-DOCUMENTS-001",
+      "rationale": "Long-term governance, architecture, scientific, and roadmap documents require explicit governance ownership.",
+      "subsystem": "Architecture",
+      "version": "1.0"
+    },
+    {
+      "capability": "Deployment and Operations",
+      "engine": "Operations",
+      "owner": "Deployment and Operations Capability",
+      "path_patterns": [
+        "deploy/**"
+      ],
+      "policy_id": "FMA-OWNER-DEPLOY-001",
+      "rationale": "Deployment, migration, verification, backup, and monitoring contracts share operational ownership.",
+      "subsystem": "Infrastructure",
+      "version": "1.0"
+    },
+    {
+      "capability": "Continuous Integration",
+      "engine": "Architecture Engine",
+      "owner": "Architecture Governance",
+      "path_patterns": [
+        ".github/**"
+      ],
+      "policy_id": "FMA-OWNER-GITHUB-001",
+      "rationale": "Repository automation and governance configuration are architecture-governed.",
+      "subsystem": "Architecture",
+      "version": "1.0"
+    }
+  ],
+  "placement_policies": [
+    {
+      "allowed_classifications": [
+        "document",
+        "artifact"
+      ],
+      "allowed_extensions": [
+        ".md",
+        ".pdf",
+        ".png"
+      ],
+      "forbidden_extensions": [
+        ".py"
+      ],
+      "path_patterns": [
+        "Documents/**"
+      ],
+      "policy_id": "FMA-PLACEMENT-DOCUMENTS-001",
+      "rationale": "The document domain contains governed documents and their intentional artifacts.",
+      "version": "1.0"
+    },
+    {
+      "allowed_classifications": [
+        "code",
+        "test"
+      ],
+      "allowed_extensions": [
+        ".py"
+      ],
+      "forbidden_extensions": [
+        ".pdf"
+      ],
+      "path_patterns": [
+        "AI-Gateway/app/architecture/**"
+      ],
+      "policy_id": "FMA-PLACEMENT-ARCHITECTURE-001",
+      "rationale": "The Architecture Engine package contains source and colocated tests under the current compatibility baseline.",
+      "version": "1.0"
+    },
+    {
+      "allowed_classifications": [
+        "code",
+        "configuration",
+        "script"
+      ],
+      "allowed_extensions": [
+        ".css",
+        ".html",
+        ".js",
+        ".py",
+        ".sh",
+        ".sql",
+        ".yaml",
+        ".yml"
+      ],
+      "forbidden_extensions": [
+        ".pyc"
+      ],
+      "path_patterns": [
+        "deploy/**"
+      ],
+      "policy_id": "FMA-PLACEMENT-DEPLOY-001",
+      "rationale": "The current deployment tree contains operational configuration, verifiers, migrations, and deployment UI assets.",
+      "version": "1.0"
+    }
+  ],
+  "project_name": "ResearchOS",
+  "schema_version": "1.0",
+  "source_revision": "FMA-000@5a81753",
+  "version": "1.0"
+}
