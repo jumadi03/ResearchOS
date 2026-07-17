@@ -14,6 +14,7 @@ from app.models.knowledge import (
     AlignmentCalibrationRollbackRequest,
     CalibrationCaseReviewRequest, CalibrationQueueRefreshRequest,
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
+    CitationTraversalRequest,
     ArtifactTransitionRequest, EvidenceReviewRequest, PublicationPreviewRequest,
     PublicationRequest,
     KnowledgeIntakeRequest, SemanticIndexRequest, SemanticSearchRequest,
@@ -24,6 +25,7 @@ from app.models.knowledge import (
     TheoryTranslationSubmissionRequest,
 )
 from app.knowledge.ingestion.models import AccessStatus, DocumentCandidate
+from app.knowledge.retrieval.snowballing import CitationDirection
 from app.knowledge.extraction.models import (
     EpistemicClassification, EvidenceReviewAssessment,
 )
@@ -60,8 +62,21 @@ def discovery_capabilities(
             "concept_authority": "human_attributed",
             "source_specific_queries": True,
         },
+        "citation_snowballing": {
+            "directions": ["backward", "forward"],
+            "contract_bound": True,
+            "candidate_status": "discovery_only",
+            "provider_directions": {
+                "openalex": ["backward", "forward"],
+                "crossref": ["backward"],
+                "semantic_scholar": ["backward", "forward"],
+            },
+        },
         "acquisition_access_statuses": ["open", "restricted", "unavailable"],
-        "workflow": ["discover", "collect_metadata", "acquire", "extract"],
+        "workflow": [
+            "discover", "collect_metadata", "traverse_citations",
+            "acquire", "extract",
+        ],
     }
 
 
@@ -127,6 +142,40 @@ def collect_metadata(
         "observation_count": sum(len(record.observations) for record in run.records),
         "citation_edge_count": len(run.citation_edges),
         "conflict_count": sum(len(record.conflicts) for record in run.records),
+    }
+    return result
+
+
+@router.post("/discovery/runs/{run_id}/citations", status_code=201)
+def traverse_citations(
+    run_id: str,
+    req: CitationTraversalRequest,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials)
+    try:
+        run, snapshot = request.app.state.knowledge_service.traverse_citations(
+            run_id, seed_record_id=req.seed_record_id,
+            directions=tuple(CitationDirection(item) for item in req.directions),
+            maximum_depth=req.maximum_depth,
+            retrieval_budget=req.retrieval_budget,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(run)
+    result["snapshot"] = snapshot.name
+    result["integrity_verified"] = run.verify()
+    result["summary"] = {
+        "candidate_count": len(run.candidates),
+        "edge_count": len(run.edges),
+        "failure_count": len(run.failures),
+        "maximum_depth_reached": max(
+            (edge.depth for edge in run.edges), default=0,
+        ),
+        "candidate_status": "discovery_only",
     }
     return result
 

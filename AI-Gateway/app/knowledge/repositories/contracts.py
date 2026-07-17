@@ -7,6 +7,7 @@ from app.knowledge.ingestion.models import AcquisitionResult
 from app.knowledge.inspection.models import SourceInspection
 from app.knowledge.screening.models import ScreeningDecision
 from app.knowledge.retrieval.models import MetadataRun
+from app.knowledge.retrieval.snowballing import CitationTraversalRun
 from app.knowledge.repositories.models import StoredRepresentation
 from app.knowledge.extraction.models import (
     EvidenceAdmission, EvidenceReviewAssessment, EvidenceReviewEvent, ExtractionManifest,
@@ -24,6 +25,10 @@ class ScientificDataRepository(Protocol):
     def persist_discovery(self, run: DiscoveryRun) -> None: ...
 
     def persist_metadata(self, run: MetadataRun) -> None: ...
+
+    def persist_citation_traversal(
+        self, run: CitationTraversalRun,
+    ) -> None: ...
 
     def persist_representation(
         self, record: LiteratureRecord, result: AcquisitionResult, storage_uri: str,

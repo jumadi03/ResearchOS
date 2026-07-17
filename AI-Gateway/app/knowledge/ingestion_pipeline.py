@@ -30,6 +30,12 @@ from app.knowledge.models import (
 )
 from app.knowledge.retrieval.collector import MetadataCollector
 from app.knowledge.retrieval.persistence import MetadataSnapshotStore
+from app.knowledge.retrieval.snowballing import (
+    CitationDirection, CitationSnowballingEngine,
+)
+from app.knowledge.retrieval.snowballing_persistence import (
+    CitationTraversalSnapshotStore,
+)
 
 
 class KnowledgeIngestionPipeline:
@@ -48,6 +54,10 @@ class KnowledgeIngestionPipeline:
         self.snapshots = DiscoverySnapshotStore(output_root / "runs")
         self.metadata_snapshots = MetadataSnapshotStore(output_root / "runs")
         self.metadata_collector = MetadataCollector()
+        self.citation_engine = CitationSnowballingEngine(providers)
+        self.citation_snapshots = CitationTraversalSnapshotStore(
+            output_root / "runs"
+        )
         self.data_repository = data_repository
         self.object_store = object_store
         self.document_acquirer = document_acquirer or DocumentAcquirer()
@@ -87,6 +97,23 @@ class KnowledgeIngestionPipeline:
         if self.data_repository is not None:
             self.data_repository.persist_metadata(metadata)
         return metadata, self.metadata_snapshots.save(metadata)
+
+    def traverse_citations(
+        self, run_id: str, *, seed_record_id: str,
+        directions: tuple[CitationDirection, ...], maximum_depth: int,
+        retrieval_budget: int,
+    ):
+        run = self.runs.get(run_id)
+        if run is None:
+            raise KeyError(f"Unknown discovery run: {run_id}")
+        traversal = self.citation_engine.traverse(
+            run, seed_record_id=seed_record_id, directions=directions,
+            maximum_depth=maximum_depth, retrieval_budget=retrieval_budget,
+            created_at=DiscoveryRun.timestamp(),
+        )
+        if self.data_repository is not None:
+            self.data_repository.persist_citation_traversal(traversal)
+        return traversal, self.citation_snapshots.save(traversal)
 
     def acquire_document(self, run_id: str, candidate: DocumentCandidate):
         run = self.runs.get(run_id)

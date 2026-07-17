@@ -128,6 +128,9 @@ class KnowledgeDiscoveryService:
     def collect_metadata(self, run_id: str):
         return self.ingestion_pipeline.collect_metadata(run_id)
 
+    def traverse_citations(self, run_id: str, **values):
+        return self.ingestion_pipeline.traverse_citations(run_id, **values)
+
     def acquire_document(self, run_id: str, candidate: DocumentCandidate):
         return self.ingestion_pipeline.acquire_document(run_id, candidate)
 

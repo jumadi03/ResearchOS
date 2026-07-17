@@ -23,7 +23,8 @@
 - Completed: SCAN-001J Evidence Extraction
 - Completed: SCAN-001K Human Review
 - Completed: SCAN-001L Knowledge Intake
-- Next deliverable: SCAN-001M Citation Snowballing
+- Completed: SCAN-001M Citation Snowballing
+- Next deliverable: SCAN-001N Continuous Monitoring
 - Change policy: focused, reviewable documentation commits; no implementation
   begins from a roadmap change without deliverable-specific verification
 - Related documents: `README.md`,
@@ -322,6 +323,46 @@ human-review provenance, persists the accepted-only graph and intake ledger in
 one transaction, and writes filesystem snapshots only after canonical
 persistence succeeds. Extraction object ordinal is retained so reconstruction
 after restart remains byte-stable and content-hash verifiable.
+
+### SCAN-001M implementation traceability
+
+SCAN-001M performs reproducible, contract-bound forward and backward citation
+traversal without promoting citation candidates to evidence:
+
+- traversal contract, candidate inventory, citation edges, partial failures,
+  stopping reasons, deterministic manifest identity, depth and budget
+  enforcement, cycle prevention, and integrity verification:
+  `AI-Gateway/app/knowledge/retrieval/snowballing.py`;
+- content-addressed portable traversal snapshot:
+  `AI-Gateway/app/knowledge/retrieval/snowballing_persistence.py`;
+- official-provider boundaries and explicit direction capabilities for
+  OpenAlex, Crossref, and Semantic Scholar:
+  `AI-Gateway/app/knowledge/discovery/providers.py`;
+- application orchestration and authenticated service/API boundary:
+  `AI-Gateway/app/knowledge/ingestion_pipeline.py`,
+  `AI-Gateway/app/knowledge/service.py`,
+  `AI-Gateway/app/models/knowledge.py`, and
+  `AI-Gateway/app/router/knowledge.py`;
+- canonical repository port and append-only PostgreSQL persistence:
+  `AI-Gateway/app/knowledge/repositories/contracts.py`,
+  `AI-Gateway/app/knowledge/repositories/postgres.py`,
+  `deploy/postgres/init/025_citation_snowballing.sql`, and
+  `deploy/postgres/init/026_citation_candidate_inventory.sql`;
+- domain and API regression:
+  `AI-Gateway/app/knowledge/tests/test_citation_snowballing.py` and
+  `AI-Gateway/app/knowledge/tests/test_knowledge_api.py`; and
+- canonical schema, idempotency, storage contract, and integrity verification:
+  `deploy/verify/canonical_repository.py`,
+  `deploy/verify/canonical_storage_healthcheck.sql`, and
+  `deploy/verify/storage_compliance.py`.
+
+Every traversal remains bound to the seed's canonical identity-resolution
+record and the originating `DiscoveryContract`. Candidate records preserve
+provider identity, title, DOI when supplied, depth, response hash, and request
+URL. Citation direction does not imply support, contradiction, relevance, or
+scientific acceptance. Every candidate must return through normal discovery,
+screening, extraction, and human-review boundaries before entering canonical
+knowledge.
 
 ## Canonical documentation review protocol
 

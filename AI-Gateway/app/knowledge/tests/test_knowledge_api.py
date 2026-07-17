@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.knowledge.authentication import KnowledgeAuthenticator, KnowledgePrincipal, KnowledgeRole
-from app.knowledge.discovery.providers import ProviderPage
+from app.knowledge.discovery.providers import CitationPage, ProviderPage
 from app.knowledge.service import KnowledgeDiscoveryService
 from app.knowledge.ingestion.acquisition import DocumentAcquirer
 from app.knowledge.repositories.models import StoredRepresentation
@@ -25,6 +25,7 @@ from app.runtime.models.runtime_response import RuntimeResponse
 
 class Provider:
     name = "openalex"
+    citation_directions = ("backward", "forward")
 
     def search(self, plan):
         return (ProviderPage(({
@@ -36,11 +37,23 @@ class Provider:
             "license": "CC-BY-4.0",
         },), "https://example.test"),)
 
+    def citation_links(self, identifier, direction, limit):
+        candidates = (
+            ({"identifier": "W0"},)
+            if str(direction) == "backward"
+            else ({"identifier": "W2"},)
+        )
+        return (CitationPage(
+            candidates[:limit],
+            f"https://example.test/citations/{identifier}/{direction}",
+        ),)
+
 
 class RecordingRepository:
     def __init__(self):
         self.discovery_runs = []
         self.metadata_runs = []
+        self.citation_traversals = []
         self.representations = []
         self.inspections = []
         self.screening_decisions = []
@@ -56,6 +69,9 @@ class RecordingRepository:
 
     def persist_discovery(self, run): self.discovery_runs.append(run)
     def persist_metadata(self, run): self.metadata_runs.append(run)
+    def persist_citation_traversal(self, run):
+        assert run.verify()
+        self.citation_traversals.append(run)
     def persist_representation(self, record, result, storage_uri):
         self.representations.append((record, result, storage_uri))
         return "representation-1", 1
@@ -414,6 +430,16 @@ def test_discovery_capabilities_expose_required_contract_bounds(
         "concept_authority": "human_attributed",
         "source_specific_queries": True,
     }
+    assert response.json()["citation_snowballing"] == {
+        "directions": ["backward", "forward"],
+        "contract_bound": True,
+        "candidate_status": "discovery_only",
+        "provider_directions": {
+            "openalex": ["backward", "forward"],
+            "crossref": ["backward"],
+            "semantic_scholar": ["backward", "forward"],
+        },
+    }
 
 
 def test_discovery_and_metadata_use_repository_port(tmp_path: Path) -> None:
@@ -428,6 +454,53 @@ def test_discovery_and_metadata_use_repository_port(tmp_path: Path) -> None:
     }
     assert repository.discovery_runs[0].run_id == discovered["run_id"]
     assert repository.metadata_runs[0].discovery_run_id == discovered["run_id"]
+
+
+def test_citation_snowballing_is_contract_bound_and_persisted(
+    tmp_path: Path,
+) -> None:
+    repository = RecordingRepository()
+    api = client(tmp_path, repository=repository)
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    endpoint = f"/knowledge/discovery/runs/{discovered['run_id']}/citations"
+    request = {
+        "seed_record_id": discovered["records"][0]["record_id"],
+        "directions": ["backward", "forward"],
+        "maximum_depth": 1,
+        "retrieval_budget": 2,
+    }
+
+    response = api.post(endpoint, json=request)
+
+    assert response.status_code == 201
+    assert response.json()["integrity_verified"] is True
+    assert response.json()["summary"] == {
+        "candidate_count": 2, "edge_count": 2, "failure_count": 0,
+        "maximum_depth_reached": 1,
+        "candidate_status": "discovery_only",
+    }
+    assert response.json()["snapshot"].startswith("v1.0-")
+    assert repository.citation_traversals[0].discovery_run_id == discovered["run_id"]
+    request["maximum_depth"] = 2
+    bypass = api.post(endpoint, json=request)
+    assert bypass.status_code == 422
+    assert "maximum depth" in bypass.json()["detail"]
+
+
+def test_citation_snowballing_rejects_unknown_run_and_seed(tmp_path: Path) -> None:
+    api = client(tmp_path)
+    request = {
+        "seed_record_id": "missing", "directions": ["backward"],
+        "maximum_depth": 1, "retrieval_budget": 1,
+    }
+    assert api.post(
+        "/knowledge/discovery/runs/missing/citations", json=request,
+    ).status_code == 404
+    discovered = api.post("/knowledge/discovery/runs", json=payload()).json()
+    assert api.post(
+        f"/knowledge/discovery/runs/{discovered['run_id']}/citations",
+        json=request,
+    ).status_code == 404
 
 
 def test_acquisition_policy_cannot_be_replaced_by_client(

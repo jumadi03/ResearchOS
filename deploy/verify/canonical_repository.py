@@ -25,6 +25,10 @@ from app.knowledge.retrieval.models import (
     MetadataObservation,
     MetadataRun,
 )
+from app.knowledge.retrieval.snowballing import (
+    CitationDirection, CitationStoppingReason, CitationTraversalEdge,
+    CitationTraversalCandidate, CitationTraversalRun,
+)
 
 
 DOI = "10.0000/researchos.repository-healthcheck"
@@ -132,12 +136,55 @@ def metadata_run() -> MetadataRun:
     )
 
 
+def citation_traversal_run() -> CitationTraversalRun:
+    return CitationTraversalRun(
+        traversal_id="citation-repository-healthcheck-v2",
+        discovery_run_id="repository-healthcheck",
+        discovery_contract_id="repository-healthcheck-contract",
+        seed_record_id="repository-healthcheck",
+        directions=(
+            CitationDirection.BACKWARD, CitationDirection.FORWARD,
+        ),
+        maximum_depth=1,
+        retrieval_budget=25,
+        created_at="2026-07-15T12:06:00Z",
+        candidates=(
+            CitationTraversalCandidate(
+                "W-REFERENCE", "openalex", 1, "c" * 64,
+                "https://api.openalex.org/works/W-REPOSITORY-HEALTHCHECK",
+                "Referenced work", None,
+            ),
+            CitationTraversalCandidate(
+                "W-CITING", "openalex", 1, "d" * 64,
+                "https://api.openalex.org/works?filter=cites:W-REPOSITORY-HEALTHCHECK",
+                "Citing work", None,
+            ),
+        ),
+        edges=(
+            CitationTraversalEdge(
+                "W-REPOSITORY-HEALTHCHECK", "W-REFERENCE",
+                CitationDirection.BACKWARD, 1, "openalex", "c" * 64,
+                "https://api.openalex.org/works/W-REPOSITORY-HEALTHCHECK",
+            ),
+            CitationTraversalEdge(
+                "W-CITING", "W-REPOSITORY-HEALTHCHECK",
+                CitationDirection.FORWARD, 1, "openalex", "d" * 64,
+                "https://api.openalex.org/works?filter=cites:W-REPOSITORY-HEALTHCHECK",
+            ),
+        ),
+        failures=(),
+        stopping_reasons=(CitationStoppingReason.DEPTH_LIMIT,),
+    ).finalized()
+
+
 def main() -> None:
     repository = PostgresScientificDataRepository(os.environ["DATABASE_URL"])
     repository.persist_discovery(discovery_run())
     repository.persist_discovery(discovery_run())
     repository.persist_metadata(metadata_run())
     repository.persist_metadata(metadata_run())
+    repository.persist_citation_traversal(citation_traversal_run())
+    repository.persist_citation_traversal(citation_traversal_run())
 
     with repository._connect() as connection:
         with connection.cursor() as cursor:
@@ -167,6 +214,23 @@ def main() -> None:
                 WHERE c.stable_key=%s
             """, (f"doi:{DOI}",))
             resolution_count = cursor.fetchone()[0]
+            cursor.execute("""
+                SELECT
+                    count(DISTINCT r.traversal_id),
+                    count(DISTINCT e.source_identifier || '>' ||
+                          e.target_identifier || ':' || e.direction),
+                    count(DISTINCT c.identifier),
+                    count(DISTINCT f.identifier)
+                FROM citation_traversal_runs r
+                LEFT JOIN citation_traversal_edges e
+                  ON e.traversal_id=r.traversal_id
+                LEFT JOIN citation_traversal_candidates c
+                  ON c.traversal_id=r.traversal_id
+                LEFT JOIN citation_traversal_failures f
+                  ON f.traversal_id=r.traversal_id
+                WHERE r.traversal_id='citation-repository-healthcheck-v2'
+            """)
+            citation_counts = cursor.fetchone()
             cursor.execute("SAVEPOINT immutable_resolution_check")
             try:
                 cursor.execute("""
@@ -206,6 +270,7 @@ def main() -> None:
     assert row == (2, 1, 2), row
     assert identifier_count == 2, identifier_count
     assert resolution_count == 1, resolution_count
+    assert citation_counts == (1, 2, 2, 0), citation_counts
     assert resolved_id == initial_id, (initial_id, resolved_id)
     print("canonical repository healthcheck: passed")
 

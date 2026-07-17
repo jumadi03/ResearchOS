@@ -62,6 +62,14 @@ class LiteratureDiscoveryRequest(BaseModel):
     search_plan: SearchPlanRequest
 
 
+class CitationTraversalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    seed_record_id: str = Field(min_length=1)
+    directions: list[Literal["backward", "forward"]] = Field(min_length=1)
+    maximum_depth: int = Field(ge=1, le=10)
+    retrieval_budget: int = Field(ge=1, le=100_000)
+
+
 class DocumentAcquisitionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     record_id: str = Field(min_length=1)

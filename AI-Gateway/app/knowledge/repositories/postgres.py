@@ -279,6 +279,89 @@ class _PostgresRepositoryCore:
                             run.created_at, content_hash,
                         ))
 
+    def persist_citation_traversal(self, run) -> None:
+        if not run.verify():
+            raise ValueError(
+                "Citation traversal manifest integrity verification failed"
+            )
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 1 FROM identity_resolution_events
+                    WHERE record_id=%s
+                """, (run.seed_record_id,))
+                if cursor.fetchone() is None:
+                    raise KeyError(
+                        f"Canonical citation seed missing for record: "
+                        f"{run.seed_record_id}"
+                    )
+                cursor.execute("""
+                    INSERT INTO citation_traversal_runs(
+                        traversal_id,discovery_run_id,discovery_contract_id,
+                        seed_record_id,directions,maximum_depth,retrieval_budget,
+                        created_at,stopping_reasons,manifest_hash,schema_version
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(traversal_id) DO NOTHING
+                """, (
+                    run.traversal_id, run.discovery_run_id,
+                    run.discovery_contract_id, run.seed_record_id,
+                    [item.value for item in run.directions],
+                    run.maximum_depth, run.retrieval_budget, run.created_at,
+                    [item.value for item in run.stopping_reasons],
+                    run.manifest_hash, run.schema_version,
+                ))
+                for edge in run.edges:
+                    cursor.execute("""
+                        INSERT INTO citation_traversal_edges(
+                            traversal_id,source_identifier,target_identifier,
+                            direction,depth,provider,response_hash,request_url
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON CONFLICT(
+                            traversal_id,source_identifier,target_identifier,
+                            direction,provider
+                        ) DO NOTHING
+                    """, (
+                        run.traversal_id, edge.source_identifier,
+                        edge.target_identifier, edge.direction.value,
+                        edge.depth, edge.provider, edge.response_hash,
+                        edge.request_url,
+                    ))
+                for candidate in run.candidates:
+                    cursor.execute("""
+                        INSERT INTO citation_traversal_candidates(
+                            traversal_id,identifier,provider,depth,response_hash,
+                            request_url,title,doi
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON CONFLICT(traversal_id,provider,identifier)
+                        DO NOTHING
+                    """, (
+                        run.traversal_id, candidate.identifier,
+                        candidate.provider, candidate.depth,
+                        candidate.response_hash, candidate.request_url,
+                        candidate.title, candidate.doi,
+                    ))
+                for failure in run.failures:
+                    cursor.execute("""
+                        INSERT INTO citation_traversal_failures(
+                            traversal_id,provider,identifier,direction,depth,
+                            error_type,message,retryable
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON CONFLICT DO NOTHING
+                    """, (
+                        run.traversal_id, failure.provider, failure.identifier,
+                        failure.direction.value, failure.depth,
+                        failure.error_type, failure.message,
+                        failure.retryable,
+                    ))
+                cursor.execute("""
+                    SELECT manifest_hash FROM citation_traversal_runs
+                    WHERE traversal_id=%s
+                """, (run.traversal_id,))
+                if cursor.fetchone()[0] != run.manifest_hash:
+                    raise ValueError(
+                        "Citation traversal persistence integrity conflict"
+                    )
+
     def persist_representation(
         self, record: LiteratureRecord, result: AcquisitionResult, storage_uri: str,
     ) -> tuple[str, int]:

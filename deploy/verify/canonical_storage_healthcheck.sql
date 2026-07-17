@@ -38,6 +38,8 @@ WHERE schemaname='public' AND tablename IN (
     'canonical_objects','scientific_sources','scientific_documents',
     'document_source_references','metadata_observations',
     'scientific_representations','source_inspections','screening_decisions',
+    'citation_traversal_runs','citation_traversal_edges',
+    'citation_traversal_candidates','citation_traversal_failures',
     'extraction_manifests','knowledge_intake_manifests',
     'scientific_identifiers','identity_resolution_events',
     'evidence_objects','provenance_events',
@@ -47,7 +49,7 @@ WHERE schemaname='public' AND tablename IN (
 
 DO $$
 BEGIN
-    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 24 THEN
+    IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 26 THEN
         RAISE EXCEPTION 'database schema version does not match application';
     END IF;
 END;
