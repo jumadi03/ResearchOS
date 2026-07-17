@@ -415,6 +415,20 @@ attempts an explicit failed transition with a bounded stage reason. This is
 end-to-end orchestration evidence, not periodic scheduling; no API, UI,
 background worker, scheduler, or Docker socket is added to a container.
 
+DATA maintenance Phase 1F-D introduces Schema 32 schedule governance. The
+canonical singleton schedule is initially paused and restricts cadence to one
+through thirty-one days. PostgreSQL owns revision, policy hash, due time,
+pending slot, and due acquisition. A host invocation receives only `paused`,
+`not_due`, or a newly created lease; a repeated invocation during an active
+slot receives the run identity without its lease token.
+
+Schedule configuration and pause/resume decisions require actor and rationale
+and are retained in an append-only event ledger. Completion, explicit failure,
+or lease expiry advances the next due time from the canonical scheduled slot,
+skipping elapsed intervals deterministically. This phase does not introduce a
+scheduler daemon, API, UI, or worker job; an external host trigger may invoke
+the controller, but cannot select due time, backup, or target.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly

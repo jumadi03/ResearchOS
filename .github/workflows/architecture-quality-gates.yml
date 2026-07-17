@@ -185,6 +185,17 @@ jobs:
           -U researchos -d researchos
           -f /dev/stdin
           < verify/restore_drill_coordination.sql
+      - name: Verify canonical restore-drill schedule gate
+        working-directory: deploy
+        run: >-
+          docker compose
+          --env-file stack.env
+          -f compose.yaml
+          exec -T postgres
+          psql -v ON_ERROR_STOP=1
+          -U researchos -d researchos
+          -f /dev/stdin
+          < verify/restore_drill_schedule_gate.sql
       - name: Verify canonical repository idempotency
         working-directory: deploy
         run: |

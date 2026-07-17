@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added Phase 1F-D Schema 32 canonical restore-drill schedule governance with
+  a fail-closed paused default, bounded cadence, PostgreSQL due decisions,
+  duplicate-trigger suppression, and append-only policy and slot provenance.
 - Added Phase 1F-C manually invoked end-to-end restore-drill control, composing
   the canonical lease, isolated drill, signed admission, and completion gates
   while failing the lease explicitly when any post-acquisition stage fails.

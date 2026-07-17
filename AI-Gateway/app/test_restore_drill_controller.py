@@ -238,3 +238,25 @@ def test_controller_is_host_only_and_does_not_accept_targets_or_secrets():
     assert "docker.sock" not in source
     assert "scheduler" not in source
     assert "subprocess.run" in source
+
+
+def test_scheduled_not_due_is_a_successful_no_op(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(controller, "REPORT_ROOT", tmp_path)
+
+    def run(command, *, cwd, environment=None):
+        calls.append(command)
+        return result(
+            {"status": "not_due", "next_due_at": "2026-07-24T00:00:00+00:00"}
+        )
+
+    receipt = controller.execute(
+        owner="host-trigger",
+        lease_seconds=7200,
+        scheduled=True,
+        run_command=run,
+    )
+
+    assert receipt["status"] == "not_due"
+    assert len(calls) == 1
+    assert "acquire-due" in calls[0]
