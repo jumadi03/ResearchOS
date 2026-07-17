@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0",
+  "matrix_id": "researchos-recovery-coverage-v1",
+  "components": [
+    {
+      "component": "postgresql",
+      "required": true,
+      "canonical_authority": "PostgreSQL canonical data and immutable ledgers",
+      "backup_component": "postgresql",
+      "coverage": "covered",
+      "restore_target": "isolated PostgreSQL database",
+      "verification_checks": [
+        "manifest hash",
+        "pg_restore structural validation",
+        "schema version",
+        "storage authority",
+        "canonical row counts"
+      ]
+    },
+    {
+      "component": "minio",
+      "required": true,
+      "canonical_authority": "MinIO immutable scientific representations",
+      "backup_component": "minio",
+      "coverage": "covered",
+      "restore_target": "isolated MinIO service and bucket",
+      "verification_checks": [
+        "manifest hash",
+        "object inventory",
+        "object size",
+        "object SHA-256 metadata"
+      ]
+    },
+    {
+      "component": "knowledge",
+      "required": true,
+      "canonical_authority": "Knowledge compatibility snapshots",
+      "backup_component": "knowledge",
+      "coverage": "covered",
+      "restore_target": "isolated filesystem root",
+      "verification_checks": [
+        "manifest hash",
+        "archive traversal safety",
+        "content tree hash"
+      ]
+    },
+    {
+      "component": "architecture",
+      "required": true,
+      "canonical_authority": "Rebuildable architecture and repository-governance snapshots",
+      "backup_component": null,
+      "coverage": "missing",
+      "restore_target": "isolated filesystem root",
+      "verification_checks": [
+        "source revision",
+        "snapshot content hashes",
+        "rebuildability"
+      ]
+    },
+    {
+      "component": "configuration",
+      "required": true,
+      "canonical_authority": "Versioned non-secret deployment reconstruction contract",
+      "backup_component": null,
+      "coverage": "missing",
+      "restore_target": "isolated reconstruction workspace",
+      "verification_checks": [
+        "Compose configuration",
+        "environment variable names",
+        "image and schema versions",
+        "absence of secret values"
+      ],
+      "secret_policy": "structure_only_no_secret_values"
+    },
+    {
+      "component": "migration",
+      "required": true,
+      "canonical_authority": "Versioned migration files and schema_migrations ledger",
+      "backup_component": null,
+      "coverage": "partial",
+      "restore_target": "isolated migration workspace",
+      "verification_checks": [
+        "migration file checksums",
+        "schema_migrations ledger",
+        "target schema version",
+        "rollback or forward-recovery evidence"
+      ]
+    }
+  ],
+  "safety": {
+    "active_target_prohibited": true,
+    "restore_execution_in_scope": false,
+    "secret_values_prohibited": true
+  }
+}

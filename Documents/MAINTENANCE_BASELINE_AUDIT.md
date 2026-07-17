@@ -207,3 +207,19 @@ is introduced here, and architecture/configuration components are not yet
 included in the produced set. Consequently `recovery_ready` remains fail-closed
 until a later accepted increment performs and records a matching isolated
 restore.
+
+### Phase 1B implementation traceability
+
+Phase 1B defines `researchos-recovery-coverage-v1` as the versioned recovery
+inventory for PostgreSQL, MinIO, knowledge, architecture, configuration, and
+migration. Its verifier is deterministic and report-only: it binds the matrix
+and backup manifest hashes, verifies current artifacts, requires explicitly
+isolated future targets, rejects unsafe paths and unexpected components, and
+prohibits configuration secret values.
+
+The accepted status vocabulary is `covered`, `partial`, and `missing`; the
+aggregate is `COMPLETE` or `INCOMPLETE`. The current matrix truthfully reports
+architecture and configuration as missing and migration as partial. Therefore
+Phase 1B does not complete Rule 13, write restore evidence, execute a restore,
+or authorize mutation of an active target. Its output determines the bounded
+coverage work required before an isolated restore drill can be implemented.

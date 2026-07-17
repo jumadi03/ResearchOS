@@ -71,6 +71,27 @@ does not introduce a restore executor and cannot restore over active ResearchOS
 data. A later, separately reviewed increment must implement the isolated
 restore drill before recovery readiness can become true.
 
+Phase 1B adds the versioned recovery matrix at
+`deploy/backup/recovery-coverage-v1.json` and the report-only verifier at
+`deploy/verify/recovery_coverage.py`. The verifier checks the matrix and
+manifest identities, component set, artifact paths, SHA-256 hashes, isolated
+targets, and secret policy. It never performs a restore and returns
+`INCOMPLETE` while any required component is partial or missing.
+
+Run it against a locally accessible backup set with:
+
+```powershell
+python deploy/verify/recovery_coverage.py `
+  --matrix deploy/backup/recovery-coverage-v1.json `
+  --manifest <backup-directory>/backup-set-<stamp>.json `
+  --backup-root <backup-directory> `
+  --output <temporary-directory>/recovery-coverage-report.json
+```
+
+The optional `--require-complete` flag returns exit code 2 for an incomplete
+matrix. It is intended for a future release gate after all six components are
+implemented; it is not enabled as a passing claim during Phase 1B.
+
 ## Database migrations
 
 PostgreSQL schema changes are applied by the one-shot `migrate` service before

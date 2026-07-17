@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added a versioned, report-only recovery coverage matrix and fail-closed
+  verifier for PostgreSQL, MinIO, knowledge, architecture, configuration, and
+  migration recovery paths without executing a restore or exposing secrets.
 - Added schema 29 portable backup-set manifests and an immutable,
   isolated-target restore-verification contract; recovery readiness now
   requires both manifest-bound archive integrity and matching restore evidence.

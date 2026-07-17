@@ -311,6 +311,21 @@ integrity (`backup_integrity_ready`), isolated restore proof
 claim (`recovery_ready`). Phase 1A defines no restoration executor and performs
 no mutation of active PostgreSQL, MinIO, knowledge, or architecture data.
 
+DATA maintenance Phase 1B adds a versioned, report-only Recovery Coverage
+Matrix. Its required component set is PostgreSQL, MinIO, knowledge,
+architecture, configuration, and migration. The verifier binds a matrix hash
+and backup manifest hash, rejects unsafe paths, symbolic links, unexpected
+components, missing files, and hash mismatches, and records that neither a
+restore nor an active-target mutation occurred. Configuration recovery is
+limited to reconstructable structure and explicitly prohibits secret values.
+
+The current evidence-based outcome is `INCOMPLETE`: PostgreSQL, MinIO, and
+knowledge artifacts are present and hash-verified; architecture and
+configuration are missing; migration coverage is partial because the database
+contains its migration ledger but the backup set does not yet carry the
+versioned migration files or forward-recovery evidence. This report is not a
+restore result and cannot populate `backup_restore_verifications`.
+
 PRODUCT-001H adds object-contextual Scientific Intelligence backed by the local
 Ollama provider. Available actions depend on canonical object type; object data
 is isolated from system instructions, and every response is explicitly
