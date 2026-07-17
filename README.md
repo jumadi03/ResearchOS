@@ -105,7 +105,7 @@ schema and persistence, and dependency-security gates.
 - [End-to-end scientific workflow pilot](Documents/END_TO_END_PILOT.md)
 - [Multi-source scientific workflow pilot](Documents/MULTI_SOURCE_PILOT.md)
 - [Theory validation and risk-of-bias guide](Documents/VALIDATION_GUIDE.md)
-- [Theory Seed: Six-Axis Orientation](Documents/THEORY_SEED_SIX_AXIS_ORIENTATION.md)
+- [Catatan Awal Teori Ruang Orientasi — Model 6S](Documents/CATATAN_AWAL_TEORI_RUANG_ORIENTASI_MODEL_6S.md)
 - [ResearchOS v0.4.0 launch announcement](Documents/LAUNCH_ANNOUNCEMENT.md)
 - [Local deployment and operations](Documents/LOCAL_STACK.md)
 - [Scientific data storage architecture](Documents/SCIENTIFIC_DATA_STORAGE.md)

@@ -1,8 +1,8 @@
-# Benih Teori Orientasi Enam Sumbu
+# Catatan Awal Teori Ruang Orientasi — Model 6S
 
 ## Status
 
-- Jenis artefak: benih teori
+- Jenis artefak: catatan awal gagasan ilmiah
 - Status ilmiah: gagasan awal yang belum diuji
 - Status evidence: belum tersedia
 - Status review manusia: belum tersedia
@@ -29,7 +29,7 @@ Dalam percakapan panjang, GPT cenderung meringkas dan mengabstraksi konteks.
 Akibatnya, jalur penalaran rinci, definisi, nama sumbu, contoh, keberatan, dan
 hubungan dengan pembahasan awal dapat berkurang atau hilang.
 
-Benih teori ini dibuat untuk memisahkan secara jujur:
+Catatan awal ini dibuat untuk memisahkan secara jujur:
 
 - apa yang masih diingat;
 - apa yang belum berhasil dipulihkan;
@@ -236,7 +236,7 @@ dengan gagasan awal.
 
 ## 10. Evidence Register Awal
 
-Belum ada evidence ilmiah yang diterima untuk benih teori ini.
+Belum ada evidence ilmiah yang diterima untuk catatan awal ini.
 
 | Jenis | Isi | Provenance | Review | Penggunaan |
 | --- | --- | --- | --- | --- |
@@ -361,7 +361,7 @@ kata yang sama.
 
 ## 16. Kriteria Kenaikan Status
 
-Benih teori ini tidak boleh dinaikkan menjadi hypothesis artifact yang lebih
+Catatan awal ini tidak boleh dinaikkan menjadi hypothesis artifact yang lebih
 kuat sebelum:
 
 - fenomena target dapat dijelaskan;
@@ -441,9 +441,9 @@ satu fragmen ingatan Jumadi
   -> tinjau ulang fragmen
 ```
 
-## 20. Definition of Done untuk Theory Seed
+## 20. Definition of Done untuk Catatan Awal
 
-Theory seed ini dianggap cukup sebagai rekaman awal apabila:
+Catatan ini dianggap cukup sebagai rekaman awal apabila:
 
 - asal gagasan dicatat;
 - hubungan awal dengan diskusi Jung dicatat tanpa klaim berlebihan;
