@@ -7,6 +7,9 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Added Phase 1F-C manually invoked end-to-end restore-drill control, composing
+  the canonical lease, isolated drill, signed admission, and completion gates
+  while failing the lease explicitly when any post-acquisition stage fails.
 - Added Phase 1F-B Schema 31 exclusive restore-drill coordination with
   server-selected backup binding, bounded lease ownership, immutable lifecycle
   events, and completion tied to canonical signed verification evidence.
