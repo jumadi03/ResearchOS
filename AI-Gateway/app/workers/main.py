@@ -150,7 +150,7 @@ def claim(connection):
               AND (
                 w.maximum_runs IS NULL OR s.completed_runs < w.maximum_runs
               )
-            ON CONFLICT(deduplication_key) DO NOTHING
+            ON CONFLICT DO NOTHING
         """)
         cursor.execute("""
             UPDATE background_jobs SET status='pending', locked_by=NULL,
