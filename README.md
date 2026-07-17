@@ -110,6 +110,7 @@ schema and persistence, and dependency-security gates.
 - [Internet discovery roadmap](Documents/INTERNET_DISCOVERY_ROADMAP.md)
 - [Internet discovery consolidation report](Documents/INTERNET_DISCOVERY_CONSOLIDATION_REPORT.md)
 - [Architecture governance](Documents/ARCHITECTURE_GOVERNANCE.md)
+- [File management architecture](Documents/FILE_MANAGEMENT_ARCHITECTURE.md)
 - [Storage compliance report](Documents/STORAGE_COMPLIANCE_REPORT.md)
 - [AI Gateway details](AI-Gateway/README.md)
 
