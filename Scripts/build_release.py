@@ -22,6 +22,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY = ROOT / "AI-Gateway"
 OUTPUT = ROOT / "dist" / "release"
+CANONICAL_UI_LOCK = ROOT / "deploy" / "canonical-ui.lock.json"
 
 
 def sha256(path: Path) -> str:
@@ -58,6 +59,47 @@ def declared_version() -> str:
     if mismatches:
         raise RuntimeError(f"Release version mismatch: {mismatches}")
     return version
+
+
+def canonical_ui_lock() -> dict:
+    document = json.loads(CANONICAL_UI_LOCK.read_text(encoding="utf-8"))
+    required = {
+        "schema_version",
+        "component",
+        "repository",
+        "commit_sha",
+        "sites_project_id",
+        "sites_version_number",
+        "deployment_url",
+        "operational_status",
+        "build_contract",
+        "tests_passed",
+    }
+    missing = sorted(required - document.keys())
+    if missing:
+        raise RuntimeError(f"Canonical UI lock is missing fields: {missing}")
+    if document["schema_version"] != "1.0":
+        raise RuntimeError("Unsupported canonical UI lock schema")
+    if document["component"] != "researchos-canonical-target-ui":
+        raise RuntimeError("Unexpected canonical UI component")
+    if not re.fullmatch(r"[0-9a-f]{40}", document["commit_sha"]):
+        raise RuntimeError("Canonical UI commit must be a full lowercase Git SHA")
+    if not str(document["sites_project_id"]).startswith("appgprj_"):
+        raise RuntimeError("Canonical UI Sites project ID is invalid")
+    if not isinstance(document["sites_version_number"], int) or document["sites_version_number"] < 1:
+        raise RuntimeError("Canonical UI Sites version must be a positive integer")
+    if not str(document["deployment_url"]).startswith("https://"):
+        raise RuntimeError("Canonical UI deployment URL must use HTTPS")
+    if document["operational_status"] not in {
+        "canonical_target_not_cutover",
+        "operational_canonical",
+    }:
+        raise RuntimeError("Canonical UI operational status is invalid")
+    if document["build_contract"] != "vinext":
+        raise RuntimeError("Canonical UI build contract must be vinext")
+    if not isinstance(document["tests_passed"], int) or document["tests_passed"] < 1:
+        raise RuntimeError("Canonical UI test count must be a positive integer")
+    return document
 
 
 def source_files() -> list[Path]:
@@ -156,6 +198,11 @@ def release_baseline(
     ui_tests: int,
     schema_version: int,
 ) -> Path:
+    ui_lock = canonical_ui_lock()
+    if ui_tests != ui_lock["tests_passed"]:
+        raise RuntimeError(
+            "Canonical UI test count does not match deploy/canonical-ui.lock.json"
+        )
     status = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=ROOT,
@@ -197,6 +244,7 @@ def release_baseline(
             "untracked_files": sum(line.startswith("??") for line in status),
             "migration_files": len(migrations),
             "latest_migration": migrations[-1].name if migrations else None,
+            "canonical_ui": ui_lock,
         },
         "publication": {
             "committed": False,
@@ -217,6 +265,7 @@ def provenance(version: str, subjects: list[Path]) -> Path:
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True
     ).stdout.strip()
+    ui_lock = canonical_ui_lock()
     document = {
         "schema_version": "1.0",
         "project": "ResearchOS",
@@ -225,6 +274,17 @@ def provenance(version: str, subjects: list[Path]) -> Path:
             "repository": "https://github.com/jumadi03/ResearchOS",
             "revision": revision,
         },
+        "external_sources": [
+            {
+                "component": ui_lock["component"],
+                "repository": ui_lock["repository"],
+                "revision": ui_lock["commit_sha"],
+                "sites_project_id": ui_lock["sites_project_id"],
+                "sites_version_number": ui_lock["sites_version_number"],
+                "deployment_url": ui_lock["deployment_url"],
+                "operational_status": ui_lock["operational_status"],
+            }
+        ],
         "builder": {
             "python": platform.python_version(),
             "platform": platform.platform(),

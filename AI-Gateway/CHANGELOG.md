@@ -5,6 +5,24 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.5.0-rc.4] - 2026-07-19
+
+### Changed
+
+- Bound the canonical Sites UI to the release contract with its exact source
+  commit, Sites project and version, production URL, test count, and
+  operational cutover status.
+- Added the canonical UI binding to the release baseline and provenance,
+  closing the cross-repository evidence gap found during RC.3 acceptance.
+- Added the secure public API tunnel contract for connecting the Sites UI to
+  an explicitly configured HTTPS backend origin.
+
+### Verification
+
+- Preserved RC.3 as an immutable candidate and recorded its consolidated
+  acceptance decision separately.
+- Added regression coverage that rejects incomplete canonical UI provenance.
+
 ## [0.5.0-rc.3] - 2026-07-19
 
 ### Fixed
