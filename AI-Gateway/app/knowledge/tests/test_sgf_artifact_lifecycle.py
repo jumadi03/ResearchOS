@@ -259,6 +259,23 @@ def test_work_queue_exposes_domain_artifact_id_for_lifecycle_endpoint():
     assert "regexp_replace(c.stable_key, '^artifact:', '')" in source
 
 
+def test_extraction_reuses_equivalent_content_and_parser_manifest():
+    pipeline = (
+        Path(__file__).resolve().parents[2]
+        / "knowledge" / "ingestion_pipeline.py"
+    ).read_text(encoding="utf-8")
+    repository = (
+        Path(__file__).resolve().parents[2]
+        / "knowledge" / "repositories" / "postgres_evidence.py"
+    ).read_text(encoding="utf-8")
+    assert "find_equivalent_extraction" in pipeline
+    assert "document.content_hash" in pipeline
+    assert "self.extraction_engine.parser_version" in pipeline
+    assert "find_equivalent_extraction" in repository
+    assert "document_content_hash=%s" in repository
+    assert "parser_version=%s" in repository
+
+
 def test_workspace_exposes_sgf_040_operational_queues_and_confirmations():
     static = Path(__file__).resolve().parents[2] / "product" / "static"
     html = (static / "index.html").read_text(encoding="utf-8")

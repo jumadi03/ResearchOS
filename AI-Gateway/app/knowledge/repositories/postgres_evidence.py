@@ -19,6 +19,23 @@ from app.knowledge.models import LiteratureRecord
 class PostgresEvidenceRepositoryMixin:
     """Canonical evidence and assertional graph behavior."""
 
+    def find_equivalent_extraction(
+        self, document_content_hash: str, parser_name: str, parser_version: str,
+    ) -> ExtractionManifest | None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT extraction_key
+                    FROM extraction_manifests
+                    WHERE document_content_hash=%s
+                      AND parser_name=%s
+                      AND parser_version=%s
+                    ORDER BY created_at DESC, extraction_manifest_id DESC
+                    LIMIT 1
+                """, (document_content_hash, parser_name, parser_version))
+                row = cursor.fetchone()
+        return self.load_extraction_manifest(row[0]) if row else None
+
     def persist_evidence(
         self, record: LiteratureRecord | None, manifest: ExtractionManifest,
         *, source_extraction_id: str | None = None,

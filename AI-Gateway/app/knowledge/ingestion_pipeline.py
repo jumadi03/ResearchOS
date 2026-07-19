@@ -477,6 +477,18 @@ class KnowledgeIngestionPipeline:
             raise ValueError("Eligible screening decision is required for evidence extraction")
         if self.data_repository is not None and self.object_store is not None:
             self.data_repository.validate_screening_decision(decision)
+            find_equivalent = getattr(
+                self.data_repository, "find_equivalent_extraction", None,
+            )
+            if find_equivalent is not None:
+                existing = find_equivalent(
+                    document.content_hash or "",
+                    self.extraction_engine.parser_name,
+                    self.extraction_engine.parser_version,
+                )
+                if existing is not None:
+                    self.extractions[existing.extraction_id] = existing
+                    return existing, self.extraction_store.save(existing)
         manifest = self.extraction_engine.extract(
             document, content, created_at=DiscoveryRun.timestamp(),
             inspection=inspection, screening_decision=decision,

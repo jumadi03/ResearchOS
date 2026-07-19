@@ -45,7 +45,15 @@ The new UI must:
 - Stage 3: accepted locally through source screening. Governed discovery,
   provider provenance, metadata enrichment, provenance-bound acquisition,
   checksum verification, source inspection, and contract screening passed.
-  Evidence extraction remains outside this stage.
+- Stage 4: accepted locally through the reviewer-queue handoff. Evidence
+  extraction is available only after eligible screening, produces provisional
+  objects, and preserves human-review authority. Equivalent content processed
+  with the same parser reuses its canonical extraction manifest; browser
+  acceptance confirmed that repeated extraction did not increase the object or
+  review-queue totals and that both totals persisted after refresh.
+- One duplicate five-object batch created while diagnosing pre-fix behavior
+  remains disclosed in the local acceptance database. It was not silently
+  removed or rewritten.
 
 Each migrated capability must have contract tests and must preserve the backend
 authorization decision. A module can replace its legacy equivalent only after
