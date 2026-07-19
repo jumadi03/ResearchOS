@@ -42,6 +42,10 @@ The new UI must:
 - Stage 2 reviewer decisions and lifecycle transitions passed fail-closed,
   role-boundary, CSRF, source-hash, audit-event, and refresh-persistence
   acceptance. Publication release remains separately publisher-gated.
+- Stage 3: accepted locally through source screening. Governed discovery,
+  provider provenance, metadata enrichment, provenance-bound acquisition,
+  checksum verification, source inspection, and contract screening passed.
+  Evidence extraction remains outside this stage.
 
 Each migrated capability must have contract tests and must preserve the backend
 authorization decision. A module can replace its legacy equivalent only after
