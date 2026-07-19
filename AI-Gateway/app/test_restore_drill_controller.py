@@ -238,6 +238,8 @@ def test_controller_is_host_only_and_does_not_accept_targets_or_secrets():
     assert "docker.sock" not in source
     assert "scheduler" not in source
     assert "subprocess.run" in source
+    assert 'encoding="utf-8"' in source
+    assert 'errors="replace"' in source
 
 
 def test_scheduled_not_due_is_a_successful_no_op(monkeypatch, tmp_path):
