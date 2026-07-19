@@ -45,7 +45,7 @@ jobs:
         with:
           subject-path: "${{ github.workspace }}/dist/release/*"
       - name: Upload verified artifact bundle
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: "ResearchOS-${{ github.ref_name }}"
           path: dist/release/*
