@@ -1629,6 +1629,10 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert 'id="translateObject"' in response.text
     assert 'id="translateProjectObjects"' in response.text
     assert "/workspace-assets/object-translation-ui.js" in response.text
+    assert "/workspace-assets/discovery.js?v=" in response.text
+    assert "/workspace-assets/workspace.css?v=" in response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["clear-site-data"] == '"cache"'
     assert 'id="qualityThreshold"' in response.text
     assert 'id="qualityMetrics"' in response.text
     assert 'id="calibrationForm"' in response.text
@@ -1683,6 +1687,9 @@ def test_discovery_workspace_submits_the_required_governed_contract() -> None:
     assert "research_question_id:questionId" in discovery
     assert "search_plan_id:planId" in discovery
     assert "project_id:state.project" in discovery
+    assert "/inspections" in discovery
+    assert "/screenings" in discovery
+    assert "screening.status!=='eligible'" in discovery
     assert "Array.isArray(body.detail)" in workspace
 
 

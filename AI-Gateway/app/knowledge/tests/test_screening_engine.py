@@ -61,6 +61,39 @@ def test_scope_rejection_and_quality_review_have_explicit_reasons(tmp_path):
     assert "REVIEW_QUALITY_METADATA_INCOMPLETE" in {
         item.code for item in review.reasons
     }
+    assert rejected.decision_id != review.decision_id
+
+
+def test_changed_screening_outcome_gets_a_new_immutable_identity(tmp_path):
+    source, _, content = document(tmp_path)
+    inspection = SourceInspectionEngine().inspect(source, content, inspected_at="now")
+    engine = ScientificScreeningEngine()
+
+    incomplete = engine.screen(
+        record(with_source=False), source, inspection, contract(), decided_at="later"
+    )
+    enriched = engine.screen(
+        record(with_source=True), source, inspection, contract(), decided_at="later"
+    )
+
+    assert incomplete.status is ScreeningStatus.HUMAN_REVIEW_REQUIRED
+    assert enriched.status is ScreeningStatus.ELIGIBLE
+    assert incomplete.decision_id != enriched.decision_id
+
+
+def test_provider_article_aliases_match_canonical_journal_article_scope(tmp_path):
+    source, _, content = document(tmp_path)
+    inspection = SourceInspectionEngine().inspect(source, content, inspected_at="now")
+    governed_contract = replace(
+        contract(), document_types=("journal_article",)
+    )
+
+    for provider_type in ("article", "journal-article", "JournalArticle"):
+        decision = ScientificScreeningEngine().screen(
+            record(work_type=provider_type), source, inspection,
+            governed_contract, decided_at="later",
+        )
+        assert decision.status is ScreeningStatus.ELIGIBLE
 
 
 def test_stale_tampered_and_noneligible_decisions_fail_closed(tmp_path):

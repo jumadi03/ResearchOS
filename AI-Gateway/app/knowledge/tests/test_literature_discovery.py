@@ -216,6 +216,35 @@ def test_openalex_follows_cursor_and_respects_total_limit() -> None:
     assert calls[1]["cursor"] == "next"
 
 
+def test_openalex_resolves_exact_doi_without_ranked_search() -> None:
+    calls = []
+
+    def transport(url, **kwargs):
+        calls.append((url, kwargs["params"]))
+        return FakeResponse(
+            {
+                "id": "https://openalex.org/W4316363711",
+                "doi": "https://doi.org/10.3389/fdata.2022.971974",
+                "title": "Exact",
+            },
+            url=url,
+        )
+
+    pages = OpenAlexProvider(transport=transport).search(
+        SearchPlan(
+            "p", "https://doi.org/10.3389/fdata.2022.971974", ("openalex",),
+            limit_per_provider=10, year_from=2022, year_to=2023,
+        )
+    )
+
+    assert pages[0].records[0]["id"] == "https://openalex.org/W4316363711"
+    assert calls == [(
+        "https://api.openalex.org/works/https://doi.org/"
+        "10.3389/fdata.2022.971974",
+        {},
+    )]
+
+
 def test_crossref_resolves_exact_doi_without_ranked_search() -> None:
     calls = []
 

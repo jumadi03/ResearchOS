@@ -17,6 +17,18 @@ follows Semantic Versioning.
   structured validation errors readably.
 - Replaced manual workspace asset version bumps with an explicit local
   no-store HTTP cache policy so rebuilt container revisions load immediately.
+- Added a cache-only Clear-Site-Data response on the local workspace entry
+  point to evict revisions cached before the no-store policy existed.
+- Added automatic content-hash query versions for every workspace stylesheet
+  and script, eliminating manual cache-busting when local assets change.
+- Resolve exact DOI queries through OpenAlex's canonical work endpoint instead
+  of ranked bibliographic search, preventing unrelated acquisition provenance.
+- Complete governed inspection and eligibility screening in the discovery UI
+  before evidence extraction, removing the browser workflow dead end.
+- Version immutable screening identities by their evaluated reasons so metadata
+  enrichment can produce a new decision without an integrity-key conflict.
+- Canonicalize provider aliases for journal articles during scope screening so
+  OpenAlex and Crossref records honor the same governed document type.
 
 ## [0.5.0-rc.4] - 2026-07-19
 
