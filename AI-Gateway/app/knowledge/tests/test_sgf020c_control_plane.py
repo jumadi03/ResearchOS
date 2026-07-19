@@ -41,6 +41,7 @@ def test_application_requires_schema_40_and_mounts_router() -> None:
 
 def test_revalidation_and_independent_appeal_are_exposed() -> None:
     assert "consequential_revalidation_queue" in SERVICE
+    assert "WHERE (%s::text IS NULL OR project_id=%s)" in SERVICE
     assert "decision_appeal_events" in SERVICE
     assert '"/revalidation"' in ROUTER
     assert '"/appeals/{appeal_id}/events"' in ROUTER

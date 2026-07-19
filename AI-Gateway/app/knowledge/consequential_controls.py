@@ -441,7 +441,7 @@ class ConsequentialResearchControls:
                        target_id,review_due_at,valid_until,reason,
                        enforcement_state
                 FROM consequential_revalidation_queue
-                WHERE (%s IS NULL OR project_id=%s)
+                WHERE (%s::text IS NULL OR project_id=%s)
                 ORDER BY
                     CASE enforcement_state WHEN 'blocked' THEN 0 ELSE 1 END,
                     review_due_at,decision_id
