@@ -156,7 +156,7 @@ class PostgresReadModelRepositoryMixin:
     def get_work_queue(self, project_id: str) -> dict:
         with self._connect() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("""
+                review_queue_query = """
                     SELECT regexp_replace(c.stable_key, '^evidence:', ''),
                            c.stable_key,e.statement,e.evidence_type,
                            e.extraction_confidence,c.updated_at,e.page,e.section,
@@ -170,10 +170,12 @@ class PostgresReadModelRepositoryMixin:
                     JOIN extraction_manifests x
                       ON x.extraction_manifest_id=e.extraction_manifest_id
                     JOIN scientific_documents d ON d.document_id=e.document_id
-                    WHERE po.project_id=%s AND ep.projected_status='pending'
+                    WHERE po.project_id=%s AND ep.projected_status=%s
                     ORDER BY c.updated_at DESC LIMIT 100
-                """, (project_id,))
-                reviews = [{
+                """
+
+                def review_items(rows):
+                    return [{
                     "object_id": str(row[0]), "stable_key": row[1], "title": row[2],
                     "evidence_type": row[3], "confidence": row[4],
                     "updated_at": row[5].isoformat(),
@@ -188,7 +190,12 @@ class PostgresReadModelRepositoryMixin:
                         "citation_fidelity", "context_preserved", "relevance",
                         "confidence", "epistemic_classification",
                     ),
-                } for row in cursor.fetchall()]
+                    } for row in rows]
+
+                cursor.execute(review_queue_query, (project_id, "pending"))
+                reviews = review_items(cursor.fetchall())
+                cursor.execute(review_queue_query, (project_id, "rejected"))
+                correction_reviews = review_items(cursor.fetchall())
                 cursor.execute("""
                     SELECT regexp_replace(c.stable_key, '^artifact:', ''),
                            c.stable_key,a.title,a.artifact_type,a.status,
@@ -370,6 +377,7 @@ class PostgresReadModelRepositoryMixin:
                 ]
         return {
             "project_id": project_id, "pending_reviews": reviews,
+            "correction_reviews": correction_reviews,
             "pending_transitions": transitions, "index_jobs": jobs,
             "impact_reviews": impact_reviews,
             "follow_up_cases": follow_up_cases,

@@ -276,6 +276,16 @@ def test_extraction_reuses_equivalent_content_and_parser_manifest():
     assert "parser_version=%s" in repository
 
 
+def test_work_queue_exposes_append_only_evidence_correction_candidates():
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "knowledge" / "repositories" / "postgres_read_model.py"
+    ).read_text(encoding="utf-8")
+    assert '"correction_reviews": correction_reviews' in source
+    assert 'cursor.execute(review_queue_query, (project_id, "rejected"))' in source
+    assert '"pending_reviews": reviews' in source
+
+
 def test_workspace_exposes_sgf_040_operational_queues_and_confirmations():
     static = Path(__file__).resolve().parents[2] / "product" / "static"
     html = (static / "index.html").read_text(encoding="utf-8")
