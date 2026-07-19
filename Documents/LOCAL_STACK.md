@@ -289,6 +289,10 @@ Reports are retained below the ignored
 backup paths, target identifiers, report paths, database URLs, or key paths.
 It is not a scheduler and is not exposed through the API, UI, or worker.
 
+The latest local end-to-end execution and its live recovery projection are
+recorded in
+[`LOCAL_RECOVERY_ACCEPTANCE_REPORT.md`](LOCAL_RECOVERY_ACCEPTANCE_REPORT.md).
+
 Phase 1F-D adds a canonical schedule that starts paused. Inspect it from
 `deploy`:
 
