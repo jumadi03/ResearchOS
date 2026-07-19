@@ -57,6 +57,11 @@ The new UI must:
 - One duplicate five-object batch created while diagnosing pre-fix behavior
   remains disclosed in the local acceptance database. It was not silently
   removed or rewritten.
+- Stage 5: started locally. One human-accepted evidence object passed the
+  deterministic indexer admission gate and produced an integrity-verified
+  graph with complete review provenance. Canonical graph inspection in
+  `site/` is the next UI migration gate; theory construction has not yet been
+  attempted.
 
 Each migrated capability must have contract tests and must preserve the backend
 authorization decision. A module can replace its legacy equivalent only after
