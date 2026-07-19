@@ -36,10 +36,12 @@ The new UI must:
 ## Current progress
 
 - Stage 1: accepted locally (session-aware shell and canonical project list).
-- Stage 2: read-only portion accepted locally (object browser, search, type
-  filter, detail inspector, cursor pagination, and project work-queue preview).
-- Stage 2 mutations remain on the legacy workspace until governed forms and
-  persistence acceptance are complete.
+- Stage 2: accepted locally. This includes the object browser, search, type
+  filter, detail inspector, cursor pagination, project work queue, governed
+  evidence-review form, and artifact lifecycle-transition form.
+- Stage 2 reviewer decisions and lifecycle transitions passed fail-closed,
+  role-boundary, CSRF, source-hash, audit-event, and refresh-persistence
+  acceptance. Publication release remains separately publisher-gated.
 
 Each migrated capability must have contract tests and must preserve the backend
 authorization decision. A module can replace its legacy equivalent only after

@@ -251,6 +251,14 @@ def test_sgf_040i_closure_requires_matching_canonical_action_event():
     assert '"stage": "case_closed"' in source
 
 
+def test_work_queue_exposes_domain_artifact_id_for_lifecycle_endpoint():
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "knowledge" / "repositories" / "postgres_read_model.py"
+    ).read_text(encoding="utf-8")
+    assert "regexp_replace(c.stable_key, '^artifact:', '')" in source
+
+
 def test_workspace_exposes_sgf_040_operational_queues_and_confirmations():
     static = Path(__file__).resolve().parents[2] / "product" / "static"
     html = (static / "index.html").read_text(encoding="utf-8")

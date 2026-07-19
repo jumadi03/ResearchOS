@@ -190,7 +190,8 @@ class PostgresReadModelRepositoryMixin:
                     ),
                 } for row in cursor.fetchall()]
                 cursor.execute("""
-                    SELECT c.object_id,c.stable_key,a.title,a.artifact_type,a.status,
+                    SELECT regexp_replace(c.stable_key, '^artifact:', ''),
+                           c.stable_key,a.title,a.artifact_type,a.status,
                            c.updated_at
                     FROM project_objects po
                     JOIN canonical_objects c ON c.object_id=po.object_id

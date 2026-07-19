@@ -82,11 +82,17 @@ class KnowledgeRepositoryService:
         actions = []
         evidence = result.get("evidence")
         artifact = result.get("artifact")
+        stable_key = result["identity"].get("stable_key", "")
+        domain_object_id = (
+            stable_key.split(":", 1)[1]
+            if ":" in stable_key
+            else result["identity"]["object_id"]
+        )
         if (
             evidence and evidence.get("review_status") == "pending"
             and principal.has_role(KnowledgeRole.REVIEWER)
         ):
-            href = f"/knowledge/evidence/{result['identity']['object_id']}/reviews"
+            href = f"/knowledge/evidence/{domain_object_id}/reviews"
             actions.extend((
                 {"action": "evidence:accept", "method": "POST", "href": href},
                 {"action": "evidence:reject", "method": "POST", "href": href},
@@ -109,7 +115,7 @@ class KnowledgeRepositoryService:
             if next_status and principal.has_role(required_role):
                 actions.append({
                     "action": "artifact:transition", "method": "POST",
-                    "href": f"/knowledge/artifacts/{result['identity']['object_id']}/transitions",
+                    "href": f"/knowledge/artifacts/{domain_object_id}/transitions",
                     "to_status": next_status,
                 })
             if (

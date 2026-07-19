@@ -60,8 +60,12 @@ requirements.
 
 ## Next gate
 
-Before stage 2 can replace the legacy object/work-queue surface completely, the
-canonical UI still needs:
+Superseded on 2026-07-19 by
+`LOCAL_CANONICAL_DECISION_ACCEPTANCE_REPORT.md`: governed evidence review and
+artifact lifecycle transition forms subsequently passed local acceptance.
+
+At the time of this report, the canonical UI still needed the following items;
+they are now completed by the superseding acceptance:
 
 1. governed evidence-review and lifecycle-transition forms;
 2. success, validation-failure, unauthorized, and stale-state browser tests;
