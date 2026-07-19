@@ -59,9 +59,10 @@ The new UI must:
   removed or rewritten.
 - Stage 5: started locally. One human-accepted evidence object passed the
   deterministic indexer admission gate and produced an integrity-verified
-  graph with complete review provenance. Canonical graph inspection in
-  `site/` is the next UI migration gate; theory construction has not yet been
-  attempted.
+  graph with complete review provenance. Canonical graph inspection is now
+  accepted locally with an Obsidian-inspired accepted-only atlas, relationship
+  filters, normalized search, pan/zoom, and provenance-aware node and edge
+  inspectors. Theory construction has not yet been attempted.
 
 Each migrated capability must have contract tests and must preserve the backend
 authorization decision. A module can replace its legacy equivalent only after
