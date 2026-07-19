@@ -45,12 +45,15 @@ The new UI must:
 - Stage 3: accepted locally through source screening. Governed discovery,
   provider provenance, metadata enrichment, provenance-bound acquisition,
   checksum verification, source inspection, and contract screening passed.
-- Stage 4: accepted locally through the reviewer-queue handoff. Evidence
+- Stage 4: accepted locally end to end. Evidence
   extraction is available only after eligible screening, produces provisional
   objects, and preserves human-review authority. Equivalent content processed
   with the same parser reuses its canonical extraction manifest; browser
   acceptance confirmed that repeated extraction did not increase the object or
-  review-queue totals and that both totals persisted after refresh.
+  review-queue totals. The reviewer form exposes source coordinates and bound
+  hashes, reviewer decisions persist after refresh, accidental decisions can
+  be corrected through append-only events, and rejected evidence is separated
+  from active work while remaining available as an audit archive.
 - One duplicate five-object batch created while diagnosing pre-fix behavior
   remains disclosed in the local acceptance database. It was not silently
   removed or rewritten.

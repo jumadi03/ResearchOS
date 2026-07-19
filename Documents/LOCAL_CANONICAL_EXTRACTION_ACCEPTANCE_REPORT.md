@@ -1,6 +1,6 @@
 # Local Canonical Evidence Extraction Acceptance Report
 
-Date: 2026-07-19  
+Date: 2026-07-20  
 Environment: local ResearchOS stack and `http://localhost:3003/`  
 Result: Accepted locally with a disclosed historical duplicate batch
 
@@ -59,13 +59,42 @@ state; canonical project and queue data are reloaded from the backend.
 ## Regression evidence
 
 - Targeted backend tests: 65 passed.
-- Full backend regression: 504 passed.
+- Final full backend regression: 505 passed.
 - Canonical UI behavior tests: 7 passed.
 - Canonical Vinext production build: passed.
 
+## Human-review completion
+
+The reviewer completed the nine-item acceptance batch. Eight malformed,
+truncated, or duplicate objects were rejected. One complete claim from page 10
+was initially rejected by mistake and then corrected through a second,
+append-only review event:
+
+- evidence object: `object-a369437ab603049f6edddf86`;
+- statement: demographic control variables explained 1% of outcome variance;
+- original transition: `pending -> rejected`;
+- corrective transition: `rejected -> accepted`;
+- final canonical status: `accepted`.
+
+The original rejection was not deleted or rewritten. Both events remain
+attributed to the reviewer and retain their timestamps.
+
+## Additional defects corrected during reviewer acceptance
+
+- The reviewer dialog now displays the complete statement, source-document
+  title, DOI, page, section, character range, statement hash, and manifest
+  hash before confirmation.
+- Duplicate development-mode session loads no longer race CSRF rotation.
+  A stale CSRF response refreshes the session without automatically replaying
+  a scientific decision.
+- Advisory guidance is explicitly labelled as non-decisional and does not
+  preselect or submit reviewer assessments.
+- Rejected evidence is retained as an audit archive and no longer appears as
+  active correction work. A completed correction leaves the active queue.
+
 ## Decision
 
-The local canonical extraction handoff is accepted. Equivalent repeated
-extraction is idempotent, evidence remains provisional, and the reviewer queue
-persists across refresh. Human reviewer decisions remain a separate governed
-action.
+Stage 4 is accepted locally end to end. Equivalent repeated extraction is
+idempotent, provisional evidence reaches the human reviewer, reviewer
+decisions are source- and hash-bound, corrections are append-only, and rejected
+history remains auditable without polluting the active queue.
