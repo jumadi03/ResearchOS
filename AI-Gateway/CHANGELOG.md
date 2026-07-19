@@ -5,6 +5,21 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.5.0-rc.3] - 2026-07-19
+
+### Fixed
+
+- Fixed the consequential-research revalidation read when `project_id` is
+  omitted by explicitly typing the nullable PostgreSQL filter parameter.
+- Added regression coverage for the unfiltered SGF-020C revalidation query.
+
+### Verification
+
+- Completed interactive visual inspection of the canonical production UI,
+  including its fail-closed unavailable-backend state and retry control.
+- Passed 487 backend tests, the Vinext production build, and one canonical
+  rendered-HTML test.
+
 ## [0.5.0-rc.2] - 2026-07-19
 
 ### Changed
