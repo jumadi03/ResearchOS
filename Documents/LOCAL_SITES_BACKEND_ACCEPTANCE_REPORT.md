@@ -31,9 +31,16 @@ Interactive browser verification passed:
 3. The verified **ResearchOS** project was loaded from the backend.
 4. The consequential-control section loaded backend-derived state.
 5. A full page reload preserved the authenticated session and project data.
+6. The verified project link opened
+   `http://localhost:8080/workspace?project=researchos-default`.
+7. The operational workspace retained the session, selected the ResearchOS
+   project, and loaded its 320 canonical objects.
 
 These observations confirm that the browser used the UI's same-origin proxy,
 not a direct cross-origin call to port 8080.
+
+The workspace handoff deliberately uses `localhost` on both UI and backend so
+the host-scoped local session remains available when moving between ports.
 
 ## Automated verification
 
