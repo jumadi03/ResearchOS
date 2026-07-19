@@ -47,6 +47,18 @@ are stopped, a runtime dependency is unavailable, or the workspace cannot be
 rendered. `--stop` performs a normal Compose shutdown and preserves volumes
 and ignored credential files.
 
+Verify continuity across a routine restart from the repository root:
+
+```powershell
+py -3.13 Scripts\verify_local_continuity.py
+```
+
+The verifier compares the PostgreSQL system identity, migration version, and
+hashed workspace-account inventory before and after restart. It also writes,
+retrieves, verifies, and removes a random MinIO sentinel. Its ignored JSON
+report contains hashes and counts only; credentials and sentinel content are
+not recorded.
+
 Run commands from `deploy` and always supply the untracked local environment:
 
 ```powershell
