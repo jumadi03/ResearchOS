@@ -2,7 +2,7 @@
 
 Date: 2026-07-19  
 Target: `http://127.0.0.1:8080/workspace`  
-Status: **PARTIALLY ACCEPTED — acquisition and extraction pass; reviewer submission remains blocked**
+Status: **ACCEPTED — acquisition, extraction, governed review, and refresh persistence pass**
 
 ## Accepted path
 
@@ -36,20 +36,21 @@ Status: **PARTIALLY ACCEPTED — acquisition and extraction pass; reviewer submi
    match the canonical contract value `journal_article`. Screening now
    normalizes these aliases.
 
-## Remaining blocker
+## Reviewer acceptance
 
-Reviewer login and queue authorization work, and the five new evidence objects
-appear in the local review inbox. Submitting a conservative rejection from the
-canonical UI returns seven `Field required` validation errors because
-`workspace.js` sends only `decision`, `rationale`, and `occurred_at`, while the
-current API also requires citation fidelity, context preservation, relevance,
-confidence assessment, epistemic classification, reviewed statement hash, and
-extraction manifest hash.
-
-Do not mark the end-to-end document-to-review workflow accepted until the
-review dialog collects and submits those governed assessment fields (with the
-two hashes sourced from canonical queue data) and a browser decision persists
-after refresh.
+- Reviewer authentication and queue authorization passed.
+- Normal evidence review now uses the complete governed assessment form:
+  citation fidelity, context preservation, relevance, confidence assessment,
+  epistemic classification, rationale, and explicit confirmation.
+- Reviewed-statement and extraction-manifest hashes are bound from the
+  canonical work queue and are not entered manually.
+- A conservative rejection of the truncated claim was recorded with
+  classification `unclear` and confidence `0.95`.
+- The pending queue decreased from six to five. After a full browser refresh,
+  it remained five and the rejected claim did not return.
+- PostgreSQL confirmed the latest immutable event as `rejected`, attributed to
+  `reviewer`, with both 64-character provenance hashes present. The evidence
+  projection is also `rejected`.
 
 ## Regression evidence
 

@@ -29,6 +29,8 @@ follows Semantic Versioning.
   enrichment can produce a new decision without an integrity-key conflict.
 - Canonicalize provider aliases for journal articles during scope screening so
   OpenAlex and Crossref records honor the same governed document type.
+- Route normal evidence review through the complete governed assessment form,
+  binding statement and extraction hashes from the canonical work queue.
 
 ## [0.5.0-rc.4] - 2026-07-19
 

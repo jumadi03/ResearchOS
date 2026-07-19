@@ -1691,6 +1691,11 @@ def test_discovery_workspace_submits_the_required_governed_contract() -> None:
     assert "/screenings" in discovery
     assert "screening.status!=='eligible'" in discovery
     assert "Array.isArray(body.detail)" in workspace
+    assert "state.queue?.pending_reviews" in workspace
+    assert "item.reviewed_statement_hash" in workspace
+    assert "item.extraction_manifest_hash" in workspace
+    assert "citation_fidelity:" in workspace
+    assert "epistemic_classification:" in workspace
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:
