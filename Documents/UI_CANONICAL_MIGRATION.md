@@ -33,6 +33,14 @@ The new UI must:
 5. Theory, graph, validation, and publication.
 6. Administration, audit, recovery, and observability.
 
+## Current progress
+
+- Stage 1: accepted locally (session-aware shell and canonical project list).
+- Stage 2: read-only portion accepted locally (object browser, search, type
+  filter, detail inspector, cursor pagination, and project work-queue preview).
+- Stage 2 mutations remain on the legacy workspace until governed forms and
+  persistence acceptance are complete.
+
 Each migrated capability must have contract tests and must preserve the backend
 authorization decision. A module can replace its legacy equivalent only after
 its success, failure, unauthenticated, unauthorized, and empty states have been
