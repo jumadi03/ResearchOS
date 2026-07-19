@@ -41,7 +41,7 @@ jobs:
       - name: Build release artifacts
         run: python ../Scripts/build_release.py
       - name: Attest release artifacts
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: "${{ github.workspace }}/dist/release/*"
       - name: Upload verified artifact bundle
