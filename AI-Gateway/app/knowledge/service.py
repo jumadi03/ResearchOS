@@ -35,6 +35,9 @@ class KnowledgeDiscoveryService:
         self.theory_pipeline = KnowledgeTheoryPipeline(
             output_root, self._graphs, data_repository=data_repository,
             object_store=object_store,
+            semantic_relation_resolver=(
+                self.ingestion_pipeline.relation_dependencies_for_graph
+            ),
         )
         self.object_translation_store = ObjectTranslationStore(
             output_root / "object-translations"
@@ -158,6 +161,14 @@ class KnowledgeDiscoveryService:
             change_id, **options
         )
 
+    def resolve_impact_review(self, change_id: str, **options):
+        return self.repository_service.resolve_impact_review(change_id, **options)
+
+    def select_follow_up_target(self, resolution_id: str, **options):
+        return self.repository_service.select_follow_up_target(
+            resolution_id, **options
+        )
+
     def acquire_document(self, run_id: str, candidate: DocumentCandidate):
         return self.ingestion_pipeline.acquire_document(run_id, candidate)
 
@@ -173,13 +184,43 @@ class KnowledgeDiscoveryService:
     def build_knowledge_graph(self, extraction_id: str):
         return self.ingestion_pipeline.build_knowledge_graph(extraction_id)
 
+    def graph_lifecycle(self, graph_id: str):
+        return self.theory_pipeline.graph_lifecycle(graph_id)
+
     def intake_accepted_evidence(
         self, extraction_id: str, *, evidence_object_ids: tuple[str, ...],
-        actor_id: str, occurred_at: str,
+        actor_id: str, occurred_at: str, semantic_relation_ids=(),
     ):
         return self.ingestion_pipeline.intake_accepted_evidence(
             extraction_id, evidence_object_ids=evidence_object_ids,
             actor_id=actor_id, occurred_at=occurred_at,
+            semantic_relation_ids=tuple(semantic_relation_ids),
+        )
+
+    def propose_semantic_relation(self, extraction_id: str, **values):
+        return self.ingestion_pipeline.propose_semantic_relation(
+            extraction_id, **values,
+        )
+
+    def review_semantic_relation(self, relation_id: str, **values):
+        return self.ingestion_pipeline.review_semantic_relation(
+            relation_id, **values,
+        )
+
+    def list_semantic_relations(self, *, extraction_id=None):
+        return self.ingestion_pipeline.list_semantic_relations(
+            extraction_id=extraction_id,
+        )
+
+    def semantic_relation_review_queue(self, extraction_id):
+        return self.ingestion_pipeline.semantic_relation_review_queue(
+            extraction_id,
+        )
+
+    def semantic_reextract(self, extraction_id, *, evidence_object_ids=()):
+        return self.ingestion_pipeline.semantic_reextract(
+            extraction_id,
+            evidence_object_ids=tuple(evidence_object_ids),
         )
 
     def review_evidence(
@@ -195,6 +236,24 @@ class KnowledgeDiscoveryService:
         return self.theory_pipeline.build_theories(
             graph_ids, generated_by=generated_by
         )
+
+    def propose_cross_study_proposition(self, **options):
+        return self.theory_pipeline.propose_cross_study_proposition(**options)
+
+    def review_cross_study_proposition(self, proposition_id, **options):
+        return self.theory_pipeline.review_cross_study_proposition(
+            proposition_id, **options,
+        )
+
+    def build_cross_study_proposition_theory(
+        self, proposition_id, **options,
+    ):
+        return self.theory_pipeline.build_cross_study_proposition_theory(
+            proposition_id, **options,
+        )
+
+    def list_cross_study_propositions(self):
+        return self.theory_pipeline.list_cross_study_propositions()
 
     def review_theory(self, bundle_id, **options):
         return self.theory_pipeline.review_theory(bundle_id, **options)
@@ -282,6 +341,9 @@ class KnowledgeDiscoveryService:
     def validation_history(self, bundle_id):
         return self.theory_pipeline.validation_history(bundle_id)
 
+    def dependency_impact(self, bundle_id):
+        return self.theory_pipeline.dependency_impact(bundle_id)
+
     def publish(self, bundle_id, **options):
         return self.theory_pipeline.publish(bundle_id, **options)
 
@@ -296,6 +358,12 @@ class KnowledgeDiscoveryService:
 
     def publication_package(self, bundle_id, publication_id):
         return self.theory_pipeline.publication_package(bundle_id, publication_id)
+
+    def relate_publication(self, publication_id, **options):
+        return self.theory_pipeline.relate_publication(publication_id, **options)
+
+    def publication_lifecycle(self, publication_id):
+        return self.theory_pipeline.publication_lifecycle(publication_id)
 
     def transition_artifact(
         self, artifact_id: str, *, to_status: str, actor_id: str,

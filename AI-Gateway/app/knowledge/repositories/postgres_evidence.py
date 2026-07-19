@@ -20,19 +20,38 @@ class PostgresEvidenceRepositoryMixin:
     """Canonical evidence and assertional graph behavior."""
 
     def persist_evidence(
-        self, record: LiteratureRecord, manifest: ExtractionManifest,
+        self, record: LiteratureRecord | None, manifest: ExtractionManifest,
+        *, source_extraction_id: str | None = None,
     ) -> tuple[str, ...]:
         if manifest.schema_version != "1.1" or not manifest.verify():
             raise ValueError("Canonical extraction manifest integrity verification failed")
         with self._connect() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("""
-                    SELECT c.object_id, r.representation_id
-                    FROM canonical_objects c
-                    JOIN scientific_representations r ON r.object_id=c.object_id
-                    WHERE c.stable_key=%s AND r.checksum_sha256=%s
-                    ORDER BY r.document_version DESC LIMIT 1
-                """, (self._stable_key(record), manifest.document_content_hash))
+                if source_extraction_id is not None:
+                    cursor.execute("""
+                        SELECT document_id,representation_id
+                        FROM extraction_manifests
+                        WHERE extraction_key=%s AND document_content_hash=%s
+                    """, (
+                        source_extraction_id,
+                        manifest.document_content_hash,
+                    ))
+                else:
+                    if record is None:
+                        raise ValueError(
+                            "Literature record or source extraction is required"
+                        )
+                    cursor.execute("""
+                        SELECT c.object_id, r.representation_id
+                        FROM canonical_objects c
+                        JOIN scientific_representations r
+                          ON r.object_id=c.object_id
+                        WHERE c.stable_key=%s AND r.checksum_sha256=%s
+                        ORDER BY r.document_version DESC LIMIT 1
+                    """, (
+                        self._stable_key(record),
+                        manifest.document_content_hash,
+                    ))
                 source = cursor.fetchone()
                 if source is None:
                     raise KeyError(f"Canonical representation missing for extraction: {manifest.extraction_id}")
@@ -361,19 +380,29 @@ class PostgresEvidenceRepositoryMixin:
             with connection.cursor() as cursor:
                 for object_id in evidence_object_ids:
                     cursor.execute("""
-                        SELECT e.human_review_status,
+                        SELECT p.projected_status,
                                v.review_id, v.decision, v.reviewer_id,
                                v.rationale, v.occurred_at, v.provenance_id,
                                v.from_status,v.assessment,v.assessment_hash
                         FROM canonical_objects c
                         JOIN evidence_objects e ON e.evidence_id=c.object_id
+                        JOIN evidence_current_review_projection p
+                          ON p.evidence_id=e.evidence_id
                         LEFT JOIN LATERAL (
                             SELECT review_id, decision, reviewer_id, rationale,
                                    occurred_at, provenance_id, from_status,
                                    assessment,assessment_hash
                             FROM evidence_review_events
                             WHERE evidence_id=e.evidence_id
-                            ORDER BY created_at DESC LIMIT 1
+                              AND assessment IS NOT NULL
+                              AND assessment_hash IS NOT NULL
+                              AND reviewed_statement_hash=e.content_hash
+                              AND extraction_manifest_hash=(
+                                  SELECT manifest_hash FROM extraction_manifests
+                                  WHERE extraction_manifest_id=e.extraction_manifest_id
+                              )
+                            ORDER BY occurred_at DESC,created_at DESC,review_id DESC
+                            LIMIT 1
                         ) v ON true
                         WHERE c.stable_key=%s
                     """, (f"evidence:{object_id}",))
@@ -425,7 +454,7 @@ class PostgresEvidenceRepositoryMixin:
                 for node in evidence_nodes:
                     cursor.execute("""
                         SELECT e.evidence_id, e.document_id, e.evidence_type,
-                               e.statement, e.content_hash, e.human_review_status,
+                               e.statement, e.content_hash, p.projected_status,
                                v.review_id, v.decision, v.reviewer_id,
                                v.rationale, v.occurred_at, v.provenance_id,
                                v.from_status,v.assessment,v.assessment_hash,
@@ -433,6 +462,8 @@ class PostgresEvidenceRepositoryMixin:
                                v.extraction_manifest_hash
                         FROM canonical_objects c
                         JOIN evidence_objects e ON e.evidence_id=c.object_id
+                        JOIN evidence_current_review_projection p
+                          ON p.evidence_id=e.evidence_id
                         LEFT JOIN LATERAL (
                             SELECT review_id, decision, reviewer_id, rationale,
                                    occurred_at, provenance_id, from_status,
@@ -441,7 +472,15 @@ class PostgresEvidenceRepositoryMixin:
                                    extraction_manifest_hash
                             FROM evidence_review_events
                             WHERE evidence_id=e.evidence_id
-                            ORDER BY created_at DESC LIMIT 1
+                              AND assessment IS NOT NULL
+                              AND assessment_hash IS NOT NULL
+                              AND reviewed_statement_hash=e.content_hash
+                              AND extraction_manifest_hash=(
+                                  SELECT manifest_hash FROM extraction_manifests
+                                  WHERE extraction_manifest_id=e.extraction_manifest_id
+                              )
+                            ORDER BY occurred_at DESC,created_at DESC,review_id DESC
+                            LIMIT 1
                         ) v ON true
                         WHERE c.stable_key=%s
                         FOR UPDATE OF e

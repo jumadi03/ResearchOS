@@ -27,6 +27,7 @@ class KnowledgeIntakeManifest:
     occurred_at: str
     content_hash: str = ""
     schema_version: str = "1.0"
+    semantic_relation_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -38,9 +39,14 @@ class KnowledgeIntakeManifest:
             tuple(self.admitted_evidence_object_ids),
         )
         object.__setattr__(self, "decisions", tuple(self.decisions))
+        object.__setattr__(
+            self, "semantic_relation_ids", tuple(self.semantic_relation_ids),
+        )
 
     def expected_hash(self) -> str:
         payload = asdict(replace(self, content_hash=""))
+        if self.schema_version == "1.0":
+            payload.pop("semantic_relation_ids", None)
         return sha256(json.dumps(
             payload, ensure_ascii=False, sort_keys=True,
             separators=(",", ":"),
@@ -57,7 +63,11 @@ class KnowledgeIntakeManifest:
             item.evidence_object_id for item in self.decisions if item.admitted
         ))
         return bool(
-            self.schema_version == "1.0"
+            self.schema_version in {"1.0", "1.1"}
+            and (
+                self.schema_version == "1.1"
+                or not self.semantic_relation_ids
+            )
             and self.intake_id
             and self.extraction_id
             and len(self.extraction_manifest_hash) == 64
@@ -79,5 +89,7 @@ class KnowledgeIntakeManifest:
             )
             and self.actor_id.strip()
             and self.occurred_at.strip()
+            and tuple(sorted(set(self.semantic_relation_ids)))
+            == self.semantic_relation_ids
             and self.content_hash == self.expected_hash()
         )

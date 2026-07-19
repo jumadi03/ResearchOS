@@ -18,6 +18,22 @@ class TheoryReviewState(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class TheoryDependencyImpact:
+    bundle_id: str
+    evidence_object_ids: tuple[str, ...]
+    impacted_evidence_ids: tuple[str, ...]
+    evidence_states: tuple[tuple[str, str], ...]
+    graph_ids: tuple[str, ...]
+    impacted_graph_ids: tuple[str, ...]
+    graph_states: tuple[tuple[str, str], ...]
+    current: bool
+    verification: str
+    semantic_relation_ids: tuple[str, ...] = ()
+    impacted_semantic_relation_ids: tuple[str, ...] = ()
+    semantic_relation_states: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class TheoryEvidence:
     edge_id: str
     graph_id: str

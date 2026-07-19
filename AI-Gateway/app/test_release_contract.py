@@ -10,7 +10,7 @@ SPEC.loader.exec_module(release)
 
 
 def test_release_version_is_synchronized() -> None:
-    assert release.declared_version() == "0.4.0"
+    assert release.declared_version() == "0.5.0-rc.1"
 
 
 def test_release_dependencies_are_exactly_pinned() -> None:

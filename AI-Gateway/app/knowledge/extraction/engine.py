@@ -19,7 +19,7 @@ from app.knowledge.screening.models import ScreeningDecision
 
 class EvidenceExtractionEngine:
     parser_name = "researchos-heading-parser"
-    parser_version = "1.1.0"
+    parser_version = "1.2.0"
 
     _HEADINGS = {
         "method": ScientificObjectType.METHOD,
@@ -39,7 +39,26 @@ class EvidenceExtractionEngine:
         "measures": ScientificObjectType.MEASUREMENT,
         "measurements": ScientificObjectType.MEASUREMENT,
         "observations": ScientificObjectType.OBSERVATION,
+        "survey recruitment": ScientificObjectType.METHOD,
+        "data collection": ScientificObjectType.METHOD,
+        "awareness and concern about reproducibility and replicability": (
+            ScientificObjectType.RESULT
+        ),
     }
+    _STOP_HEADINGS = (
+        "author contributions", "supporting information", "references",
+        "discussion", "discussion and recommendations", "acknowledgments",
+        "acknowledgements", "funding", "competing interests",
+    )
+    _PAGE_FURNITURE = re.compile(
+        r"(?im)^[ \t]*(?:PLOS ONE|OPEN ACCESS|a1111111111|Citation:|Editor:|"
+        r"Received:|Accepted:|Published:|Copyright:|Data Availability Statement:|"
+        r"Funding:|Competing interests:).*$"
+    )
+    _NON_SCIENTIFIC_CONTRIBUTIONS = re.compile(
+        r"(?i)(?:Project administration:|Writing\s*[–-]\s*original draft:|"
+        r"Writing\s*[–-]\s*review\s*&\s*editing:|Supervision:|Visualization:)"
+    )
 
     def extract(
         self, document: SourceDocument, pdf: bytes, *, created_at: str,
@@ -93,35 +112,58 @@ class EvidenceExtractionEngine:
         ).finalized()
 
     def _sections(self, text: str):
+        all_headings = (*self._HEADINGS, *self._STOP_HEADINGS)
         headings = "|".join(sorted(
-            (re.escape(item) for item in self._HEADINGS), key=len, reverse=True
+            (re.escape(item) for item in all_headings), key=len, reverse=True
         ))
         matches = list(re.finditer(
             rf"(?im)^\s*({headings})\s*[:\n]", text
         ))
         sections = []
         for index, match in enumerate(matches):
+            section = match.group(1).strip()
+            if section.lower() in self._STOP_HEADINGS:
+                continue
             start = match.end()
             end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+            end = self._clean_end(text, start, end)
             raw = text[start:end]
             leading = len(raw) - len(raw.lstrip())
             trailing = len(raw.rstrip())
             start += leading
             end = match.end() + trailing
             content = text[start:end]
-            if content:
-                section = match.group(1).strip()
+            if (
+                len(content) >= 20
+                and not self._NON_SCIENTIFIC_CONTRIBUTIONS.search(content)
+            ):
                 sections.append((
                     self._HEADINGS[section.lower()], content, start, end,
-                    section, "heading_section", 0.85,
+                    section, "bounded_heading_section", 0.90,
                 ))
         if not sections:
             for match in re.finditer(r"(?i)([^.!?]*(?:we (?:find|show|conclude)|results? (?:show|indicate))[^.!?]*[.!?])", text):
-                content = match.group(1)
-                if content:
+                content = match.group(1).strip()
+                if len(content) >= 80:
+                    start = match.start(1) + len(match.group(1)) - len(
+                        match.group(1).lstrip()
+                    )
                     sections.append((
                         ScientificObjectType.CLAIM, content,
-                        match.start(), match.end(), None,
-                        "explicit_claim_sentence", 0.70,
+                        start, start + len(content), None,
+                        "complete_explicit_claim_sentence", 0.75,
                     ))
         return sections
+
+    def _clean_end(self, text: str, start: int, end: int) -> int:
+        candidate = text[start:end]
+        furniture = self._PAGE_FURNITURE.search(candidate)
+        if furniture:
+            end = start + furniture.start()
+            candidate = text[start:end]
+        candidate = candidate.rstrip()
+        if candidate and candidate[-1] not in ".!?":
+            sentence_ends = tuple(re.finditer(r"[.!?](?=\s|$)", candidate))
+            if sentence_ends:
+                end = start + sentence_ends[-1].end()
+        return end

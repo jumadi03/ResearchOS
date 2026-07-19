@@ -9,7 +9,11 @@ from app.knowledge.discovery.persistence import DiscoverySnapshotStore, RawPageS
 from app.knowledge.discovery.providers import LiteratureProvider
 from app.knowledge.discovery.source_registry import CanonicalSourceRegistry
 from app.knowledge.extraction.engine import EvidenceExtractionEngine
+from app.knowledge.extraction.models import ExtractionReviewState
 from app.knowledge.extraction.persistence import ExtractionManifestStore
+from app.knowledge.extraction.semantic_reextraction import (
+    SemanticReextractionEngine,
+)
 from app.knowledge.ingestion.acquisition import (
     DocumentAcquirer, bind_candidate_to_source,
 )
@@ -20,7 +24,15 @@ from app.knowledge.inspection.persistence import SourceInspectionStore
 from app.knowledge.screening.engine import ScientificScreeningEngine
 from app.knowledge.screening.persistence import ScreeningDecisionStore
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
+from app.knowledge.modeling.models import (
+    KnowledgeEdgeType, KnowledgeRelationAssertion,
+)
 from app.knowledge.modeling.persistence import KnowledgeGraphStore
+from app.knowledge.modeling.relation_persistence import SemanticRelationStore
+from app.knowledge.modeling.relation_review import (
+    ADMISSIBLE_SEMANTIC_RELATION_TYPES, SemanticRelation,
+    SemanticRelationState,
+)
 from app.knowledge.intake.models import (
     KnowledgeIntakeDecision, KnowledgeIntakeManifest,
 )
@@ -67,15 +79,276 @@ class KnowledgeIngestionPipeline:
         self.screening_engine = ScientificScreeningEngine()
         self.screening_store = ScreeningDecisionStore(output_root / "screenings")
         self.extraction_engine = EvidenceExtractionEngine()
+        self.semantic_reextraction_engine = SemanticReextractionEngine()
         self.extraction_store = ExtractionManifestStore(output_root / "extractions")
         self.graph_builder = ScientificKnowledgeGraphBuilder()
         self.graph_store = KnowledgeGraphStore(output_root / "graphs")
         self.intake_store = KnowledgeIntakeStore(output_root / "intakes")
+        self.relation_store = SemanticRelationStore(
+            output_root / "semantic-relations"
+        )
         self.runs: dict[str, DiscoveryRun] = {}
         self.extractions = {}
         self.inspections = {}
         self.screening_decisions = {}
-        self.graphs = {}
+        self.graphs = {
+            item.graph_id: item for item in self.graph_store.load_all()
+        }
+        self.semantic_relations = {
+            item.relation_id: item for item in self.relation_store.load_all()
+        }
+
+    def semantic_reextract(
+        self, extraction_id: str, *,
+        evidence_object_ids: tuple[str, ...] = (),
+    ):
+        if self.data_repository is None:
+            raise ValueError(
+                "Canonical repository is required for semantic re-extraction"
+            )
+        parent = self.data_repository.load_extraction_manifest(extraction_id)
+        parent_ids = tuple(item.object_id for item in parent.objects)
+        admissions = self.data_repository.resolve_evidence_admissions(parent_ids)
+        requested = (
+            tuple(evidence_object_ids)
+            if evidence_object_ids else
+            tuple(
+                item.evidence_object_id for item in admissions
+                if item.review_state is ExtractionReviewState.ACCEPTED
+            )
+        )
+        accepted = self.graph_builder.admission_gate.admit(
+            parent, admissions, requested,
+        )
+        admission_times = sorted(
+            item.review_event.occurred_at
+            for item in admissions
+            if (
+                item.evidence_object_id in accepted
+                and item.review_event is not None
+            )
+        )
+        manifest = self.semantic_reextraction_engine.extract(
+            parent, tuple(sorted(accepted)),
+            # The latest source-admission event is a stable, meaningful
+            # boundary for this deterministic derivation.  Using wall-clock
+            # time here would give the same extraction key a different hash
+            # when an identical request is safely retried.
+            created_at=(
+                admission_times[-1] if admission_times else parent.created_at
+            ),
+        )
+        try:
+            existing = self.data_repository.load_extraction_manifest(
+                manifest.extraction_id
+            )
+        except KeyError:
+            existing = None
+        if existing is not None:
+            if (
+                existing.parser_name != manifest.parser_name
+                or existing.parser_version != manifest.parser_version
+                or existing.configuration_hash != manifest.configuration_hash
+                or tuple(item.object_id for item in existing.objects)
+                != tuple(item.object_id for item in manifest.objects)
+            ):
+                raise RuntimeError(
+                    "Semantic re-extraction integrity conflict"
+                )
+            self.extractions[existing.extraction_id] = existing
+            return existing, self.extraction_store.save(existing)
+        self.data_repository.persist_evidence(
+            None, manifest, source_extraction_id=extraction_id,
+        )
+        self.extractions[manifest.extraction_id] = manifest
+        return manifest, self.extraction_store.save(manifest)
+
+    def propose_semantic_relation(
+        self, extraction_id: str, *, source_object_id: str,
+        target_object_id: str, edge_type: str, provenance_object_id: str,
+        proposed_by: str, rationale: str, proposed_at: str,
+    ):
+        if self.data_repository is None:
+            raise ValueError(
+                "Canonical repository is required for semantic relation proposal"
+            )
+        if source_object_id == target_object_id:
+            raise ValueError("Semantic relation cannot be self-referential")
+        if not rationale.strip():
+            raise ValueError("Semantic relation proposal rationale is required")
+        manifest = self.data_repository.load_extraction_manifest(extraction_id)
+        manifest_ids = {item.object_id for item in manifest.objects}
+        referenced = {
+            source_object_id, target_object_id, provenance_object_id,
+        }
+        missing = sorted(referenced - manifest_ids)
+        if missing:
+            raise ValueError(
+                "Semantic relation evidence does not belong to extraction: "
+                f"{missing[0]}"
+            )
+        admissions = self.data_repository.resolve_evidence_admissions(
+            tuple(sorted(referenced))
+        )
+        self.graph_builder.admission_gate.admit(
+            manifest, admissions, tuple(sorted(referenced)),
+        )
+        relation_type = KnowledgeEdgeType(edge_type)
+        if relation_type not in ADMISSIBLE_SEMANTIC_RELATION_TYPES:
+            raise ValueError(
+                f"Relation type is not an admissible scientific assertion: "
+                f"{relation_type.value}"
+            )
+        identity = (
+            f"{extraction_id}:{source_object_id}:{relation_type.value}:"
+            f"{target_object_id}:{provenance_object_id}:"
+            f"{proposed_by}:{proposed_at}"
+        )
+        relation = SemanticRelation(
+            f"semantic-relation-{sha256(identity.encode()).hexdigest()[:24]}",
+            extraction_id, source_object_id, target_object_id, relation_type,
+            provenance_object_id, proposed_by, rationale.strip(), proposed_at,
+        ).finalized()
+        existing = self.semantic_relations.get(relation.relation_id)
+        if existing is not None:
+            if existing.content_hash != relation.content_hash:
+                raise RuntimeError("Semantic relation proposal conflict")
+            return existing, self.relation_store.save(existing)
+        self.semantic_relations[relation.relation_id] = relation
+        return relation, self.relation_store.save(relation)
+
+    def review_semantic_relation(
+        self, relation_id: str, *, decision: str, reviewer: str,
+        rationale: str, occurred_at: str,
+    ):
+        relation = self.semantic_relations.get(relation_id)
+        if relation is None:
+            raise KeyError(f"Unknown semantic relation: {relation_id}")
+        if decision == SemanticRelationState.ACCEPTED.value:
+            manifest = self.data_repository.load_extraction_manifest(
+                relation.extraction_id
+            )
+            referenced = tuple(sorted({
+                relation.source_object_id, relation.target_object_id,
+                relation.provenance_object_id,
+            }))
+            admissions = self.data_repository.resolve_evidence_admissions(
+                referenced
+            )
+            self.graph_builder.admission_gate.admit(
+                manifest, admissions, referenced,
+            )
+        reviewed = relation.review(
+            decision=SemanticRelationState(decision), reviewer=reviewer,
+            rationale=rationale, occurred_at=occurred_at,
+        )
+        self.semantic_relations[relation_id] = reviewed
+        return reviewed, self.relation_store.save(reviewed)
+
+    def list_semantic_relations(
+        self, *, extraction_id: str | None = None,
+    ) -> tuple[SemanticRelation, ...]:
+        return tuple(sorted(
+            (
+                item for item in self.semantic_relations.values()
+                if extraction_id is None or item.extraction_id == extraction_id
+            ),
+            key=lambda item: item.relation_id,
+        ))
+
+    def relation_dependencies_for_graph(
+        self, graph_id: str,
+    ) -> tuple[tuple[str, str], ...]:
+        return tuple(sorted(
+            (
+                relation.relation_id, relation.state.value
+            )
+            for relation in self.semantic_relations.values()
+            if any(
+                event.graph_id == graph_id for event in relation.admissions
+            )
+        ))
+
+    def semantic_relation_review_queue(self, extraction_id: str) -> dict:
+        if self.data_repository is None:
+            raise ValueError(
+                "Canonical repository is required for semantic relation queue"
+            )
+        manifest = self.data_repository.load_extraction_manifest(extraction_id)
+        object_ids = tuple(item.object_id for item in manifest.objects)
+        admissions = self.data_repository.resolve_evidence_admissions(object_ids)
+        admission_by_id = {
+            item.evidence_object_id: item for item in admissions
+        }
+        accepted_objects = tuple(
+            item for item in manifest.objects
+            if (
+                item.object_id in admission_by_id
+                and admission_by_id[item.object_id].review_state is
+                ExtractionReviewState.ACCEPTED
+                and admission_by_id[item.object_id].review_event is not None
+            )
+        )
+        review_context = tuple({
+            "object_id": item.object_id,
+            "review_state": admission_by_id[item.object_id].review_state.value,
+            "review_event": admission_by_id[item.object_id].review_event,
+        } for item in accepted_objects)
+        object_by_id = {item.object_id: item for item in accepted_objects}
+        relations = self.list_semantic_relations(extraction_id=extraction_id)
+        proposals = tuple({
+            "relation": relation,
+            "source": object_by_id.get(relation.source_object_id),
+            "target": object_by_id.get(relation.target_object_id),
+            "provenance": object_by_id.get(relation.provenance_object_id),
+        } for relation in relations)
+        required_types = ("population", "variable", "measurement", "limitation")
+        present_types = {item.object_type.value for item in accepted_objects}
+        coverage = tuple({
+            "object_type": kind,
+            "status": "present" if kind in present_types else "missing",
+        } for kind in required_types)
+        blockers = []
+        if len(accepted_objects) < 2:
+            blockers.append(
+                "At least two accepted objects are required for a relation"
+            )
+        if not relations:
+            blockers.append(
+                "No provenance-bound semantic relation has been proposed"
+            )
+        missing_types = tuple(
+            item["object_type"] for item in coverage
+            if item["status"] == "missing"
+        )
+        if missing_types:
+            blockers.append(
+                "Structured annotation is missing: " + ", ".join(missing_types)
+            )
+        return {
+            "extraction_id": extraction_id,
+            "manifest_hash": manifest.manifest_hash,
+            "accepted_objects": accepted_objects,
+            "review_context": review_context,
+            "annotation_coverage": coverage,
+            "proposals": proposals,
+            "counts": {
+                "accepted_objects": len(accepted_objects),
+                "proposed": sum(
+                    item.state is SemanticRelationState.PROPOSED
+                    for item in relations
+                ),
+                "accepted": sum(
+                    item.state is SemanticRelationState.ACCEPTED
+                    for item in relations
+                ),
+                "rejected": sum(
+                    item.state is SemanticRelationState.REJECTED
+                    for item in relations
+                ),
+            },
+            "blockers": tuple(blockers),
+        }
 
     def discover(
         self, question: ScientificQuestion, contract: DiscoveryContract,
@@ -150,10 +423,17 @@ class KnowledgeIngestionPipeline:
         if self.object_store is not None:
             if self.data_repository is None or not document.content_hash:
                 raise RuntimeError("Canonical repository is required for object retrieval")
-            record = next(
-                (record for run in self.runs.values() for record in run.records
-                 if record.record_id == document.record_id), None,
-            )
+            record = next((
+                record
+                for run in reversed(tuple(self.runs.values()))
+                for record in run.records
+                if record.record_id == document.record_id
+                and any(
+                    source.query_family_id == document.query_family_id
+                    and source.source_definition_id == document.source_definition_id
+                    for source in record.source_records
+                )
+            ), None)
             if record is None:
                 raise KeyError(f"Discovery record missing for document: {document_id}")
             representation = self.data_repository.get_representation(
@@ -214,15 +494,18 @@ class KnowledgeIngestionPipeline:
         if inspection is None:
             inspection, _ = self.inspect_document(document_id)
         document, record, _ = self._verified_document_content(document_id)
-        run = next((
-            run for run in self.runs.values()
-            if any(item.record_id == document.record_id for item in run.records)
-        ), None)
-        if run is not None and record is None:
-            record = next(
-                item for item in run.records
-                if item.record_id == document.record_id
+        run_record = next((
+            (run, item)
+            for run in reversed(tuple(self.runs.values()))
+            for item in run.records
+            if item.record_id == document.record_id
+            and any(
+                source.query_family_id == document.query_family_id
+                and source.source_definition_id == document.source_definition_id
+                for source in item.source_records
             )
+        ), None)
+        run, record = run_record if run_record is not None else (None, None)
         if run is None or record is None:
             raise ValueError("Discovery contract provenance is required for screening")
         decision = self.screening_engine.screen(
@@ -254,6 +537,7 @@ class KnowledgeIngestionPipeline:
     def intake_accepted_evidence(
         self, extraction_id: str, *, evidence_object_ids: tuple[str, ...],
         actor_id: str, occurred_at: str,
+        semantic_relation_ids: tuple[str, ...] = (),
     ):
         if self.data_repository is None:
             raise ValueError(
@@ -294,20 +578,63 @@ class KnowledgeIngestionPipeline:
             )
             raise ValueError(f"Knowledge intake admitted no evidence: {reasons}")
         admitted = tuple(admitted_ids)
-        graph = self.graph_builder.build(manifest, admissions, admitted)
+        relation_ids = tuple(sorted(set(semantic_relation_ids)))
+        if len(relation_ids) != len(semantic_relation_ids):
+            raise ValueError("Semantic relation selection contains duplicates")
+        relations = []
+        for relation_id in relation_ids:
+            relation = self.semantic_relations.get(relation_id)
+            if relation is None:
+                raise ValueError(f"Unknown semantic relation: {relation_id}")
+            if relation.extraction_id != extraction_id:
+                raise ValueError(
+                    "Semantic relation belongs to another extraction: "
+                    f"{relation_id}"
+                )
+            if relation.state is not SemanticRelationState.ACCEPTED:
+                raise ValueError(
+                    f"Semantic relation is not accepted: {relation_id}"
+                )
+            referenced = {
+                relation.source_object_id, relation.target_object_id,
+                relation.provenance_object_id,
+            }
+            missing = sorted(referenced - set(admitted))
+            if missing:
+                raise ValueError(
+                    "Semantic relation requires admitted evidence: "
+                    f"{missing[0]}"
+                )
+            relations.append(KnowledgeRelationAssertion(
+                relation.source_object_id, relation.target_object_id,
+                relation.edge_type, relation.provenance_object_id,
+            ))
+        graph = self.graph_builder.build(
+            manifest, admissions, admitted, relations=tuple(relations),
+        )
         identity = (
             f"{manifest.extraction_id}:{manifest.manifest_hash}:"
-            f"{','.join(requested_ids)}:{actor_id}:{occurred_at}"
+            f"{','.join(requested_ids)}:{','.join(relation_ids)}:"
+            f"{actor_id}:{occurred_at}"
         )
         intake = KnowledgeIntakeManifest(
             f"intake-{sha256(identity.encode()).hexdigest()[:24]}",
             manifest.extraction_id, manifest.manifest_hash,
             graph.graph_id, graph.content_hash, requested_ids, admitted,
             tuple(decisions), actor_id, occurred_at,
+            schema_version="1.1" if relation_ids else "1.0",
+            semantic_relation_ids=relation_ids,
         ).finalized()
         self.data_repository.persist_graph(
             graph, occurred_at=occurred_at, intake=intake,
         )
+        for relation_id in relation_ids:
+            relation = self.semantic_relations[relation_id].admit(
+                graph_id=graph.graph_id, intake_id=intake.intake_id,
+                indexer=actor_id, occurred_at=occurred_at,
+            )
+            self.semantic_relations[relation_id] = relation
+            self.relation_store.save(relation)
         self.graphs[graph.graph_id] = graph
         graph_snapshot = self.graph_store.save(graph)
         intake_snapshot = self.intake_store.save(intake)

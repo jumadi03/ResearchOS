@@ -66,13 +66,15 @@ def test_administration_ui_uses_restore_verified_recovery_semantics():
     assert "${r.ready?" not in script
 
 
-def test_schema_version_32_is_consistent():
+def test_schema_version_41_is_consistent():
     settings = (ROOT / "AI-Gateway/app/settings.py").read_text(encoding="utf-8")
     environment = (ROOT / "deploy/stack.env.example").read_text(encoding="utf-8")
     healthcheck = (
         ROOT / "deploy/verify/canonical_storage_healthcheck.sql"
     ).read_text(encoding="utf-8")
 
-    assert 'DATABASE_SCHEMA_VERSION", "32"' in settings
-    assert "DATABASE_SCHEMA_VERSION=32" in environment
-    assert "max(version),0) FROM schema_migrations) <> 32" in healthcheck
+    assert 'DATABASE_SCHEMA_VERSION", "41"' in settings
+    assert "DATABASE_SCHEMA_VERSION=41" in environment
+    assert "max(version),0) FROM schema_migrations) <> 41" in healthcheck
+    assert "evidence_current_review_projection" in healthcheck
+    assert "projection coverage is incomplete" in healthcheck

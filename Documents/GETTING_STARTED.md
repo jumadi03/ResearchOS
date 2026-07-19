@@ -49,13 +49,13 @@ slow network. The command:
 
 - creates unique local credentials;
 - starts PostgreSQL, MinIO, the API, workers, and monitoring;
-- creates five role-separated browser accounts; and
+- creates six role-separated browser accounts; and
 - verifies account login, API health, and both required object-storage buckets.
 
 The installation is ready when the command ends with:
 
 ```text
-runtime-bootstrap=passed accounts=5 buckets=2
+runtime-bootstrap=passed accounts=6 buckets=2
 researchos-bootstrap=passed credentials=deploy/local-access.env
 ```
 

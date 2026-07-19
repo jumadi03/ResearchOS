@@ -75,6 +75,65 @@ def test_document_manifest_tampering_is_rejected(tmp_path: Path) -> None:
         raise AssertionError("Tampered raw-capture manifest was accepted")
 
 
+def test_fresh_capture_supersedes_unverifiable_legacy_record(tmp_path: Path) -> None:
+    result = DocumentAcquirer(
+        transport=lambda *args, **kwargs: Response(),
+    ).acquire(candidate(), acquired_at="new-time")
+    legacy_blob = tmp_path / "blobs" / result.content_hash[:2] / (
+        result.content_hash + ".pdf"
+    )
+    legacy_blob.parent.mkdir(parents=True)
+    legacy_blob.write_bytes(result.content)
+    legacy_path = tmp_path / "records" / result.record_id / "v00001.json"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_text(json.dumps({
+        "document_id": "document-legacy",
+        "record_id": result.record_id,
+        "version": 1,
+        "status": "acquired",
+        "acquired_at": "old-time",
+        "source_url": result.source_url,
+        "source_provider": result.source_provider,
+        "source_response_hash": result.source_response_hash,
+        "license": result.license,
+        "media_type": result.media_type,
+        "content_hash": result.content_hash,
+        "byte_size": result.byte_size,
+        "blob_path": str(legacy_blob.relative_to(tmp_path)).replace("\\", "/"),
+        "reason": None,
+        "schema_version": "1.0",
+    }), encoding="utf-8")
+
+    upgraded, upgraded_path = DocumentRegistry(tmp_path).register(result)
+
+    assert upgraded.version == 2
+    assert upgraded.document_id != "document-legacy"
+    assert upgraded.capture_manifest_hash == result.capture_manifest_hash
+    assert upgraded.schema_version == "1.1"
+    assert upgraded_path.name == "v00002.json"
+    assert legacy_path.exists()
+    assert DocumentRegistry(tmp_path).verify(upgraded)
+
+
+def test_same_bytes_with_new_capture_create_a_new_document_version(
+    tmp_path: Path,
+) -> None:
+    acquirer = DocumentAcquirer(
+        transport=lambda *args, **kwargs: Response(),
+    )
+    first, _ = DocumentRegistry(tmp_path).register(
+        acquirer.acquire(candidate(), acquired_at="first-time")
+    )
+    second, _ = DocumentRegistry(tmp_path).register(
+        acquirer.acquire(candidate(), acquired_at="second-time")
+    )
+
+    assert first.content_hash == second.content_hash
+    assert first.capture_manifest_hash != second.capture_manifest_hash
+    assert second.version == 2
+    assert second.document_id != first.document_id
+
+
 def test_unknown_rights_create_metadata_only_entry_without_transport(tmp_path: Path) -> None:
     called = []
     result = DocumentAcquirer(transport=lambda *args, **kwargs: called.append(True)).acquire(

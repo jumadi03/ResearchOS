@@ -305,3 +305,176 @@ class PostgresMonitoringRepositoryMixin:
                 ON CONFLICT(acknowledgement_id) DO NOTHING
             """, (ack_id, change_id, actor_id, rationale.strip(), occurred_at))
         return ack_id
+
+    def resolve_impact_review(
+        self, change_id: str, *, decision: str, reviewer_id: str,
+        rationale: str, occurred_at: str,
+    ):
+        from app.knowledge.monitoring.models import (
+            ImpactReviewDecision, ImpactReviewResolution,
+        )
+        selected = ImpactReviewDecision(decision)
+        if not reviewer_id.strip() or not rationale.strip():
+            raise ValueError("Impact review reviewer and rationale are required")
+        identity = canonical_json({
+            "change_id": change_id, "decision": selected.value,
+            "reviewer_id": reviewer_id, "rationale": rationale.strip(),
+            "occurred_at": occurred_at,
+        })
+        resolution_id = f"impact-resolution-{sha256(identity.encode()).hexdigest()[:24]}"
+        payload = {
+            "resolution_id": resolution_id, "change_id": change_id,
+            "decision": selected.value, "reviewer_id": reviewer_id,
+            "rationale": rationale.strip(), "occurred_at": occurred_at,
+        }
+        event_hash = sha256(canonical_json(payload).encode()).hexdigest()
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT c.change_kind
+                FROM scientific_changes c
+                WHERE c.change_id=%s
+            """, (change_id,))
+            row = cursor.fetchone()
+            if row is None:
+                raise KeyError(f"Unknown scientific change: {change_id}")
+            if row[0] != "retracted":
+                raise ValueError("Impact review resolution requires a retraction signal")
+            cursor.execute("""
+                SELECT resolution_id,decision,reviewer_id,rationale,occurred_at,
+                       provenance_id
+                FROM scientific_impact_review_resolutions
+                WHERE change_id=%s
+            """, (change_id,))
+            existing = cursor.fetchone()
+            if existing is not None:
+                if existing[0] != resolution_id:
+                    raise ValueError("Impact review has already been resolved")
+                return ImpactReviewResolution(
+                    existing[0], change_id, ImpactReviewDecision(existing[1]),
+                    existing[2], existing[3],
+                    existing[4].isoformat().replace("+00:00", "Z"),
+                    str(existing[5]),
+                )
+            cursor.execute("""
+                INSERT INTO provenance_events(
+                    execution_id,human_reviewer,event_type,event_payload,
+                    occurred_at,event_hash
+                ) VALUES (%s,%s,'scientific_impact_review_resolution',%s,%s,%s)
+                RETURNING provenance_id
+            """, (
+                resolution_id, reviewer_id, json.dumps(payload),
+                occurred_at, event_hash,
+            ))
+            provenance_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO scientific_impact_review_resolutions(
+                    resolution_id,change_id,decision,reviewer_id,rationale,
+                    occurred_at,provenance_id
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                resolution_id, change_id, selected.value, reviewer_id,
+                rationale.strip(), occurred_at, provenance_id,
+            ))
+        return ImpactReviewResolution(
+            resolution_id, change_id, selected, reviewer_id,
+            rationale.strip(), occurred_at, str(provenance_id),
+        )
+
+    def select_follow_up_target(
+        self, resolution_id: str, *, target_kind: str, target_object_id: str,
+        selector_id: str, rationale: str, occurred_at: str,
+    ):
+        from app.knowledge.monitoring.models import FollowUpCaseTarget
+        if target_kind not in {"evidence", "publication"}:
+            raise ValueError("Invalid follow-up target kind")
+        if not selector_id.strip() or not rationale.strip():
+            raise ValueError("Target selector and rationale are required")
+        identity = canonical_json({
+            "resolution_id": resolution_id, "target_kind": target_kind,
+            "target_object_id": target_object_id, "selector_id": selector_id,
+            "rationale": rationale.strip(), "occurred_at": occurred_at,
+        })
+        selection_id = f"follow-up-target-{sha256(identity.encode()).hexdigest()[:24]}"
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT decision FROM scientific_impact_review_resolutions
+                WHERE resolution_id=%s
+            """, (resolution_id,))
+            row = cursor.fetchone()
+            if row is None:
+                raise KeyError(f"Unknown impact resolution: {resolution_id}")
+            expected = (
+                "evidence" if row[0] == "evidence_review_required"
+                else "publication" if row[0] == "publication_review_required"
+                else None
+            )
+            if expected != target_kind:
+                raise ValueError("Follow-up target kind does not match impact decision")
+            if target_kind == "evidence":
+                cursor.execute("""
+                    SELECT c.object_id FROM canonical_objects c
+                    JOIN evidence_objects e ON e.evidence_id=c.object_id
+                    WHERE c.object_id::text=%s OR c.stable_key=%s
+                """, (target_object_id, f"evidence:{target_object_id}"))
+            else:
+                cursor.execute("""
+                    SELECT c.object_id FROM canonical_objects c
+                    JOIN research_artifacts a ON a.artifact_id=c.object_id
+                    WHERE (c.object_id::text=%s OR c.stable_key=%s)
+                      AND a.artifact_type='publication_package'
+                """, (target_object_id, f"artifact:{target_object_id}"))
+            target = cursor.fetchone()
+            if target is None:
+                raise KeyError(f"Unknown canonical {target_kind}: {target_object_id}")
+            canonical_id = target[0]
+            payload = {
+                "selection_id": selection_id,
+                "source_resolution_id": resolution_id,
+                "target_kind": target_kind,
+                "target_object_id": target_object_id,
+                "selector_id": selector_id, "rationale": rationale.strip(),
+                "occurred_at": occurred_at,
+            }
+            event_hash = sha256(canonical_json(payload).encode()).hexdigest()
+            cursor.execute("""
+                INSERT INTO provenance_events(
+                    execution_id,output_object_id,human_reviewer,event_type,
+                    event_payload,occurred_at,event_hash
+                ) VALUES (%s,%s,%s,'follow_up_case_target_selected',%s,%s,%s)
+                ON CONFLICT(event_hash) DO NOTHING RETURNING provenance_id
+            """, (
+                selection_id, canonical_id, selector_id, json.dumps(payload),
+                occurred_at, event_hash,
+            ))
+            inserted = cursor.fetchone()
+            if inserted is None:
+                cursor.execute(
+                    "SELECT provenance_id FROM provenance_events WHERE event_hash=%s",
+                    (event_hash,),
+                )
+                provenance_id = cursor.fetchone()[0]
+            else:
+                provenance_id = inserted[0]
+            cursor.execute("""
+                INSERT INTO scientific_follow_up_case_targets(
+                    selection_id,resolution_id,target_kind,target_object_id,
+                    selector_id,rationale,occurred_at,provenance_id
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT(resolution_id) DO NOTHING
+                RETURNING selection_id
+            """, (
+                selection_id, resolution_id, target_kind, canonical_id,
+                selector_id, rationale.strip(), occurred_at, provenance_id,
+            ))
+            linked = cursor.fetchone()
+            if linked is None:
+                cursor.execute("""
+                    SELECT selection_id FROM scientific_follow_up_case_targets
+                    WHERE resolution_id=%s
+                """, (resolution_id,))
+                if cursor.fetchone()[0] != selection_id:
+                    raise ValueError("Follow-up case target has already been selected")
+        return FollowUpCaseTarget(
+            selection_id, resolution_id, target_kind, target_object_id,
+            selector_id, rationale.strip(), occurred_at, str(provenance_id),
+        )

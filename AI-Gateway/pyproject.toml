@@ -1,6 +1,6 @@
 [project]
 name = "researchos-ai-gateway"
-version = "0.4.0"
+version = "0.5.0-rc.1"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi==0.139.0",
@@ -20,7 +20,7 @@ dependencies = [
 dev = [
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
-    "httpx==0.28.1",
+    "httpx2==2.7.0",
     "pytest-asyncio==1.4.0",
     "pip-audit==2.10.0",
 ]

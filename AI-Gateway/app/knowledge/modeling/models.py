@@ -21,12 +21,54 @@ class KnowledgeNodeType(StrEnum):
     RESULT = "result"
     LIMITATION = "limitation"
     CONCLUSION = "conclusion"
+    POPULATION = "population"
+    OBSERVATION = "observation"
+    MEASUREMENT = "measurement"
 
 
 class KnowledgeEdgeType(StrEnum):
+    DERIVED_FROM = "derived_from"
     CONTAINS = "contains"
+    PART_OF = "part_of"
+    CITES = "cites"
     USES_METHOD = "uses_method"
     SUPPORTS = "supports"
+    CONTRADICTS = "contradicts"
+    EXTENDS = "extends"
+    REPLICATES = "replicates"
+    MEASURES = "measures"
+    HAS_LIMITATION = "has_limitation"
+    INTERPRETS = "interprets"
+    INFERS_FROM = "infers_from"
+    SUPERSEDES = "supersedes"
+    CORRECTS = "corrects"
+    INVALIDATES = "invalidates"
+    REPRESENTS = "represents"
+
+
+@dataclass(frozen=True, slots=True)
+class KnowledgeRelationAssertion:
+    """An explicit, provenance-bound relation supplied to graph construction."""
+
+    source_object_id: str
+    target_object_id: str
+    edge_type: KnowledgeEdgeType
+    provenance_object_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class GraphLifecycleProjection:
+    graph_id: str
+    graph_content_hash: str
+    state: str
+    current: bool
+    evidence_object_ids: tuple[str, ...]
+    impacted_evidence_ids: tuple[str, ...]
+    evidence_states: tuple[tuple[str, str], ...]
+    verification: str
+    semantic_relation_ids: tuple[str, ...] = ()
+    impacted_semantic_relation_ids: tuple[str, ...] = ()
+    semantic_relation_states: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

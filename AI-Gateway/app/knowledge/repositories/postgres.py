@@ -19,6 +19,10 @@ from app.knowledge.repositories.postgres_read_model import PostgresReadModelRepo
 from app.knowledge.repositories.postgres_evidence import PostgresEvidenceRepositoryMixin
 from app.knowledge.repositories.postgres_artifacts import PostgresArtifactRepositoryMixin
 from app.knowledge.repositories.postgres_monitoring import PostgresMonitoringRepositoryMixin
+from app.knowledge.repositories.artifacts import (
+    ARTIFACT_LIFECYCLE_STATES,
+    ARTIFACT_LIFECYCLE_TRANSITIONS,
+)
 
 
 def normalized_source_license(raw: dict) -> str | None:
@@ -45,12 +49,8 @@ def source_access_status(raw: dict, license_value: str | None) -> str:
 
 
 class _PostgresRepositoryCore:
-    _LIFECYCLE_TRANSITIONS = {
-        "planned": "draft", "draft": "review", "review": "validated",
-        "validated": "ratified", "ratified": "published",
-        "published": "deprecated", "deprecated": "archived",
-    }
-    _LIFECYCLE_STATES = frozenset((*_LIFECYCLE_TRANSITIONS, "archived"))
+    _LIFECYCLE_TRANSITIONS = ARTIFACT_LIFECYCLE_TRANSITIONS
+    _LIFECYCLE_STATES = ARTIFACT_LIFECYCLE_STATES
     def __init__(self, database_url: str) -> None:
         if not database_url:
             raise ValueError("database_url is required")
@@ -437,6 +437,18 @@ class _PostgresRepositoryCore:
                 """, (document_id, representation_type, result.content_hash))
                 existing = cursor.fetchone()
                 if existing is not None:
+                    cursor.execute("""
+                        INSERT INTO representation_capture_events(
+                            representation_id,capture_manifest_hash,
+                            source_response_hash,source_definition_id,
+                            query_family_id,captured_at
+                        ) VALUES (%s,%s,%s,%s,%s,%s)
+                        ON CONFLICT(capture_manifest_hash) DO NOTHING
+                    """, (
+                        existing[0], result.capture_manifest_hash,
+                        result.source_response_hash, result.source_definition_id,
+                        result.query_family_id, result.acquired_at,
+                    ))
                     return str(existing[0]), existing[1]
                 cursor.execute("""
                     SELECT COALESCE(max(document_version),0)+1
@@ -467,6 +479,18 @@ class _PostgresRepositoryCore:
                     result.capture_manifest_hash,
                 ))
                 representation_id = cursor.fetchone()[0]
+                cursor.execute("""
+                    INSERT INTO representation_capture_events(
+                        representation_id,capture_manifest_hash,
+                        source_response_hash,source_definition_id,
+                        query_family_id,captured_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(capture_manifest_hash) DO NOTHING
+                """, (
+                    representation_id, result.capture_manifest_hash,
+                    result.source_response_hash, result.source_definition_id,
+                    result.query_family_id, result.acquired_at,
+                ))
                 cursor.execute(
                     "UPDATE scientific_documents SET license=COALESCE(%s,license) WHERE document_id=%s",
                     (result.license, document_id),
@@ -552,7 +576,17 @@ class _PostgresRepositoryCore:
                         "Canonical representation missing for inspection: "
                         f"{inspection.inspection_id}"
                     )
-                if row[1] != inspection.raw_capture_manifest_hash:
+                cursor.execute("""
+                    SELECT EXISTS(
+                        SELECT 1 FROM representation_capture_events
+                        WHERE representation_id=%s AND capture_manifest_hash=%s
+                    )
+                """, (row[0], inspection.raw_capture_manifest_hash))
+                capture_recorded = cursor.fetchone()[0]
+                if (
+                    row[1] != inspection.raw_capture_manifest_hash
+                    and not capture_recorded
+                ):
                     raise ValueError(
                         "Inspection raw-capture provenance does not match representation"
                     )

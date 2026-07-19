@@ -21,9 +21,9 @@ def test_generated_configuration_is_complete_and_synchronized() -> None:
     stack_values = bootstrap.parse_env(stack)
     local_values = bootstrap.parse_env(local)
     knowledge = json.loads(stack_values["KNOWLEDGE_API_PRINCIPALS"])
-    assert len(knowledge) == 4
+    assert len(knowledge) == 5
     assert len(json.loads(stack_values["ARCHITECTURE_API_PRINCIPALS"])) == 1
-    assert len(set(knowledge) | {monitor.strip()}) == 5
+    assert len(set(knowledge) | {monitor.strip()}) == 6
     assert all(
         len(local_values[f"RESEARCHOS_{name.upper()}_PASSWORD"]) >= 20
         for name, _, _ in bootstrap.ACCOUNT_DEFINITIONS
@@ -38,6 +38,47 @@ def test_configuration_bootstrap_is_idempotent(tmp_path: Path) -> None:
     first = (deploy / "stack.env").read_bytes()
     assert bootstrap.ensure_configuration(tmp_path) == "reused"
     assert (deploy / "stack.env").read_bytes() == first
+
+
+def test_existing_configuration_is_upgraded_without_rotating_credentials(
+    tmp_path: Path,
+) -> None:
+    deploy = tmp_path / "deploy"
+    (deploy / "monitoring").mkdir(parents=True)
+    (deploy / "stack.env.example").write_text(_template(), encoding="utf-8")
+    stack, local, monitor = bootstrap.generated_configuration(_template())
+    stack_values = bootstrap.parse_env(stack)
+    knowledge = json.loads(stack_values["KNOWLEDGE_API_PRINCIPALS"])
+    legacy_knowledge = {
+        token: value for token, value in knowledge.items()
+        if value["roles"] != ["publisher"]
+    }
+    stack = bootstrap.replace_env(stack, {
+        "KNOWLEDGE_API_PRINCIPALS": json.dumps(
+            legacy_knowledge, separators=(",", ":")
+        ),
+    })
+    legacy_local = "\n".join(
+        line for line in local.splitlines()
+        if "PUBLISHER" not in line
+    ) + "\n"
+    (deploy / "stack.env").write_text(stack, encoding="utf-8")
+    (deploy / "local-access.env").write_text(legacy_local, encoding="utf-8")
+    (deploy / "monitoring" / "prometheus.token").write_text(
+        monitor, encoding="utf-8"
+    )
+    discoverer_before = bootstrap.parse_env(legacy_local)[
+        "RESEARCHOS_DISCOVERER_TOKEN"
+    ]
+
+    assert bootstrap.ensure_configuration(tmp_path) == "upgraded"
+    upgraded_local = bootstrap.parse_env(
+        (deploy / "local-access.env").read_text(encoding="utf-8")
+    )
+    assert upgraded_local["RESEARCHOS_DISCOVERER_TOKEN"] == discoverer_before
+    assert upgraded_local["RESEARCHOS_PUBLISHER_TOKEN"]
+    assert upgraded_local["RESEARCHOS_PUBLISHER_USERNAME"] == "publisher"
+    assert bootstrap.ensure_configuration(tmp_path) == "reused"
 
 
 def test_partial_configuration_is_rejected(tmp_path: Path) -> None:

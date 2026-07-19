@@ -20,9 +20,10 @@ ACCOUNT_DEFINITIONS = (
     ("auditor", "Research Auditor", ["auditor"]),
     ("reviewer", "Research Reviewer", ["reviewer"]),
     ("indexer", "Research Indexer", ["indexer"]),
+    ("publisher", "Research Publisher", ["publisher"]),
     ("admin", "Research Administrator", ["admin"]),
 )
-TOKEN_ROLES = ("discoverer", "auditor", "reviewer", "indexer")
+TOKEN_ROLES = ("discoverer", "auditor", "reviewer", "indexer", "publisher")
 
 
 def parse_env(content: str) -> dict[str, str]:
@@ -136,6 +137,39 @@ def validate_configuration(stack: str, local: str, monitor: str) -> None:
             raise RuntimeError(f"Local {name} account configuration is incomplete")
 
 
+def upgrade_configuration(stack: str, local: str) -> tuple[str, str, bool]:
+    """Add SGF-020A publisher credentials without rotating existing secrets."""
+    local_values = parse_env(local)
+    changed = False
+    publisher_token = local_values.get("RESEARCHOS_PUBLISHER_TOKEN")
+    if not publisher_token:
+        publisher_token = secrets.token_hex(32)
+        knowledge = json.loads(parse_env(stack)["KNOWLEDGE_API_PRINCIPALS"])
+        knowledge[publisher_token] = {
+            "roles": ["publisher"],
+            "actor_id": "publisher@researchos.local",
+        }
+        stack = replace_env(stack, {
+            "KNOWLEDGE_API_PRINCIPALS": json.dumps(
+                knowledge, separators=(",", ":")
+            ),
+        })
+        local = (
+            local.rstrip()
+            + "\n"
+            + f"RESEARCHOS_PUBLISHER_TOKEN={publisher_token}\n"
+        )
+        changed = True
+    if not local_values.get("RESEARCHOS_PUBLISHER_USERNAME"):
+        local = (
+            local.rstrip()
+            + "\nRESEARCHOS_PUBLISHER_USERNAME=publisher\n"
+            + f"RESEARCHOS_PUBLISHER_PASSWORD={secrets.token_urlsafe(24)}\n"
+        )
+        changed = True
+    return stack, local, changed
+
+
 def ensure_configuration(root: Path) -> str:
     deploy = root / "deploy"
     stack_path = deploy / "stack.env"
@@ -149,12 +183,18 @@ def ensure_configuration(root: Path) -> str:
             "secret files before bootstrapping."
         )
     if all(existing):
+        stack = stack_path.read_text(encoding="utf-8")
+        local = local_path.read_text(encoding="utf-8")
+        stack, local, upgraded = upgrade_configuration(stack, local)
+        if upgraded:
+            atomic_secret_write(stack_path, stack)
+            atomic_secret_write(local_path, local)
         validate_configuration(
-            stack_path.read_text(encoding="utf-8"),
-            local_path.read_text(encoding="utf-8"),
+            stack,
+            local,
             monitor_path.read_text(encoding="utf-8"),
         )
-        return "reused"
+        return "upgraded" if upgraded else "reused"
     template = (deploy / "stack.env.example").read_text(encoding="utf-8")
     stack, local, monitor = generated_configuration(template)
     validate_configuration(stack, local, monitor)
@@ -236,7 +276,7 @@ client = boto3.client(
 )
 for bucket in ("researchos-documents", "researchos-backups"):
     client.head_bucket(Bucket=bucket)
-print("runtime-bootstrap=passed accounts=5 buckets=2")
+print(f"runtime-bootstrap=passed accounts={len(accounts)} buckets=2")
 """
     encoded = base64.b64encode(source.encode()).decode()
     runner = "import os,base64;exec(base64.b64decode(os.getenv('BOOTSTRAP_CODE')))"

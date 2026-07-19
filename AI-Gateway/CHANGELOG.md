@@ -5,6 +5,8 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.5.0-rc.1] - 2026-07-19
+
 ### Changed
 
 - Added Phase 1F-E Windows host-trigger contract with read-only planning and

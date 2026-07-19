@@ -1,6 +1,7 @@
 """Canonical repository operations and product read-model orchestration."""
 
 from app.knowledge.authentication import KnowledgeRole
+from app.knowledge.repositories.artifacts import next_artifact_status
 
 
 class KnowledgeRepositoryService:
@@ -58,6 +59,16 @@ class KnowledgeRepositoryService:
             "scientific change acknowledgement"
         ).acknowledge_scientific_change(change_id, **options)
 
+    def resolve_impact_review(self, change_id, **options):
+        return self._required(
+            "scientific impact review"
+        ).resolve_impact_review(change_id, **options)
+
+    def select_follow_up_target(self, resolution_id, **options):
+        return self._required(
+            "follow-up case target selection"
+        ).select_follow_up_target(resolution_id, **options)
+
     def list_projects(self):
         return self._required("product reads").list_projects()
 
@@ -89,11 +100,13 @@ class KnowledgeRepositoryService:
                 "href": "/knowledge/semantic-index/jobs",
             })
         if artifact:
-            transitions = {
-                "draft": "validated", "validated": "ratified", "ratified": "published",
-            }
-            next_status = transitions.get(artifact.get("status"))
-            if next_status and principal.has_role(KnowledgeRole.REVIEWER):
+            next_status = next_artifact_status(artifact.get("status"))
+            required_role = (
+                KnowledgeRole.PUBLISHER
+                if next_status == "published"
+                else KnowledgeRole.REVIEWER
+            )
+            if next_status and principal.has_role(required_role):
                 actions.append({
                     "action": "artifact:transition", "method": "POST",
                     "href": f"/knowledge/artifacts/{result['identity']['object_id']}/transitions",
@@ -119,8 +132,56 @@ class KnowledgeRepositoryService:
         queue["permissions"] = {
             "can_review": principal.has_role(KnowledgeRole.REVIEWER),
             "can_index": principal.has_role(KnowledgeRole.INDEXER),
+            "can_publish": principal.has_role(KnowledgeRole.PUBLISHER),
             "roles": sorted(role.value for role in principal.roles),
         }
+        for case in queue.get("follow_up_cases", []):
+            authorized = (
+                principal.has_role(KnowledgeRole.REVIEWER)
+                if case["required_role"] == "reviewer"
+                else principal.has_role(KnowledgeRole.PUBLISHER)
+            )
+            case["action_authorized"] = authorized
+            case["available_action"] = None
+            target = case.get("target_selection")
+            if authorized and case.get("status") == "target_selected" and target:
+                if case["case_type"] == "evidence_review":
+                    stable_key = target.get("target_stable_key") or ""
+                    evidence_id = (
+                        stable_key.removeprefix("evidence:")
+                        if stable_key.startswith("evidence:") else None
+                    )
+                    if evidence_id:
+                        case["available_action"] = {
+                            "action": "evidence:review",
+                            "method": "POST",
+                            "href": f"/knowledge/evidence/{evidence_id}/reviews",
+                            "requires_confirmation": True,
+                            "audit_workflow": "evidence_review_event",
+                            "reviewed_statement_hash": target.get(
+                                "reviewed_statement_hash"
+                            ),
+                            "extraction_manifest_hash": target.get(
+                                "extraction_manifest_hash"
+                            ),
+                        }
+                elif case["case_type"] == "publication_review":
+                    stable_key = target.get("target_stable_key") or ""
+                    publication_id = (
+                        stable_key.removeprefix("artifact:")
+                        if stable_key.startswith("artifact:") else None
+                    )
+                    if publication_id:
+                        case["available_action"] = {
+                            "action": "publication:retract",
+                            "method": "POST",
+                            "href": (
+                                f"/knowledge/publications/{publication_id}/relationships"
+                            ),
+                            "relation_type": "retracts",
+                            "requires_confirmation": True,
+                            "audit_workflow": "publication_relationship",
+                        }
         return queue
 
     def get_project_graph(self, project_id: str, **options):

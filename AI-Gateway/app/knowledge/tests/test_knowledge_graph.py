@@ -8,7 +8,9 @@ from app.knowledge.extraction.models import (
     ScientificObjectType,
 )
 from app.knowledge.modeling.graph_builder import ScientificKnowledgeGraphBuilder
-from app.knowledge.modeling.models import KnowledgeEdgeType
+from app.knowledge.modeling.models import (
+    KnowledgeEdgeType, KnowledgeRelationAssertion,
+)
 from app.knowledge.modeling.persistence import KnowledgeGraphStore
 
 
@@ -82,6 +84,46 @@ def test_graph_integrity_rejects_unfinalized_snapshot(tmp_path: Path) -> None:
     object.__setattr__(graph, "content_hash", "tampered")
     with pytest.raises(ValueError, match="integrity"):
         KnowledgeGraphStore(tmp_path).save(graph)
+
+
+def test_explicit_semantic_relations_require_accepted_provenance() -> None:
+    relation = KnowledgeRelationAssertion(
+        "result-1", "limitation-1", KnowledgeEdgeType.HAS_LIMITATION,
+        "limitation-1",
+    )
+    graph = ScientificKnowledgeGraphBuilder().build(
+        manifest(), admissions(), relations=(relation,),
+    )
+    edge = next(
+        item for item in graph.edges
+        if item.edge_type is KnowledgeEdgeType.HAS_LIMITATION
+    )
+    assert edge.source_id == "node:result-1"
+    assert edge.target_id == "node:limitation-1"
+    assert edge.provenance.object_id == "limitation-1"
+    assert edge.provenance.review_state is ExtractionReviewState.ACCEPTED
+    assert graph.verify()
+
+
+def test_explicit_semantic_relations_fail_closed_for_unadmitted_or_self_links() -> None:
+    import pytest
+    builder = ScientificKnowledgeGraphBuilder()
+    with pytest.raises(ValueError, match="accepted graph evidence"):
+        builder.build(
+            manifest(), admissions(),
+            relations=(KnowledgeRelationAssertion(
+                "result-1", "variable-missing", KnowledgeEdgeType.MEASURES,
+                "result-1",
+            ),),
+        )
+    with pytest.raises(ValueError, match="self-referential"):
+        builder.build(
+            manifest(), admissions(),
+            relations=(KnowledgeRelationAssertion(
+                "result-1", "result-1", KnowledgeEdgeType.DERIVED_FROM,
+                "result-1",
+            ),),
+        )
 
 
 def test_graph_builder_rejects_unreviewed_and_rejected_evidence() -> None:

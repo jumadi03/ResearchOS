@@ -25,8 +25,8 @@ py -3.13 Scripts\bootstrap_local.py
 ```
 
 The command generates the three ignored credential files, starts the stack,
-creates the `discoverer`, `auditor`, `reviewer`, `indexer`, and `admin` browser
-accounts, and verifies both account login and canonical MinIO buckets. Complete
+creates the `discoverer`, `auditor`, `reviewer`, `indexer`, `publisher`, and
+`admin` browser accounts, and verifies both account login and canonical MinIO buckets. Complete
 existing configuration is reused. A partial configuration fails closed instead
 of guessing or overwriting credentials. Existing ResearchOS volumes without
 their ignored credential files are also rejected; restore the credential files

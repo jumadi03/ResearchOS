@@ -19,6 +19,13 @@ class ScientificObjectType(StrEnum):
     MEASUREMENT = "measurement"
 
 
+CANONICAL_EVIDENCE_TYPES = frozenset(item.value for item in ScientificObjectType)
+# `evidence` predates the structured extraction vocabulary and remains a
+# supported persistence value for backward compatibility. New extractions must
+# use one of the canonical ScientificObjectType values.
+PERSISTENCE_EVIDENCE_TYPES = CANONICAL_EVIDENCE_TYPES | {"evidence"}
+
+
 class ExtractionReviewState(StrEnum):
     PROVISIONAL = "provisional"
     ACCEPTED = "accepted"

@@ -7,7 +7,7 @@ authors:
     alias: jumadi03
 repository-code: "https://github.com/jumadi03/ResearchOS"
 url: "https://github.com/jumadi03/ResearchOS"
-version: 0.4.0
+version: 0.5.0-rc.1
 date-released: 2026-07-16
 license: Apache-2.0
 keywords:

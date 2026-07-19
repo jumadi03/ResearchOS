@@ -21,9 +21,21 @@ class DocumentRegistry:
             data = json.loads(path.read_text(encoding="utf-8"))
             if result.content_hash and data.get("content_hash") == result.content_hash:
                 document = SourceDocument(**data)
-                if not self.verify(document):
+                if (
+                    self.verify(document)
+                    and document.capture_manifest_hash
+                    == result.capture_manifest_hash
+                ):
+                    return document, path
+                if self.verify(document):
+                    continue
+                if data.get("schema_version", "1.0") != "1.0":
                     raise ValueError("SourceDocument integrity verification failed")
-                return document, path
+                # A legacy v1.0 record may predate the raw-capture contract.
+                # A fresh acquisition with a complete capture manifest creates
+                # a new version; the unverifiable historical record is retained.
+                if not result.capture_manifest_hash:
+                    raise ValueError("SourceDocument integrity verification failed")
         version = len(versions) + 1
         blob_path = None
         if result.content is not None and result.content_hash:

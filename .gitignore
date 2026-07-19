@@ -32,6 +32,7 @@ htmlcov/
 # Packaging and build artifacts
 build/
 dist/
+.pnpm-store/
 *.egg-info/
 .eggs/
 
@@ -47,6 +48,9 @@ AI-Gateway/tmp/
 .vscode/
 *.swp
 *.swo
+
+# Canonical UI is maintained in its own connected Sites repository
+/site/
 
 # Operating system metadata
 .DS_Store

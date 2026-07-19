@@ -39,3 +39,16 @@ def authorize(
     if role is not None and not principal.has_role(role):
         raise HTTPException(status_code=403, detail=f"Role required: {role.value}")
     return principal
+
+
+def authorize_any(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+    *roles: KnowledgeRole,
+):
+    """Authorize an authenticated principal holding at least one listed role."""
+    principal = authorize(request, credentials, None)
+    if roles and not any(principal.has_role(role) for role in roles):
+        expected = ", ".join(role.value for role in roles)
+        raise HTTPException(status_code=403, detail=f"One role required: {expected}")
+    return principal

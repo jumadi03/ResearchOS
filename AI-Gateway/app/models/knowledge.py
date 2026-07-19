@@ -85,6 +85,23 @@ class ScientificChangeAcknowledgementRequest(BaseModel):
     occurred_at: str = Field(min_length=1)
 
 
+class ImpactReviewResolutionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal[
+        "investigate", "no_action", "evidence_review_required",
+        "publication_review_required",
+    ]
+    rationale: str = Field(min_length=12)
+    occurred_at: str = Field(min_length=1)
+
+
+class FollowUpCaseTargetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target_object_id: str = Field(min_length=1)
+    rationale: str = Field(min_length=12)
+    occurred_at: str = Field(min_length=1)
+
+
 class SourceWatchTransitionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     to_status: Literal["active", "paused"]
@@ -108,9 +125,54 @@ class TheoryBuildRequest(BaseModel):
     graph_ids: list[str] = Field(min_length=1)
 
 
+class CrossStudyEvidenceReferenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    graph_id: str = Field(min_length=1)
+    object_id: str = Field(min_length=1)
+    stance: Literal["supports", "contradicts"]
+
+
+class CrossStudyPropositionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    statement: str = Field(min_length=1)
+    evidence: list[CrossStudyEvidenceReferenceRequest] = Field(min_length=2)
+    rationale: str = Field(min_length=1)
+    proposed_at: str = Field(min_length=1)
+
+
+class CrossStudyPropositionReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal["accepted", "rejected"]
+    rationale: str = Field(min_length=1)
+    occurred_at: str = Field(min_length=1)
+
+
 class KnowledgeIntakeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     evidence_object_ids: list[str] = Field(default_factory=list)
+    semantic_relation_ids: list[str] = Field(default_factory=list)
+    occurred_at: str = Field(min_length=1)
+
+
+class SemanticRelationProposalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_object_id: str = Field(min_length=1)
+    target_object_id: str = Field(min_length=1)
+    edge_type: str = Field(min_length=1)
+    provenance_object_id: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+    proposed_at: str = Field(min_length=1)
+
+
+class SemanticReextractionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    evidence_object_ids: list[str] = Field(default_factory=list)
+
+
+class SemanticRelationReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision: str
+    rationale: str = Field(min_length=1)
     occurred_at: str = Field(min_length=1)
 
 
@@ -260,3 +322,11 @@ class PublicationPreviewRequest(BaseModel):
         "literature_review", "scoping_review", "systematic_review_support",
         "research_proposal", "evidence_brief",
     ]
+
+
+class PublicationRelationshipRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    relation_type: Literal["corrects", "supersedes", "retracts"]
+    target_publication_id: str | None = Field(default=None, min_length=1)
+    rationale: str = Field(min_length=12)
+    occurred_at: str = Field(min_length=1)
