@@ -5,6 +5,21 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.5.0-rc.2] - 2026-07-19
+
+### Changed
+
+- Added repeatable local credential rotation with automatic rollback for API
+  role tokens, PostgreSQL, MinIO, Grafana, and human workspace accounts.
+- Added atomic workspace password rotation with fresh PBKDF2 salts, lockout
+  reset, attributable audit evidence, and revocation of all existing sessions.
+- Verified isolated restore, PostgreSQL and MinIO outage recovery, application
+  fail-closed behavior, and post-rotation backup continuity.
+- Made restore-controller subprocess decoding deterministic on Windows by
+  using UTF-8 with replacement for non-decodable diagnostic bytes.
+- Added object-storage outage regression coverage proving that failed reads
+  and writes do not produce fallback payloads or false success URIs.
+
 ## [0.5.0-rc.1] - 2026-07-19
 
 ### Changed
