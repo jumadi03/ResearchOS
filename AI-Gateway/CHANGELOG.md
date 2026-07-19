@@ -15,6 +15,8 @@ follows Semantic Versioning.
 - Fixed the browser discovery form to submit the required governed contract,
   bind the canonical project ID, attribute query concepts, and render
   structured validation errors readably.
+- Replaced manual workspace asset version bumps with an explicit local
+  no-store HTTP cache policy so rebuilt container revisions load immediately.
 
 ## [0.5.0-rc.4] - 2026-07-19
 

@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from app.settings import APP_NAME
@@ -46,6 +45,7 @@ from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.repositories.minio import MinioScientificObjectStore
 from app.infrastructure.database import require_schema_version
 from app.infrastructure.readiness import RuntimeReadinessChecker
+from app.product.static_cache import LocalWorkspaceStaticFiles
 from app.knowledge.consequential_controls import ConsequentialResearchControls
 from app.observability import (
     AuditTrail,
@@ -78,7 +78,9 @@ def create_app() -> FastAPI:
     )
     app.mount(
         "/workspace-assets",
-        StaticFiles(directory=Path(__file__).resolve().parent / "product" / "static"),
+        LocalWorkspaceStaticFiles(
+            directory=Path(__file__).resolve().parent / "product" / "static"
+        ),
         name="workspace-assets",
     )
     app.state.knowledge_authenticator = KnowledgeAuthenticator(KNOWLEDGE_API_PRINCIPALS)

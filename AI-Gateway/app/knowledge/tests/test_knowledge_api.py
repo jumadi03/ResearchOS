@@ -1684,9 +1684,6 @@ def test_discovery_workspace_submits_the_required_governed_contract() -> None:
     assert "search_plan_id:planId" in discovery
     assert "project_id:state.project" in discovery
     assert "Array.isArray(body.detail)" in workspace
-    index = (static / "index.html").read_text(encoding="utf-8")
-    assert "workspace.js?v=20260719-discovery-contract-2" in index
-    assert "discovery.js?v=20260719-discovery-contract-2" in index
 
 
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:

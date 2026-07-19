@@ -44,7 +44,9 @@ The fix:
   evidence, depth, budget, license, review, and stopping policies;
 - supplies a human-attributed query concept;
 - renders structured validation messages as readable text; and
-- versions the corrected JavaScript asset URLs to prevent stale browser code.
+- serves local JavaScript and stylesheet assets with an explicit `no-store`
+  HTTP policy, preventing stale container revisions without manual URL
+  version changes.
 
 ## Decision
 
