@@ -386,7 +386,10 @@ class PostgresReadModelRepositoryMixin:
                 ]
         return {
             "project_id": project_id, "pending_reviews": reviews,
-            "correction_reviews": correction_reviews,
+            # Rejected evidence is an archive, not active work. A future
+            # correction request must promote a selected item explicitly.
+            "correction_reviews": [],
+            "rejected_review_archive": correction_reviews,
             "pending_transitions": transitions, "index_jobs": jobs,
             "impact_reviews": impact_reviews,
             "follow_up_cases": follow_up_cases,
