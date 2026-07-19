@@ -282,7 +282,8 @@ def test_work_queue_exposes_append_only_evidence_correction_candidates():
         / "knowledge" / "repositories" / "postgres_read_model.py"
     ).read_text(encoding="utf-8")
     assert '"correction_reviews": correction_reviews' in source
-    assert 'cursor.execute(review_queue_query, (project_id, "rejected"))' in source
+    assert 'cursor.execute(review_queue_query, (project_id, "rejected", "rejected"))' in source
+    assert "correction.from_status='rejected'" in source
     assert '"pending_reviews": reviews' in source
 
 

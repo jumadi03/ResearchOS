@@ -171,6 +171,15 @@ class PostgresReadModelRepositoryMixin:
                       ON x.extraction_manifest_id=e.extraction_manifest_id
                     JOIN scientific_documents d ON d.document_id=e.document_id
                     WHERE po.project_id=%s AND ep.projected_status=%s
+                      AND (
+                        %s <> 'rejected'
+                        OR NOT EXISTS (
+                          SELECT 1
+                          FROM evidence_review_events correction
+                          WHERE correction.evidence_id=e.evidence_id
+                            AND correction.from_status='rejected'
+                        )
+                      )
                     ORDER BY c.updated_at DESC LIMIT 100
                 """
 
@@ -192,9 +201,9 @@ class PostgresReadModelRepositoryMixin:
                     ),
                     } for row in rows]
 
-                cursor.execute(review_queue_query, (project_id, "pending"))
+                cursor.execute(review_queue_query, (project_id, "pending", "pending"))
                 reviews = review_items(cursor.fetchall())
-                cursor.execute(review_queue_query, (project_id, "rejected"))
+                cursor.execute(review_queue_query, (project_id, "rejected", "rejected"))
                 correction_reviews = review_items(cursor.fetchall())
                 cursor.execute("""
                     SELECT regexp_replace(c.stable_key, '^artifact:', ''),
