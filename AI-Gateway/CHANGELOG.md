@@ -5,6 +5,12 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Strengthened the one-machine local controller with dependency-aware
+  readiness, rendered-workspace verification, read-only status inspection,
+  and a data-preserving stop operation.
+
 ## [0.5.0-rc.4] - 2026-07-19
 
 ### Changed

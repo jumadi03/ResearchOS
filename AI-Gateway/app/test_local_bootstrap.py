@@ -108,3 +108,83 @@ def test_missing_credentials_with_existing_volumes_is_rejected(
         assert "volumes exist" in str(error)
     else:
         raise AssertionError("Orphaned volumes must fail closed")
+
+
+def test_runtime_verification_requires_dependencies_and_workspace(
+    monkeypatch,
+) -> None:
+    responses = {
+        "http://127.0.0.1:8080/health": (200, {"status": "ok"}, ""),
+        "http://127.0.0.1:8080/ready": (
+            200,
+            {
+                "status": "ready",
+                "checks": {
+                    "database": True,
+                    "schema_version": True,
+                    "worker": True,
+                    "object_storage": True,
+                },
+            },
+            "",
+        ),
+        "http://127.0.0.1:8080/workspace": (
+            200,
+            None,
+            '<form id="authForm"></form>',
+        ),
+    }
+    monkeypatch.setattr(bootstrap, "read_endpoint", responses.__getitem__)
+
+    assert bootstrap.verify_runtime() == responses[
+        "http://127.0.0.1:8080/ready"
+    ][1]["checks"]
+
+
+def test_runtime_verification_fails_closed_on_dependency_failure(
+    monkeypatch,
+) -> None:
+    responses = {
+        "http://127.0.0.1:8080/health": (200, {"status": "ok"}, ""),
+        "http://127.0.0.1:8080/ready": (
+            503,
+            {
+                "status": "not_ready",
+                "checks": {"database": True, "worker": False},
+            },
+            "",
+        ),
+    }
+    monkeypatch.setattr(bootstrap, "read_endpoint", responses.__getitem__)
+
+    try:
+        bootstrap.verify_runtime()
+    except RuntimeError as error:
+        assert "worker" in str(error)
+    else:
+        raise AssertionError("A failed runtime dependency must fail closed")
+
+
+def test_local_status_requires_all_credential_files(tmp_path: Path) -> None:
+    (tmp_path / "deploy").mkdir()
+
+    try:
+        bootstrap.require_local_configuration(tmp_path)
+    except RuntimeError as error:
+        assert "configuration is incomplete" in str(error)
+    else:
+        raise AssertionError("Status must not create or guess missing credentials")
+
+
+def test_stop_preserves_data(monkeypatch, tmp_path: Path, capsys) -> None:
+    calls = []
+    monkeypatch.setattr(
+        bootstrap,
+        "compose",
+        lambda root, *arguments, **_options: calls.append((root, arguments)),
+    )
+
+    bootstrap.stop_runtime(tmp_path)
+
+    assert calls == [(tmp_path, ("down",))]
+    assert "data=preserved" in capsys.readouterr().out

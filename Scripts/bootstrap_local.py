@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from typing import Any
 import urllib.request
 
 
@@ -228,16 +229,22 @@ def refuse_orphaned_volumes(root: Path) -> None:
         )
 
 
-def compose(root: Path, *arguments: str, input_text: str | None = None) -> None:
+def compose(
+    root: Path,
+    *arguments: str,
+    input_text: str | None = None,
+    capture_output: bool = False,
+) -> subprocess.CompletedProcess[str]:
     command = [
         "docker", "compose", "--env-file", "stack.env", "-f", "compose.yaml",
         *arguments,
     ]
-    subprocess.run(
+    return subprocess.run(
         command,
         cwd=root / "deploy",
         input=input_text,
         text=True,
+        capture_output=capture_output,
         check=True,
     )
 
@@ -288,20 +295,103 @@ print(f"runtime-bootstrap=passed accounts={len(accounts)} buckets=2")
     )
 
 
+def read_endpoint(url: str) -> tuple[int, Any, str]:
+    with urllib.request.urlopen(url, timeout=15) as response:
+        content_type = response.headers.get_content_type()
+        text = response.read().decode("utf-8", errors="replace")
+        payload = json.loads(text) if content_type == "application/json" else None
+        return response.status, payload, text
+
+
+def verify_runtime() -> dict[str, bool]:
+    status, health, _ = read_endpoint("http://127.0.0.1:8080/health")
+    if status != 200 or health != {"status": "ok"}:
+        raise RuntimeError(f"ResearchOS health check returned {status}")
+
+    status, readiness, _ = read_endpoint("http://127.0.0.1:8080/ready")
+    checks = readiness.get("checks", {}) if isinstance(readiness, dict) else {}
+    failed = sorted(name for name, passed in checks.items() if passed is not True)
+    if (
+        status != 200
+        or not isinstance(readiness, dict)
+        or readiness.get("status") != "ready"
+        or not checks
+        or failed
+    ):
+        detail = ",".join(failed) if failed else "invalid-response"
+        raise RuntimeError(
+            f"ResearchOS readiness check returned {status}: {detail}"
+        )
+
+    status, _, workspace = read_endpoint("http://127.0.0.1:8080/workspace")
+    if status != 200 or 'id="authForm"' not in workspace:
+        raise RuntimeError(
+            f"ResearchOS workspace check returned {status} without the login interface"
+        )
+    return checks
+
+
+def require_local_configuration(root: Path) -> None:
+    required = (
+        root / "deploy" / "stack.env",
+        root / "deploy" / "local-access.env",
+        root / "deploy" / "monitoring" / "prometheus.token",
+    )
+    if not all(path.is_file() for path in required):
+        raise RuntimeError(
+            "Local configuration is incomplete; run the bootstrap before status or stop"
+        )
+
+
+def show_status(root: Path) -> None:
+    result = compose(root, "ps", "--format", "json", capture_output=True)
+    if not result.stdout.strip():
+        raise RuntimeError("ResearchOS local services are not running")
+    checks = verify_runtime()
+    print(
+        "researchos-status=ready "
+        f"checks={len(checks)} workspace=http://127.0.0.1:8080/workspace"
+    )
+
+
+def stop_runtime(root: Path) -> None:
+    compose(root, "down")
+    print("researchos-stop=passed data=preserved")
+
+
 def verify_health() -> None:
-    with urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=15) as response:
-        if response.status != 200:
-            raise RuntimeError(f"ResearchOS health check returned {response.status}")
+    """Compatibility wrapper for callers that used the original health gate."""
+    status, _, _ = read_endpoint("http://127.0.0.1:8080/health")
+    if status != 200:
+        raise RuntimeError(f"ResearchOS health check returned {status}")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    operations = parser.add_mutually_exclusive_group()
+    operations.add_argument(
         "--configuration-only", action="store_true",
         help="Generate or validate ignored secret files without starting Docker.",
     )
+    operations.add_argument(
+        "--status", action="store_true",
+        help="Verify running containers, dependency readiness, and workspace rendering.",
+    )
+    operations.add_argument(
+        "--stop", action="store_true",
+        help="Stop local services without deleting persistent data or credentials.",
+    )
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parents[1]
+    if args.status or args.stop:
+        require_local_configuration(root)
+        if shutil.which("docker") is None:
+            raise RuntimeError("Docker is required to manage the local ResearchOS stack")
+        if args.status:
+            show_status(root)
+        else:
+            stop_runtime(root)
+        return 0
     refuse_orphaned_volumes(root)
     state = ensure_configuration(root)
     print(f"local-configuration={state} secrets=hidden", flush=True)
@@ -311,8 +401,12 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError("Docker is required to start the local ResearchOS stack")
     compose(root, "up", "--build", "--detach", "--wait")
     bootstrap_accounts(root)
-    verify_health()
-    print("researchos-bootstrap=passed credentials=deploy/local-access.env")
+    checks = verify_runtime()
+    print(
+        "researchos-bootstrap=passed "
+        f"checks={len(checks)} credentials=deploy/local-access.env "
+        "workspace=http://127.0.0.1:8080/workspace"
+    )
     return 0
 
 
