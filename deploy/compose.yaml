@@ -84,9 +84,24 @@ services:
       - architecture_data:/data/architecture
       - ./restore/trust:/restore-trust:ro
     ports: ["127.0.0.1:8080:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     depends_on:
       migrate: {condition: service_completed_successfully}
       minio-init: {condition: service_completed_successfully}
+
+  cloudflared:
+    profiles: ["public-api"]
+    image: cloudflare/cloudflared:2026.7.2
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:-}
+    depends_on:
+      api: {condition: service_healthy}
 
   worker:
     build: {context: ../AI-Gateway}
