@@ -12,6 +12,9 @@ follows Semantic Versioning.
   and a data-preserving stop operation.
 - Added restart continuity acceptance for PostgreSQL identity, schema and
   workspace accounts, plus a temporary write-read-delete MinIO sentinel.
+- Fixed the browser discovery form to submit the required governed contract,
+  bind the canonical project ID, attribute query concepts, and render
+  structured validation errors readably.
 
 ## [0.5.0-rc.4] - 2026-07-19
 

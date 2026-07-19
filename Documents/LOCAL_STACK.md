@@ -293,6 +293,10 @@ The latest local end-to-end execution and its live recovery projection are
 recorded in
 [`LOCAL_RECOVERY_ACCEPTANCE_REPORT.md`](LOCAL_RECOVERY_ACCEPTANCE_REPORT.md).
 
+The verified local login, discovery, logout, login-renewal, and persistence
+flow is recorded in
+[`LOCAL_BROWSER_ACCEPTANCE_REPORT.md`](LOCAL_BROWSER_ACCEPTANCE_REPORT.md).
+
 Phase 1F-D adds a canonical schedule that starts paused. Inspect it from
 `deploy`:
 
