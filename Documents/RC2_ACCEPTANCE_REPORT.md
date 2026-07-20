@@ -166,6 +166,13 @@ These later infrastructure results do not contain the typed-null SGF-020C fix
 inside tagged commit `38913be`; therefore RC.2 remains rejected and must not be
 moved or relabeled.
 
+The subsequent canonical mutation acceptance also passed on 2026-07-20:
+a reviewer moved artifact `bada8f58-839b-45a1-8dde-1cf56f975841` from `draft`
+to `review`; F5 preserved the new queue state; and PostgreSQL matched immutable
+lifecycle event `af60c4f8-ee72-4270-bd83-5330e27de073`. This proves the later
+production environment, not the immutable RC.2 candidate. RC.2 therefore
+remains **NOT ACCEPTED**.
+
 ## Acceptance decision
 
 `v0.5.0-rc.2` is rejected as the release candidate because its tagged code has

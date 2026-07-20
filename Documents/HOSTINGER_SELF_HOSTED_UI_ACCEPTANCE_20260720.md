@@ -113,3 +113,49 @@ The broader canonical mutation acceptance remains a separate controlled step:
 perform one safe audited mutation, refresh, and match the resulting audit event
 and production database record. No acceptance-only mutation was performed as
 part of this infrastructure cutover.
+
+## Canonical mutation addendum
+
+Date and time: 2026-07-20 15:33 WITA
+
+Decision: **ACCEPTED**
+
+After the infrastructure cutover acceptance, the reviewer performed one
+controlled, non-publication lifecycle mutation through the public production
+UI:
+
+```text
+Artifact: Scientific theory bundle
+Artifact ID: bada8f58-839b-45a1-8dde-1cf56f975841
+Transition: draft -> review
+Actor: reviewer
+Rationale: artefak siap memasuki tahap review formal.
+```
+
+The UI returned the success message `Scientific theory bundle berpindah dari
+draft ke review.` No `review -> validated` or publication transition was
+authorized or performed.
+
+The production PostgreSQL audit ledger recorded:
+
+```text
+Lifecycle event ID: af60c4f8-ee72-4270-bd83-5330e27de073
+Occurred at: 2026-07-20 07:33:00.785+00
+Stored artifact status: review
+```
+
+The user then pressed F5 and visually confirmed that the target remained in the
+`review -> validated` work queue rather than returning to `draft -> review`.
+A final database read returned the same immutable event, rationale, actor,
+artifact ID, and current `review` status.
+
+Additional visual evidence:
+
+- `C:\Users\ROG\Pictures\Screenshots\Screenshot 2026-07-20 153309.png`
+  — immediate UI success message after the mutation.
+- `C:\Users\ROG\Pictures\Screenshots\Screenshot 2026-07-20 153528.png`
+  — persisted `review -> validated` queue state after F5.
+
+This completes the required production chain:
+
+`public login -> real project -> safe audited mutation -> reload -> production database match`.
