@@ -458,6 +458,32 @@ def client(
     return TestClient(app, headers=headers)
 
 
+def test_operational_status_returns_status_payload(tmp_path, monkeypatch):
+    expected = {
+        "status": "passed",
+        "checked_at": "2026-07-20T08:00:00Z",
+        "monitor": {"status": "passed", "checked_at": None, "checks": []},
+        "backup": {"status": "passed", "stamp": "20260720T075150Z"},
+        "disk": {
+            "used_percent": 8,
+            "available_bytes": 92_000_000_000,
+            "threshold_percent": 80,
+        },
+        "deployment": {"revision": "test-revision"},
+    }
+    monkeypatch.setattr(
+        "app.router.knowledge.build_operational_status",
+        lambda **_kwargs: expected,
+    )
+
+    response = client(tmp_path, token="audit").get(
+        "/knowledge/operations/status"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == expected
+
+
 def payload():
     return {
         "question": {"question_id": "q1", "text": "Why?"},

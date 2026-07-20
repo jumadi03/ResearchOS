@@ -57,6 +57,15 @@ def operational_status(
         request, credentials,
         KnowledgeRole.ADMIN, KnowledgeRole.AUDITOR, KnowledgeRole.REVIEWER,
     )
+    return build_operational_status(
+        monitor_path=Path(os.getenv(
+            "OPERATIONS_STATE_PATH", "/operations-state/health.json"
+        )),
+        backup_root=Path(os.getenv("BACKUP_STATUS_ROOT", "/backups")),
+        deployed_commit_path=Path(os.getenv(
+            "DEPLOYED_COMMIT_PATH", "/runtime/DEPLOYED_COMMIT"
+        )),
+    )
 
 @router.get("/operations/storage-tiers")
 def storage_tier_status(
@@ -68,15 +77,6 @@ def storage_tier_status(
         KnowledgeRole.ADMIN, KnowledgeRole.AUDITOR, KnowledgeRole.REVIEWER,
     )
     return read_storage_tier_status(DATABASE_URL)
-    return build_operational_status(
-        monitor_path=Path(os.getenv(
-            "OPERATIONS_STATE_PATH", "/operations-state/health.json"
-        )),
-        backup_root=Path(os.getenv("BACKUP_STATUS_ROOT", "/backups")),
-        deployed_commit_path=Path(os.getenv(
-            "DEPLOYED_COMMIT_PATH", "/runtime/DEPLOYED_COMMIT"
-        )),
-    )
 
 @router.get("/discovery/capabilities")
 def discovery_capabilities(
