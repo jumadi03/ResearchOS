@@ -3,6 +3,17 @@ DECLARE
     object_uuid uuid;
     event_uuid uuid;
 BEGIN
+    IF to_regclass('public.storage_tier_attestations') IS NULL OR
+       to_regclass('public.storage_tier_current') IS NULL THEN
+        RAISE EXCEPTION 'tiered storage catalog is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='storage_tier_attestations_immutable'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'storage tier attestation immutability is missing';
+    END IF;
     INSERT INTO canonical_objects(object_type, stable_key, lifecycle_status)
     VALUES ('health_check', 'health:provenance-object', 'draft')
     ON CONFLICT(stable_key) DO UPDATE SET updated_at=now()
@@ -54,7 +65,7 @@ WHERE schemaname='public' AND tablename IN (
 
 DO $$
 BEGIN
-IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 41 THEN
+IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 42 THEN
         RAISE EXCEPTION 'database schema version does not match application';
     END IF;
     IF EXISTS (

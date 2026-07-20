@@ -233,7 +233,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
       RESEARCHOS_INTERNAL_HEALTH_URL: http://api:8000/health
       MINIO_INTERNAL_HEALTH_URL: http://minio:9000/minio/health/live
-      EXPECTED_SCHEMA_VERSION: "41"
+      EXPECTED_SCHEMA_VERSION: "42"
       HEALTHCHECK_INTERVAL_SECONDS: ${HEALTHCHECK_INTERVAL_SECONDS:-60}
       HEALTHCHECK_STATE_PATH: /state/health.json
     volumes:

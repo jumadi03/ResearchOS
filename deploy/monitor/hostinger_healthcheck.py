@@ -72,7 +72,7 @@ def run_checks() -> tuple[dict[str, object], bool]:
         checks.append(
             check_database(
                 os.environ["DATABASE_URL"],
-                int(os.environ.get("EXPECTED_SCHEMA_VERSION", "41")),
+                int(os.environ.get("EXPECTED_SCHEMA_VERSION", "42")),
             )
         )
     except Exception as exc:

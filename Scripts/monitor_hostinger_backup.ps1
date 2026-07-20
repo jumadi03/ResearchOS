@@ -17,6 +17,7 @@ if (-not $OperationalStateRoot) {
 $alertRoot = Join-Path $OperationalStateRoot "alerts"
 $statusRoot = Join-Path $OperationalStateRoot "status"
 $pullScript = Join-Path $RepositoryRoot "Scripts\pull_hostinger_backup.ps1"
+$attestationScript = Join-Path $RepositoryRoot "Scripts\register_local_backup_attestation.ps1"
 
 function Write-AtomicJson {
     param([string]$Path, [hashtable]$Payload)
@@ -60,6 +61,13 @@ try {
         -DestinationRoot $backupRoot
     if ($LASTEXITCODE -ne 0) {
         throw "Offsite backup pull or checksum verification failed"
+    }
+
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $attestationScript `
+        -HostName $HostName -RemoteUser $RemoteUser -KeyPath $KeyPath `
+        -BackupRoot $backupRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Local backup attestation failed"
     }
 
     $now = [DateTimeOffset]::UtcNow

@@ -33,8 +33,8 @@ def test_control_plane_requires_explicit_roles() -> None:
     assert '/decisions/{decision_id}/appeals' in ROUTER
 
 
-def test_application_requires_schema_40_and_mounts_router() -> None:
-    assert 'os.getenv("DATABASE_SCHEMA_VERSION", "41")' in SETTINGS
+def test_application_requires_current_schema_and_mounts_router() -> None:
+    assert 'os.getenv("DATABASE_SCHEMA_VERSION", "42")' in SETTINGS
     assert "app.state.consequential_controls" in MAIN
     assert "app.include_router(consequential_router)" in MAIN
 

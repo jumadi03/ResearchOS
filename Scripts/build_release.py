@@ -121,6 +121,7 @@ def canonical_ui_lock() -> dict:
     if document["operational_status"] not in {
         "canonical_target_not_cutover",
         "operational_canonical",
+        "authenticated_production_acceptance_passed",
     }:
         raise RuntimeError("Canonical UI operational status is invalid")
     if document["build_contract"] != "vinext":

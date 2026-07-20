@@ -39,6 +39,8 @@ from app.knowledge.extraction.models import (
 )
 from app.runtime.models.runtime_request import RuntimeRequest
 from app.product.operational_status import build_operational_status
+from app.product.storage_tiers import read_storage_tier_status
+from app.settings import DATABASE_URL
 from app.router.knowledge_dependencies import authorize, authorize_any, bearer
 from app.router.knowledge_workspace import router as workspace_router
 
@@ -55,6 +57,17 @@ def operational_status(
         request, credentials,
         KnowledgeRole.ADMIN, KnowledgeRole.AUDITOR, KnowledgeRole.REVIEWER,
     )
+
+@router.get("/operations/storage-tiers")
+def storage_tier_status(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials,
+        KnowledgeRole.ADMIN, KnowledgeRole.AUDITOR, KnowledgeRole.REVIEWER,
+    )
+    return read_storage_tier_status(DATABASE_URL)
     return build_operational_status(
         monitor_path=Path(os.getenv(
             "OPERATIONS_STATE_PATH", "/operations-state/health.json"

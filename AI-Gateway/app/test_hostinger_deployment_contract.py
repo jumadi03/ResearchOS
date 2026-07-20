@@ -68,7 +68,7 @@ def test_hostinger_stack_schedules_verified_backups_and_internal_monitoring() ->
     )
     assert "operations_state:/state" in compose
     assert "hostinger_healthcheck.py" in compose
-    assert "EXPECTED_SCHEMA_VERSION: \"41\"" in compose
+    assert "EXPECTED_SCHEMA_VERSION: \"42\"" in compose
     assert "operations_state:/operations-state:ro" in compose
     assert "backup_data:/backups:ro" in compose
     assert "/opt/researchos/DEPLOYED_COMMIT:/runtime/DEPLOYED_COMMIT:ro" in compose
