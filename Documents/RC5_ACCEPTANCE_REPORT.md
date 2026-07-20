@@ -1,0 +1,76 @@
+# ResearchOS v0.5.0-rc.5 Acceptance Report
+
+Date: 2026-07-20
+
+Candidate: `v0.5.0-rc.5`
+
+Candidate commit: `2760a6ec6123ec0cb933d84391f0fe9a1e1bc2a4`
+
+## Decision
+
+**TECHNICALLY ACCEPTED AS A LOCAL RELEASE CANDIDATE.**
+
+**PUBLICATION IS NOT AUTHORIZED.** RC.5 has not been pushed as a ResearchOS
+repository release, has not been published as a GitHub Release, and its saved
+Sites UI version has not been deployed to production.
+
+RC.2 remains **NOT ACCEPTED**. Its tag was not moved or modified.
+
+## Acceptance evidence
+
+- Backend regression: **505 passed, 0 failed** in 32.15 seconds.
+- Release-contract regression: **4 passed, 0 failed**.
+- Canonical UI regression: **8 passed, 0 failed**.
+- Canonical UI production build: **passed** with Vinext.
+- Installed backend package version: `0.5.0rc5`.
+- Database schema version: `41`.
+- Source archive inventory: 620 tracked files and **0 temporary test entries**.
+- Release artifacts, SBOM, baseline, provenance, and SHA-256 manifest were
+  generated successfully.
+
+The first full backend attempt completed 275 tests while 230 fixtures could not
+start because the configured parent temporary directory did not exist. After
+creating an isolated local parent directory, the unchanged suite passed
+505/505. This was an execution-environment failure, not an application failure.
+
+## Canonical UI binding
+
+- UI source commit: `8b06689b36f8a7c6df024c8e188d51e595fac216`.
+- Saved Sites version: `8`.
+- Saved version state: `saved_not_deployed`.
+- Currently deployed Sites version: `7`.
+- Production target:
+  `https://researchos-ilmiah.jumadi03.chatgpt.site/`.
+- Operational state: `canonical_target_not_cutover`.
+
+The accepted graph-explorer behavior and visual layout are recorded in
+`Documents/LOCAL_CANONICAL_GRAPH_EXPLORER_ACCEPTANCE_REPORT.md`. RC.5 binds that
+exact accepted source to a reconstructible saved Sites version while explicitly
+keeping it separate from the older production deployment.
+
+## Release artifact checksums
+
+```text
+8f2e73ca2af8b6f80898b1690e47e83084b1b89ce79d4cf7822417e663d50af6  ResearchOS-0.5.0-rc.5-source.zip
+cf43b191492e89476faabdb5408f09cca3bf80ee71b8527c280e3f4fb5e8aa77  ResearchOS-0.5.0-rc.5.baseline.json
+aa10149222b52e30eae3b32ce3ad00978e392c8ee7b17af02837c23fc5be89e1  ResearchOS-0.5.0-rc.5.cdx.json
+dc1c4cfc5e184e4619239091e1db21e6af878c576108474b2b173d3981145a69  ResearchOS-0.5.0-rc.5.provenance.json
+ecd7bc8286014d9d487489194f573b0e98a56360c95236ad2670804988359c0e  researchos_ai_gateway-0.5.0rc5-py3-none-any.whl
+```
+
+## Tag integrity and publication boundary
+
+- `v0.5.0-rc.1` through `v0.5.0-rc.4` retain their existing tag objects and
+  target commits.
+- `v0.5.0-rc.5` is an annotated local tag resolving to the candidate commit
+  stated above.
+- No ResearchOS repository push was performed.
+- No GitHub Release was created.
+- No Sites production deployment was performed.
+
+## Remaining gate
+
+RC.5 may proceed to a separate publication decision only after explicit
+authorization to push the repository tag and/or deploy saved Sites version 8.
+Those two operations are independent and must not be inferred from this local
+acceptance.
