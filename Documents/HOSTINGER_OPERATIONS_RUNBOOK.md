@@ -88,6 +88,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 The off-VPS copy deliberately excludes `stack.hostinger.env`, SSH keys, API
 tokens, and user passwords.
 
+The scheduled task runs `Scripts/monitor_hostinger_backup.ps1`, which requires a
+recent passing Hostinger monitor state and a completed backup no older than 36
+hours before invoking the checksum-bound pull. A successful run updates
+`D:\ResearchOS\Backups\Hostinger\status\latest.json`. A failure:
+
+- returns a failed Windows task result;
+- writes a durable incident to
+  `D:\ResearchOS\Backups\Hostinger\alerts\latest.json`; and
+- attempts to show a Windows message to the signed-in user.
+
 The first backup proven restorable by the isolated off-VPS drill is
 `20260720T030625Z`. Earlier sets `20260720T024359Z` and
 `20260720T025833Z` remain checksum-valid historical artifacts but must not be

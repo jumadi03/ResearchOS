@@ -71,9 +71,24 @@ def test_offsite_backup_pull_is_manifest_bound_and_secret_excluding() -> None:
     assert "Assert-SafeChildPath" in script
     assert "stack.hostinger.env" not in script
     assert "offsite-backup=passed" in script
+    assert "MaximumBackupAgeHours" in script
 
     override = (
         ROOT / "deploy" / "restore" / "compose.offsite-restore-drill.yaml"
     ).read_text(encoding="utf-8")
     assert "RESTORE_BACKUP_DIR" in override
     assert ":/backups:ro" in override
+
+
+def test_local_monitor_produces_durable_alerts_without_secrets() -> None:
+    script = (
+        ROOT / "Scripts" / "monitor_hostinger_backup.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "researchos-monitor-1" in script
+    assert "MaximumMonitorAgeMinutes" in script
+    assert "alerts" in script
+    assert "latest.json" in script
+    assert "msg.exe" in script
+    assert "hostinger-backup-monitor=passed" in script
+    assert "stack.hostinger.env" not in script

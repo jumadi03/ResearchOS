@@ -141,3 +141,26 @@ complete isolated restore drill:
 
 The production monitor remained `passed` with schema 41 and 325 canonical
 objects after reconciliation.
+
+## Local failure-alert acceptance
+
+Windows task `ResearchOS-Hostinger-Offsite-Backup` now runs
+`Scripts/monitor_hostinger_backup.ps1`. Each run requires:
+
+- a reachable Hostinger monitor;
+- monitor status `passed`;
+- monitor state no older than five minutes;
+- a completed backup no older than 36 hours; and
+- a checksum-verified local copy.
+
+The success path completed with Windows task result `0`, returned to `Ready`,
+and recorded schema 41 plus 325 canonical objects in the local status file. The
+controlled failure test used a zero-minute freshness threshold and correctly:
+
+- exited with a failed result;
+- wrote a durable JSON alert containing no secret values; and
+- identified the stale monitor state as the cause.
+
+For normal failures the wrapper also attempts a visible Windows message. The
+durable alert file and failed task result remain authoritative if no interactive
+desktop session is available.

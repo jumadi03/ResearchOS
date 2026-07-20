@@ -3,7 +3,8 @@ param(
     [string]$HostName = "76.13.20.211",
     [string]$KeyPath = "$HOME\.ssh\researchos_hostinger_ed25519",
     [string]$DestinationRoot = "D:\ResearchOS\Backups\Hostinger",
-    [int]$RetentionDays = 30
+    [int]$RetentionDays = 30,
+    [int]$MaximumBackupAgeHours = 36
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,6 +63,16 @@ if ($manifestName -notmatch '^backup-set-(\d{8}T\d{6}Z)\.json$') {
     throw "Unexpected backup manifest name: $manifestName"
 }
 $stamp = $Matches[1]
+$backupTime = [DateTime]::ParseExact(
+    $stamp,
+    "yyyyMMddTHHmmssZ",
+    [Globalization.CultureInfo]::InvariantCulture,
+    [Globalization.DateTimeStyles]::AssumeUniversal -bor
+        [Globalization.DateTimeStyles]::AdjustToUniversal
+)
+if (([DateTime]::UtcNow - $backupTime).TotalHours -gt $MaximumBackupAgeHours) {
+    throw "Latest completed Hostinger backup is older than $MaximumBackupAgeHours hours"
+}
 $finalDirectory = Join-Path $rootFull $stamp
 $partialDirectory = Join-Path $rootFull ".partial-$stamp"
 Assert-SafeChildPath $rootFull $finalDirectory
