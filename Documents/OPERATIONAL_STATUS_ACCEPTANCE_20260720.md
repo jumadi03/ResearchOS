@@ -70,3 +70,43 @@ this correction. VPS eviction remains fail-closed and unauthorized.
 - Authenticated public UI visual confirmation: **PENDING USER REFRESH AND
   CONFIRMATION**.
 
+## Second production observation and UI hardening
+
+The user performed both a normal refresh and `Ctrl+Shift+R` after the backend
+correction. The authenticated production UI still showed the empty section.
+This failed observation remains part of the acceptance history.
+
+Further production checks proved:
+
+- the authenticated direct API path returned the complete operational payload;
+- the authenticated UI proxy path returned the same complete payload;
+- `archived_local` was 6 and `eviction_authorized` was `false` through both
+  paths; and
+- the user's refresh requests were visible in the real API access log with
+  HTTP 200 for both endpoints.
+
+The UI was hardened so that:
+
+- operational and storage-tier requests settle independently;
+- a failure in one cannot erase a successful result from the other;
+- storage-tier cards no longer depend on the monitor payload;
+- loading and error states are always visible instead of leaving silent blank
+  space.
+
+UI verification and deployment:
+
+- UI tests: **14 passed**;
+- production build: **passed**;
+- UI source commit:
+  `1d747220ddf5b30bc4cb3506adcb7f71aacdbf19`;
+- archive SHA-256:
+  `8a1b74ecfc296f44a2d9f0edf1e59cb5b313e649a0850f8f5d1f12ac1e47aaab`;
+- running image:
+  `researchos-ui:1d747220ddf5b30bc4cb3506adcb7f71aacdbf19`;
+- running image digest:
+  `sha256:6e1320426f02a21b8df428884217cbd7ec1255f2978e73cb9f1240f5bdb842a3`;
+- container state: `running healthy`;
+- previous public asset: `page-66UeCDH-.js`;
+- new public asset: `page-B-vD-1q2.js`.
+
+Authenticated visual confirmation of this new asset remains pending.
