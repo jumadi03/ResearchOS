@@ -22,14 +22,14 @@ def test_release_dependencies_are_exactly_pinned() -> None:
         assert not any(operator in requirement for operator in (">=", "<=", "~=", "!="))
 
 
-def test_canonical_ui_lock_distinguishes_saved_and_deployed_source() -> None:
+def test_canonical_ui_lock_binds_the_deployed_source() -> None:
     lock = release.canonical_ui_lock()
 
     assert len(lock["commit_sha"]) == 40
     assert lock["deployment_url"].startswith("https://")
     assert lock["sites_version_number"] > 0
-    assert lock["deployment_status"] == "saved_not_deployed"
-    assert lock["deployed_sites_version_number"] < lock["sites_version_number"]
+    assert lock["deployment_status"] == "deployed"
+    assert lock["deployed_sites_version_number"] == lock["sites_version_number"]
     assert lock["tests_passed"] > 0
 
 

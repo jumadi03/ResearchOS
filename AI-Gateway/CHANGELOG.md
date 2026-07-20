@@ -5,6 +5,11 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Recorded the owner-only production deployment of canonical Sites UI version
+  8 without moving the immutable RC.5 tag or claiming backend cutover.
+
 ## [0.5.0-rc.5] - 2026-07-20
 
 ### Changed

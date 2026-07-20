@@ -10,9 +10,10 @@ Candidate commit: `2760a6ec6123ec0cb933d84391f0fe9a1e1bc2a4`
 
 **TECHNICALLY ACCEPTED AS A LOCAL RELEASE CANDIDATE.**
 
-**PUBLICATION IS NOT AUTHORIZED.** RC.5 has not been pushed as a ResearchOS
-repository release, has not been published as a GitHub Release, and its saved
-Sites UI version has not been deployed to production.
+**REPOSITORY PUBLICATION IS NOT AUTHORIZED.** RC.5 has not been pushed as a
+ResearchOS repository release and has not been published as a GitHub Release.
+After local acceptance, its owner-only Sites UI version was deployed without
+moving the RC.5 tag.
 
 RC.2 remains **NOT ACCEPTED**. Its tag was not moved or modified.
 
@@ -38,16 +39,21 @@ creating an isolated local parent directory, the unchanged suite passed
 
 - UI source commit: `8b06689b36f8a7c6df024c8e188d51e595fac216`.
 - Saved Sites version: `8`.
-- Saved version state: `saved_not_deployed`.
-- Currently deployed Sites version: `7`.
+- Current version state: `deployed`.
+- Currently deployed Sites version: `8`.
 - Production target:
   `https://researchos-ilmiah.jumadi03.chatgpt.site/`.
 - Operational state: `canonical_target_not_cutover`.
 
 The accepted graph-explorer behavior and visual layout are recorded in
 `Documents/LOCAL_CANONICAL_GRAPH_EXPLORER_ACCEPTANCE_REPORT.md`. RC.5 binds that
-exact accepted source to a reconstructible saved Sites version while explicitly
-keeping it separate from the older production deployment.
+exact accepted source to a reconstructible saved Sites version.
+
+The subsequent owner-only production deployment succeeded at the same canonical
+URL. Browser inspection confirmed the new UI shell is active and correctly
+fails closed with `Backend belum tersedia` because `RESEARCHOS_API_ORIGIN` is
+not yet configured in the Sites runtime. No sample data or false connected
+state is displayed.
 
 ## Interactive local-browser acceptance
 
@@ -82,11 +88,12 @@ ecd7bc8286014d9d487489194f573b0e98a56360c95236ad2670804988359c0e  researchos_ai_
   stated above.
 - No ResearchOS repository push was performed.
 - No GitHub Release was created.
-- No Sites production deployment was performed.
+- Sites version 8 was deployed after the immutable RC.5 candidate tag was
+  created; the tag was not moved.
 
 ## Remaining gate
 
-RC.5 may proceed to a separate publication decision only after explicit
-authorization to push the repository tag and/or deploy saved Sites version 8.
-Those two operations are independent and must not be inferred from this local
-acceptance.
+The remaining implementation gate is a publicly reachable HTTPS backend origin
+and explicit configuration of `RESEARCHOS_API_ORIGIN` in Sites. Repository tag
+push and GitHub Release publication remain separate decisions and are not
+authorized by this acceptance.
