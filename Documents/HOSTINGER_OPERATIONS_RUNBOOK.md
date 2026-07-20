@@ -95,6 +95,11 @@ selected for recovery because their filesystem control-manifest contract was
 not portable. Recovery selection must require a successful signed restore-drill
 report, not checksum validity alone.
 
+After removing the legacy root control manifests from the Hostinger knowledge
+and architecture volumes, backup `20260720T031629Z` passed the same complete
+drill and is the preferred recovery set. The local knowledge and architecture
+sources were already free of those legacy control files.
+
 ## Incident priorities
 
 1. Preserve data and backup volumes.

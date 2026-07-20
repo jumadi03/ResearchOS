@@ -109,3 +109,35 @@ the production target was not touched.
   `909da2218b8f0c99277f6c6f444d42c5810b5fcec873da972845d72afe6b0211`.
 
 The public production health endpoint remained healthy after the local drill.
+
+## Source-volume reconciliation
+
+The local and Hostinger knowledge sources were compared after the first
+successful off-VPS drill:
+
+- The local knowledge and architecture roots contained no legacy
+  `.researchos-tree-manifest.txt` control files.
+- Hostinger contained a 165,238-byte legacy knowledge control manifest and an
+  empty architecture control manifest.
+- The knowledge control manifest was recorded with SHA-256
+  `c24a83a81616f950e3051733828497954216c08a8e0da961d8c9c4ec2a6c14a1`
+  before both control files were removed.
+- No scientific object, document, database row, or MinIO object was removed.
+
+Post-cleanup backup `20260720T031629Z` was copied locally and passed another
+complete isolated restore drill:
+
+- Outcome: `verified`.
+- Schema version: 41.
+- Canonical object count: 325.
+- MinIO object count: 22.
+- Knowledge files: 452.
+- Migration files: 42.
+- Cleanup and Ed25519 attestation: verified.
+- Restore report content hash:
+  `7d5c78daba6e9850bb6f28534351426e3c12f3e1493d636c519dda36cd1c9b2f`.
+- Manifest hash:
+  `28ef70cfc21ba96287fd2acf6f0376ae0322dfff99ed180ab483e93d539ed276`.
+
+The production monitor remained `passed` with schema 41 and 325 canonical
+objects after reconciliation.

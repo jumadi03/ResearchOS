@@ -44,3 +44,22 @@ Both contracts were corrected and covered by regression tests. Historical sets
 `20260720T024359Z` and `20260720T025833Z` must not be used for recovery despite
 having valid transport checksums. The corrected set `20260720T030625Z` is the
 first Hostinger backup with verified restore evidence.
+
+## Post-cleanup confirmation
+
+The source-volume control files were subsequently reconciled: local sources
+were already clean, while the two legacy Hostinger root manifests were recorded
+and removed. A new backup, `20260720T031629Z`, then passed the complete isolated
+drill with the same canonical counts:
+
+- schema version 41;
+- 325 canonical objects;
+- 22 MinIO objects;
+- 452 knowledge files; and
+- 42 migration files.
+
+Its signed restore report has content hash
+`7d5c78daba6e9850bb6f28534351426e3c12f3e1493d636c519dda36cd1c9b2f`
+and manifest hash
+`28ef70cfc21ba96287fd2acf6f0376ae0322dfff99ed180ab483e93d539ed276`.
+This post-cleanup set is the preferred recovery set.
