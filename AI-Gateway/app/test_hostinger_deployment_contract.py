@@ -24,12 +24,18 @@ def test_hostinger_configuration_is_secret_and_hostname_bound() -> None:
     assert f"RESEARCHOS_API_HOSTNAME={hostname}" in generated
 
 
-def test_hostinger_compose_uses_existing_tls_proxy_without_public_data_ports() -> None:
+def test_hostinger_compose_owns_tls_proxy_without_public_data_ports() -> None:
     compose = (ROOT / "deploy" / "compose.hostinger.yaml").read_text(
         encoding="utf-8"
     )
 
     assert "name: n8n_default" in compose
+    assert "traefik@sha256:279606d45ac2a96f" in compose
+    assert "traefik_data:/letsencrypt" in compose
+    assert "/var/run/docker.sock:/var/run/docker.sock:ro" in compose
+    assert "external: true" in compose
+    assert "- 80:80" in compose
+    assert "- 443:443" in compose
     assert "traefik.http.routers.researchos-api.tls.certresolver" in compose
     assert "Host(`${RESEARCHOS_API_HOSTNAME}`)" in compose
     assert 'ports: ["127.0.0.1:5432:5432"]' not in compose

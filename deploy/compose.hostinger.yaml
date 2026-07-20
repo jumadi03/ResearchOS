@@ -1,6 +1,28 @@
 name: researchos
 
 services:
+  traefik:
+    image: traefik@sha256:279606d45ac2a96f6b3f2e2f978b5534afeb9b5aeda478a728dede7e8d55ac37
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.mytlschallenge.acme.tlschallenge=true
+      - --certificatesresolvers.mytlschallenge.acme.email=user@srv1534304.hstgr.cloud
+      - --certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik
+
   postgres:
     image: pgvector/pgvector:0.8.2-pg17-bookworm
     restart: unless-stopped
@@ -196,6 +218,9 @@ services:
       minio: {condition: service_healthy}
 
 volumes:
+  traefik_data:
+    external: true
+    name: traefik_data
   postgres_data:
   minio_data:
   backup_data:
