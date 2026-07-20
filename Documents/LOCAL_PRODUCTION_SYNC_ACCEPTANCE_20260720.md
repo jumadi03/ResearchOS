@@ -67,3 +67,12 @@ The local dashboard initially displayed unavailable operational facts because th
 ## Operating boundary
 
 This acceptance proves recoverable synchronization, not a live two-way database mirror. Production continues to serve users from the VPS. The local computer stores verified backup generations and can restore them independently. This avoids exposing the home computer as a production dependency and prevents accidental overwriting of the local development database.
+
+## Revision-marker correction
+
+The full production marker recorded above was later found not to resolve to a
+Git object. Its abbreviated value `477e8bc` resolves in the authoritative
+local repository to
+`477e8bcc268982c7e13a5593117c48d2b48d3b59`.
+The original observation is retained for audit history; the corrected identity
+is used by the production release manifest and subsequent deployments.

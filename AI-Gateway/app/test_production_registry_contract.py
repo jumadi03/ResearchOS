@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 from urllib.parse import urlparse
 
 
@@ -10,6 +11,16 @@ RELEASE_PATH = ROOT / "deploy" / "production-release.json"
 
 def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _assert_git_commit_exists(commit: str) -> None:
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, f"release manifest references unknown commit {commit}"
 
 
 def test_production_registry_has_one_canonical_public_target() -> None:
@@ -43,6 +54,7 @@ def test_release_manifest_binds_backend_ui_and_schema() -> None:
     assert release["acceptance_state"] == "accepted"
     assert len(release["backend"]["commit"]) == 40
     assert len(release["ui"]["commit"]) == 40
+    _assert_git_commit_exists(release["backend"]["commit"])
     assert release["database"]["schema_version"] == 42
     assert release["production_mutation_verified"] is True
     assert all((ROOT / evidence).is_file() for evidence in release["acceptance_evidence"])

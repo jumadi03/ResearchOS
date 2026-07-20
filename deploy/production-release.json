@@ -4,7 +4,7 @@
   "accepted_at": "2026-07-20T17:21:00+08:00",
   "backend": {
     "repository": "ResearchOS",
-    "commit": "477e8bc252e47aa8d609c5cc4cb9e75e0c090799",
+    "commit": "477e8bcc268982c7e13a5593117c48d2b48d3b59",
     "image_digest": "sha256:53789dd7b573f9f83d989896ecb3d25f4ce9fb5aa26e3e34f465e93f39542529"
   },
   "ui": {

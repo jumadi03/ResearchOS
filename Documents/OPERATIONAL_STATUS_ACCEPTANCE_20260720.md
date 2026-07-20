@@ -128,3 +128,16 @@ Final decision for this operational-status correction:
 
 This acceptance does not authorize deletion of any VPS data. The next required
 gate remains an isolated restore test from the local backup.
+
+## Revision-marker correction
+
+During the 2026-07-20 local-to-production source reconciliation, the recorded
+full value `477e8bc252e47aa8d609c5cc4cb9e75e0c090799` was found not to resolve to
+a Git object. The deployed source and all earlier evidence consistently
+identified the abbreviated revision `477e8bc`; the actual repository commit
+resolving that abbreviation is
+`477e8bcc268982c7e13a5593117c48d2b48d3b59`.
+
+This correction does not erase the earlier observed marker or change the
+accepted runtime behavior. It records that the marker-expansion procedure was
+faulty and replaces it with the repository-resolved commit identity.
