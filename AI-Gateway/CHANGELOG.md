@@ -5,7 +5,16 @@ follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.5.0-rc.5] - 2026-07-20
+
 ### Changed
+
+- Reconciled the canonical UI release binding with the accepted local graph
+  explorer source and its saved Sites version.
+- Distinguished a saved-but-not-deployed UI version from the currently
+  deployed production version in release baseline and provenance metadata.
+- Expanded canonical UI regression coverage from two to eight rendered
+  contract tests.
 
 - Strengthened the one-machine local controller with dependency-aware
   readiness, rendered-workspace verification, read-only status inspection,
@@ -31,6 +40,12 @@ follows Semantic Versioning.
   OpenAlex and Crossref records honor the same governed document type.
 - Route normal evidence review through the complete governed assessment form,
   binding statement and extraction hashes from the canonical work queue.
+
+### Verification
+
+- Preserved every earlier release-candidate tag without modification.
+- Saved Sites version 8 from the exact validated UI source without deploying
+  it to production.
 
 ## [0.5.0-rc.4] - 2026-07-19
 

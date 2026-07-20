@@ -70,6 +70,8 @@ def canonical_ui_lock() -> dict:
         "commit_sha",
         "sites_project_id",
         "sites_version_number",
+        "deployment_status",
+        "deployed_sites_version_number",
         "deployment_url",
         "operational_status",
         "build_contract",
@@ -78,7 +80,7 @@ def canonical_ui_lock() -> dict:
     missing = sorted(required - document.keys())
     if missing:
         raise RuntimeError(f"Canonical UI lock is missing fields: {missing}")
-    if document["schema_version"] != "1.0":
+    if document["schema_version"] != "1.1":
         raise RuntimeError("Unsupported canonical UI lock schema")
     if document["component"] != "researchos-canonical-target-ui":
         raise RuntimeError("Unexpected canonical UI component")
@@ -88,6 +90,32 @@ def canonical_ui_lock() -> dict:
         raise RuntimeError("Canonical UI Sites project ID is invalid")
     if not isinstance(document["sites_version_number"], int) or document["sites_version_number"] < 1:
         raise RuntimeError("Canonical UI Sites version must be a positive integer")
+    if document["deployment_status"] not in {
+        "saved_not_deployed",
+        "deployed",
+    }:
+        raise RuntimeError("Canonical UI deployment status is invalid")
+    if (
+        not isinstance(document["deployed_sites_version_number"], int)
+        or document["deployed_sites_version_number"] < 1
+    ):
+        raise RuntimeError(
+            "Canonical UI deployed Sites version must be a positive integer"
+        )
+    if (
+        document["deployment_status"] == "saved_not_deployed"
+        and document["deployed_sites_version_number"] >= document["sites_version_number"]
+    ):
+        raise RuntimeError(
+            "Saved-only canonical UI version must be newer than the deployed version"
+        )
+    if (
+        document["deployment_status"] == "deployed"
+        and document["deployed_sites_version_number"] != document["sites_version_number"]
+    ):
+        raise RuntimeError(
+            "Deployed canonical UI version must match the saved version"
+        )
     if not str(document["deployment_url"]).startswith("https://"):
         raise RuntimeError("Canonical UI deployment URL must use HTTPS")
     if document["operational_status"] not in {
@@ -104,7 +132,7 @@ def canonical_ui_lock() -> dict:
 
 def source_files() -> list[Path]:
     result = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        ["git", "ls-files", "--cached"],
         cwd=ROOT,
         text=True,
         capture_output=True,
@@ -281,6 +309,10 @@ def provenance(version: str, subjects: list[Path]) -> Path:
                 "revision": ui_lock["commit_sha"],
                 "sites_project_id": ui_lock["sites_project_id"],
                 "sites_version_number": ui_lock["sites_version_number"],
+                "deployment_status": ui_lock["deployment_status"],
+                "deployed_sites_version_number": ui_lock[
+                    "deployed_sites_version_number"
+                ],
                 "deployment_url": ui_lock["deployment_url"],
                 "operational_status": ui_lock["operational_status"],
             }

@@ -7,7 +7,7 @@ load_dotenv()
 
 APP_NAME = os.getenv("APP_NAME", "ResearchOS API")
 
-APP_VERSION = os.getenv("APP_VERSION", "0.5.0-rc.4")
+APP_VERSION = os.getenv("APP_VERSION", "0.5.0-rc.5")
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
 
