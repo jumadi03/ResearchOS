@@ -147,6 +147,21 @@ and architecture volumes, backup `20260720T031629Z` passed the same complete
 drill and is the preferred recovery set. The local knowledge and architecture
 sources were already free of those legacy control files.
 
+The Windows scheduled task is named
+`ResearchOS-Hostinger-Backup-Sync`. It invokes
+`Scripts/run_hostinger_backup_sync.cmd` every day at 14:30 WITA. Because the SSH
+key remains in the `ROG` user profile, the task runs only while that user is
+logged in. Keep the computer powered on and signed in at the scheduled time, or
+run the wrapper manually after the next login.
+
+Backup `20260720T075150Z` was created after the first accepted public
+production mutation. It was copied to the local archive, all component hashes
+passed, and its PostgreSQL dump restored successfully into an isolated local
+container. The restored database contained schema version 41, 325 canonical
+objects, the accepted artifact status `review`, and lifecycle event
+`af60c4f8-ee72-4270-bd83-5330e27de073`. This is the current preferred local
+recovery set.
+
 ## Incident priorities
 
 1. Preserve data and backup volumes.
