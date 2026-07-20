@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 deploy/stack.env
+deploy/stack.hostinger.env
 deploy/local-access.env
 deploy/monitoring/prometheus.token
 deploy/restore/private/
