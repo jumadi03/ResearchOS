@@ -57,3 +57,27 @@ The Docker network is still named `n8n_default` because changing the live
 network was not required to remove n8n and would have added avoidable routing
 risk. It contains the ResearchOS API and Traefik endpoints only. The name is a
 compatibility identifier, not a running n8n application.
+
+## Hostinger Docker Manager reconciliation
+
+After the container migration, the user's refreshed hPanel still displayed an
+`n8n` project with one container and ResearchOS with eight. This observation
+was treated as a production finding rather than dismissed as browser cache.
+
+Live inspection at `2026-07-20T04:40:13Z` showed that Docker Compose listed only
+the `researchos` project, but Hostinger's legacy catalog directory
+`/docker/n8n` still contained the original `docker-compose.yml` defining
+Traefik, n8n, and WAHA. hPanel was therefore retaining the project from its
+catalog definition rather than current Docker container state.
+
+The complete `/docker/n8n` directory, including its private environment file,
+was moved without deletion to:
+
+`/opt/n8n-retirement-backup/20260720T042147Z/hostinger-project`
+
+Post-move evidence confirmed:
+
+- `/docker` contained no project directory;
+- `docker compose ls -a` listed only `researchos`;
+- no `n8n-*` container existed; and
+- the public ResearchOS API remained healthy.
