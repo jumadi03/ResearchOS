@@ -43,6 +43,7 @@ dist/
 *.tmp
 *.temp
 AI-Gateway/tmp/
+/Backups/Hostinger/
 
 # IDE and editor settings
 .idea/

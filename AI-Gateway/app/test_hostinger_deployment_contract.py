@@ -53,3 +53,16 @@ def test_hostinger_stack_schedules_verified_backups_and_internal_monitoring() ->
     assert "EXPECTED_SCHEMA_VERSION: \"41\"" in compose
     assert 'cursor.execute("SELECT COUNT(*) FROM canonical_objects")' in monitor
     assert "maximum_age" in monitor
+
+
+def test_offsite_backup_pull_is_manifest_bound_and_secret_excluding() -> None:
+    script = (
+        ROOT / "Scripts" / "pull_hostinger_backup.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "Get-FileHash" in script
+    assert "ConvertFrom-Json" in script
+    assert "component.sha256" in script
+    assert "Assert-SafeChildPath" in script
+    assert "stack.hostinger.env" not in script
+    assert "offsite-backup=passed" in script

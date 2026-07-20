@@ -69,3 +69,19 @@ Automated operational controls were activated on 2026-07-20:
 
 The operating and recovery procedure is documented in
 `Documents/HOSTINGER_OPERATIONS_RUNBOOK.md`.
+
+## Off-VPS backup acceptance
+
+The completed production set `20260720T024359Z` was copied to the local
+secondary location
+`D:\ResearchOS\Backups\Hostinger\20260720T024359Z`.
+
+- The local set contains 14 files totaling 19,116,718 bytes.
+- The manifest checksum, manifest component hashes, and all component sidecar
+  checksums matched before the partial directory was promoted.
+- The copied set excludes the Hostinger environment file, SSH key, API tokens,
+  and workspace passwords.
+- A second run returned `status=already-present` without duplicating the set.
+- Windows task `ResearchOS-Hostinger-Offsite-Backup` is registered in `Ready`
+  state and runs daily at 11:30 local time with start-when-available enabled.
+- Local verified sets have a default 30-day retention period.

@@ -70,6 +70,24 @@ recent `checked_at` timestamp.
 Never alter recorded migration checksums to force a restore through its guard.
 Use the exact migration archive included in the verified backup set.
 
+## Off-VPS copy
+
+The local Windows task runs `Scripts/pull_hostinger_backup.ps1` and stores
+verified sets under `D:\ResearchOS\Backups\Hostinger\<backup-stamp>`. The
+directory is excluded from Git. The pull accepts a set only after the manifest,
+every component, and every sidecar checksum agree. Local copies are retained for
+30 days by default.
+
+Run an additional copy manually:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File D:\ResearchOS\Scripts\pull_hostinger_backup.ps1
+```
+
+The off-VPS copy deliberately excludes `stack.hostinger.env`, SSH keys, API
+tokens, and user passwords.
+
 ## Incident priorities
 
 1. Preserve data and backup volumes.
