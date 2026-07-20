@@ -1,6 +1,8 @@
 """Authenticated HTTP boundary for SK-001A."""
 
 from dataclasses import asdict
+import os
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials
@@ -36,12 +38,32 @@ from app.knowledge.extraction.models import (
     EpistemicClassification, EvidenceReviewAssessment,
 )
 from app.runtime.models.runtime_request import RuntimeRequest
+from app.product.operational_status import build_operational_status
 from app.router.knowledge_dependencies import authorize, authorize_any, bearer
 from app.router.knowledge_workspace import router as workspace_router
 
 
 router = APIRouter(prefix="/knowledge", tags=["scientific-knowledge"])
 router.include_router(workspace_router)
+
+@router.get("/operations/status")
+def operational_status(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials,
+        KnowledgeRole.ADMIN, KnowledgeRole.AUDITOR, KnowledgeRole.REVIEWER,
+    )
+    return build_operational_status(
+        monitor_path=Path(os.getenv(
+            "OPERATIONS_STATE_PATH", "/operations-state/health.json"
+        )),
+        backup_root=Path(os.getenv("BACKUP_STATUS_ROOT", "/backups")),
+        deployed_commit_path=Path(os.getenv(
+            "DEPLOYED_COMMIT_PATH", "/runtime/DEPLOYED_COMMIT"
+        )),
+    )
 
 @router.get("/discovery/capabilities")
 def discovery_capabilities(

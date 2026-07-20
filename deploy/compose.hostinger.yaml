@@ -102,10 +102,16 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
       MODEL_NAME: ${MODEL_NAME:-qwen3:8b}
       RESTORE_TRUST_ROOT: /restore-trust
+      OPERATIONS_STATE_PATH: /operations-state/health.json
+      BACKUP_STATUS_ROOT: /backups
+      DEPLOYED_COMMIT_PATH: /runtime/DEPLOYED_COMMIT
     volumes:
       - knowledge_data:/data/knowledge
       - architecture_data:/data/architecture
       - ./restore/trust:/restore-trust:ro
+      - operations_state:/operations-state:ro
+      - backup_data:/backups:ro
+      - /opt/researchos/DEPLOYED_COMMIT:/runtime/DEPLOYED_COMMIT:ro
     expose: ["8000"]
     healthcheck:
       test:
