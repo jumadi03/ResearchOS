@@ -215,3 +215,16 @@ The same revalidation connected directly to Hostinger and confirmed:
 This correction is retained as an acceptance finding. Full evidence is recorded
 in `Documents/HOSTINGER_LIVE_EVIDENCE_20260720T034917Z.md`. Authenticated
 mutation acceptance remains separate and is not claimed by this revalidation.
+
+## Traefik ownership migration
+
+On 2026-07-20 the remaining `n8n-traefik-1` container was migrated into the
+committed ResearchOS deployment. The new `researchos-traefik-1` reused the
+existing ACME volume and exact Traefik image digest. The old proxy was retained
+until public health passed through the replacement, then removed.
+
+Post-cutover verification confirmed no remaining `n8n-*` containers, HTTP 301,
+HTTPS 200, API health `ok`, monitor `passed`, schema 41, 325 canonical objects,
+6 workspace users, and a successful public UI reload. The production commit is
+`7381412014d7e4c3ea369b9971e49a76a6f50238`. Detailed evidence is in
+`Documents/TRAEFIK_RESEARCHOS_MIGRATION_REPORT_20260720.md`.

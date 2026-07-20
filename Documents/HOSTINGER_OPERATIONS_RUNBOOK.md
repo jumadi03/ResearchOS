@@ -9,8 +9,9 @@ Date: 2026-07-20
 - Public API health: `https://researchos-api.srv1534304.hstgr.cloud/health`
 - PostgreSQL, MinIO, backup storage, and health state remain private Docker
   volumes.
-- Existing n8n, WAHA, and Traefik services are outside the ResearchOS Compose
-  project and must not be removed by ResearchOS operations.
+- Traefik is owned by the ResearchOS Compose project and uses the external
+  `traefik_data` volume for ACME certificates. The former n8n and WAHA
+  containers were retired on 2026-07-20.
 
 ## Administrative access and firewall
 
@@ -153,5 +154,5 @@ sources were already free of those legacy control files.
    ResearchOS service.
 3. Confirm disk capacity before restarting a database or storage service.
 4. Restart only the affected ResearchOS service when possible.
-5. Do not restart or reconfigure n8n, WAHA, or Traefik unless evidence shows the
-   incident belongs to those services.
+5. Treat `researchos-traefik-1` as part of the ResearchOS production path;
+   preserve `traefik_data` during proxy maintenance or recovery.
