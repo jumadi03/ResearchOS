@@ -109,4 +109,22 @@ UI verification and deployment:
 - previous public asset: `page-66UeCDH-.js`;
 - new public asset: `page-B-vD-1q2.js`.
 
-Authenticated visual confirmation of this new asset remains pending.
+## Final authenticated visual acceptance
+
+At 2026-07-20 17:21 Asia/Makassar, the user supplied a screenshot of the
+authenticated public production UI at `https://researchos.click`. It visibly
+confirmed:
+
+- **Produksi sehat**;
+- monitor: `passed`;
+- backup: `20260720T075150Z`, `available`;
+- disk used: `16.7%`, below the `85%` attention threshold;
+- production revision: `477e8bc252e4`;
+- **Arsip lokal terverifikasi: 6**, `komponen checksum-valid`; and
+- **Penghapusan dari VPS: terkunci**, `restore-first, fail-closed`.
+
+Final decision for this operational-status correction:
+**ACCEPTED IN PRODUCTION**.
+
+This acceptance does not authorize deletion of any VPS data. The next required
+gate remains an isolated restore test from the local backup.
