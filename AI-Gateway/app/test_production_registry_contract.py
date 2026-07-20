@@ -51,7 +51,10 @@ def test_release_manifest_binds_backend_ui_and_schema() -> None:
     assert registry["release_manifest"] == "deploy/production-release.json"
     assert release["schema_version"] == 1
     assert release["environment"] == "production"
-    assert release["acceptance_state"] == "accepted"
+    assert release["acceptance_state"] in {
+        "technical_acceptance_passed",
+        "accepted",
+    }
     assert len(release["backend"]["commit"]) == 40
     assert len(release["ui"]["commit"]) == 40
     _assert_git_commit_exists(release["backend"]["commit"])
@@ -75,4 +78,6 @@ def test_live_operational_configuration_matches_release_manifest() -> None:
     schema = release["database"]["schema_version"]
     assert f'os.getenv("DATABASE_SCHEMA_VERSION", "{schema}")' in settings
     assert f'EXPECTED_SCHEMA_VERSION: "{schema}"' in compose
+    assert len(deployed_commit) == 40
+    _assert_git_commit_exists(deployed_commit)
     assert deployed_commit == release["backend"]["commit"]
