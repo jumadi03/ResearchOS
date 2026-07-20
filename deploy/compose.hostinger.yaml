@@ -157,8 +157,8 @@ services:
       - backup_data:/backups
       - knowledge_data:/source/knowledge:ro
       - architecture_data:/source/architecture:ro
-      - ./compose.hostinger.yaml:/source/configuration/compose.hostinger.yaml:ro
-      - ./stack.hostinger.env.example:/source/configuration/stack.hostinger.env.example:ro
+      - ./compose.hostinger.yaml:/source/configuration/compose.yaml:ro
+      - ./stack.hostinger.env.example:/source/configuration/stack.env.example:ro
       - ./backup/recovery-coverage-v1.json:/source/configuration/recovery-coverage-v1.json:ro
       - ./migrate/migrate.sh:/source/migration/migrate.sh:ro
       - ./postgres/init:/source/migration/sql:ro

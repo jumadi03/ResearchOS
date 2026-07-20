@@ -424,7 +424,8 @@ def execute_restore_drill(
             cleanup_verified = _cleanup(runner)
             if not cleanup_verified:
                 outcome = "failed"
-                error = "Isolated restore target cleanup failed"
+                cleanup_error = "Isolated restore target cleanup failed"
+                error = f"{error}; {cleanup_error}" if error else cleanup_error
     completed_at = _utcnow()
     report: dict[str, Any] = {
         "schema_version": "1.0",

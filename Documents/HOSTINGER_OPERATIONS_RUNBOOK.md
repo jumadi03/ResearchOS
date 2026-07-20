@@ -88,6 +88,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 The off-VPS copy deliberately excludes `stack.hostinger.env`, SSH keys, API
 tokens, and user passwords.
 
+The first backup proven restorable by the isolated off-VPS drill is
+`20260720T030625Z`. Earlier sets `20260720T024359Z` and
+`20260720T025833Z` remain checksum-valid historical artifacts but must not be
+selected for recovery because their filesystem control-manifest contract was
+not portable. Recovery selection must require a successful signed restore-drill
+report, not checksum validity alone.
+
 ## Incident priorities
 
 1. Preserve data and backup volumes.

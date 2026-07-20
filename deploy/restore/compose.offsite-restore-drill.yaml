@@ -1,0 +1,4 @@
+services:
+  restore-drill:
+    volumes:
+      - ${RESTORE_BACKUP_DIR:?set RESTORE_BACKUP_DIR}:/backups:ro

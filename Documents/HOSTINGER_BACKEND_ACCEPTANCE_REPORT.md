@@ -85,3 +85,27 @@ secondary location
 - Windows task `ResearchOS-Hostinger-Offsite-Backup` is registered in `Ready`
   state and runs daily at 11:30 local time with start-when-available enabled.
 - Local verified sets have a default 30-day retention period.
+
+## Off-VPS restore-drill acceptance
+
+The local set `20260720T030625Z` passed a full isolated restore drill. The drill
+used temporary PostgreSQL and MinIO targets on an internal-only Docker network;
+the production target was not touched.
+
+- Outcome: `verified`.
+- PostgreSQL restore completed with schema ledger verification.
+- Schema version: 41.
+- Canonical object count: 325.
+- MinIO object count: 22, with sizes and hashes verified.
+- Knowledge tree: 452 files, manifest verified.
+- Architecture tree: 0 files, empty tree manifest verified.
+- Migration tree: 42 files, manifest verified.
+- Recovery configuration: 3 allowlisted files, structurally valid, no secret
+  values.
+- Cleanup: verified.
+- Attestation: Ed25519, key ID
+  `restore-ed25519-24a827b8beb07e99`.
+- Restore report content hash:
+  `909da2218b8f0c99277f6c6f444d42c5810b5fcec873da972845d72afe6b0211`.
+
+The public production health endpoint remained healthy after the local drill.

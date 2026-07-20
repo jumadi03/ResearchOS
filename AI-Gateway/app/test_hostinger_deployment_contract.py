@@ -48,6 +48,11 @@ def test_hostinger_stack_schedules_verified_backups_and_internal_monitoring() ->
     assert "BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}" in compose
     assert "backup_data:/backups" in compose
     assert "stack.hostinger.env:/source" not in compose
+    assert "./compose.hostinger.yaml:/source/configuration/compose.yaml:ro" in compose
+    assert (
+        "./stack.hostinger.env.example:/source/configuration/stack.env.example:ro"
+        in compose
+    )
     assert "operations_state:/state" in compose
     assert "hostinger_healthcheck.py" in compose
     assert "EXPECTED_SCHEMA_VERSION: \"41\"" in compose
@@ -66,3 +71,9 @@ def test_offsite_backup_pull_is_manifest_bound_and_secret_excluding() -> None:
     assert "Assert-SafeChildPath" in script
     assert "stack.hostinger.env" not in script
     assert "offsite-backup=passed" in script
+
+    override = (
+        ROOT / "deploy" / "restore" / "compose.offsite-restore-drill.yaml"
+    ).read_text(encoding="utf-8")
+    assert "RESTORE_BACKUP_DIR" in override
+    assert ":/backups:ro" in override

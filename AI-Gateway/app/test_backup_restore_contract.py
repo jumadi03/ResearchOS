@@ -33,6 +33,7 @@ def test_backup_producer_publishes_a_hash_bound_portable_manifest():
     assert r'\"name\":\"migration\"' in script
     assert "snapshot_tree()" in script
     assert "write_tree_manifest()" in script
+    assert "! -path './.researchos-tree-manifest.txt'" in script
     assert 'write_tree_manifest "$destination" "$copied"' in script
     assert 'cmp --silent "$before" "$copied"' in script
     assert 'cmp --silent "$before" "$after"' in script
