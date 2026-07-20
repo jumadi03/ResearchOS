@@ -60,3 +60,49 @@ def test_operational_status_fails_to_attention_when_evidence_is_missing(
     assert result["monitor"]["status"] == "unavailable"
     assert result["backup"]["status"] == "unavailable"
     assert result["deployment"]["revision"] is None
+
+
+def test_operational_status_finds_offsite_backup_in_timestamp_directory(
+    tmp_path: Path,
+) -> None:
+    backups = tmp_path / "backups"
+    generation = backups / "20260720T092644Z"
+    generation.mkdir(parents=True)
+    (generation / "backup-set-20260720T092644Z.json").write_text(
+        "{}", encoding="utf-8"
+    )
+
+    result = build_operational_status(
+        monitor_path=tmp_path / "missing.json",
+        backup_root=backups,
+        deployed_commit_path=tmp_path / "missing-commit",
+        disk_root=tmp_path,
+    )
+
+    assert result["backup"] == {
+        "status": "available",
+        "stamp": "20260720T092644Z",
+    }
+
+
+def test_operational_status_accepts_windows_powershell_utf8_bom(
+    tmp_path: Path,
+) -> None:
+    monitor = tmp_path / "health.json"
+    monitor.write_bytes(
+        b"\xef\xbb\xbf"
+        + json.dumps({
+            "status": "passed",
+            "checked_at": "2026-07-20T09:28:07+00:00",
+            "checks": [],
+        }).encode("utf-8")
+    )
+
+    result = build_operational_status(
+        monitor_path=monitor,
+        backup_root=tmp_path / "missing-backups",
+        deployed_commit_path=tmp_path / "missing-commit",
+        disk_root=tmp_path,
+    )
+
+    assert result["monitor"]["status"] == "passed"

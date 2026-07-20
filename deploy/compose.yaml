@@ -83,6 +83,9 @@ services:
       - knowledge_data:/data/knowledge
       - architecture_data:/data/architecture
       - ./restore/trust:/restore-trust:ro
+      - ../Backups/Hostinger/status/latest.json:/operations-state/health.json:ro
+      - ../Backups/Hostinger:/backups:ro
+      - ./local-runtime/PRODUCTION_DEPLOYED_COMMIT:/runtime/DEPLOYED_COMMIT:ro
     ports: ["127.0.0.1:8080:8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]

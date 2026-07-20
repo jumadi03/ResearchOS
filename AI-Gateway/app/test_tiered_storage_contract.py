@@ -24,4 +24,6 @@ def test_local_archive_attestation_requires_checksum_verification():
     assert "'archived_local'" in script
     assert "'hot'" in script
     assert "ON CONFLICT" in script
+    assert '[ValidateSet("Hostinger", "Local")]' in script
+    assert "Local storage attestation was rejected" in script
     assert "restore_required" not in script

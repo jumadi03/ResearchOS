@@ -4,7 +4,9 @@ param(
     [string]$RemoteUser = "ubuntu",
     [string]$KeyPath = "$HOME\.ssh\researchos_hostinger_ed25519",
     [string]$BackupRoot = "D:\ResearchOS\Backups\Hostinger",
-    [int]$RetentionDays = 30
+    [int]$RetentionDays = 30,
+    [ValidateSet("Hostinger", "Local")]
+    [string]$Target = "Hostinger"
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,6 +52,19 @@ try {
     [IO.File]::WriteAllText(
         $temporary, $sql, (New-Object Text.UTF8Encoding($false))
     )
+    if ($Target -eq "Local") {
+        Get-Content -LiteralPath $temporary -Raw |
+            & docker exec -i researchos-postgres-1 psql `
+                -v ON_ERROR_STOP=1 -U researchos -d researchos
+        if ($LASTEXITCODE -ne 0) {
+            throw "Local storage attestation was rejected"
+        }
+        Write-Output (
+            "storage-tier-attestation=passed target=local " +
+            "stamp=$stamp components=$($manifest.components.Count)"
+        )
+        exit 0
+    }
     & scp -i $KeyPath $temporary "${RemoteUser}@${HostName}:$remote"
     if ($LASTEXITCODE -ne 0) { throw "Could not upload storage attestation" }
     & ssh -i $KeyPath "$RemoteUser@$HostName" sudo docker cp $remote `

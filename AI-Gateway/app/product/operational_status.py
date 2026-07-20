@@ -9,7 +9,7 @@ from typing import Any
 
 def _read_monitor(path: Path) -> dict[str, Any]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError, TypeError):
         return {"status": "unavailable", "checked_at": None, "checks": []}
     if not isinstance(payload, dict):
@@ -22,7 +22,11 @@ def _read_monitor(path: Path) -> dict[str, Any]:
 
 
 def _latest_backup(root: Path) -> dict[str, Any]:
-    manifests = sorted(root.glob("backup-set-*.json"), reverse=True)
+    manifests = sorted(
+        [*root.glob("backup-set-*.json"), *root.glob("*/backup-set-*.json")],
+        key=lambda path: path.name,
+        reverse=True,
+    )
     if not manifests:
         return {"status": "unavailable", "stamp": None}
     name = manifests[0].name

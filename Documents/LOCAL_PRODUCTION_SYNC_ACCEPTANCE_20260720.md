@@ -45,6 +45,11 @@ ResearchOS production remains authoritative on `https://researchos.click`. A fre
 - API health endpoint returned HTTP `200`.
 - UI rebuilt from site revision `1d74722` and returned HTTP `200`.
 - Browser acceptance confirmed the ResearchOS login form at `http://127.0.0.1:3002`.
+- Local operational projection returned `passed`.
+- Local monitor status returned `passed`.
+- Latest locally visible backup: `20260720T092644Z`.
+- Production revision marker: `477e8bc252e47aa8d609c5cc4cb9e75e0c090799`.
+- Local storage-tier projection: six `hot` and six `archived_local` attestations.
 
 ### Regression
 
@@ -56,6 +61,8 @@ ResearchOS production remains authoritative on `https://researchos.click`. A fre
 The first restore attempt correctly failed because historical migration ledger entries contain a mixture of LF-based and CRLF-based checksums. The archive manifest already protects exact bytes, so the migration-ledger comparison was made portable by accepting the raw checksum or its LF-normalized equivalent while still requiring an exact version and filename match.
 
 Regression coverage was added for Windows and Linux line endings. The corrected restore completed successfully from an empty isolated target.
+
+The local dashboard initially displayed unavailable operational facts because the API container did not mount the host status/archive paths and the Windows PowerShell status file contained a UTF-8 BOM. Read-only mounts, timestamp-directory discovery, and BOM-compatible parsing were added with regression coverage.
 
 ## Operating boundary
 
