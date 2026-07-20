@@ -5,14 +5,41 @@
 ResearchOS implementation work must not stop at a local commit. For each
 approved production change:
 
-1. implement and test the change on the local ResearchOS source;
-2. create an intentional Git commit containing only the approved scope;
-3. deploy that exact committed source to the ResearchOS services on Hostinger;
-4. verify the deployed revision on the real Hostinger VPS;
-5. verify the corresponding behavior through the public production UI or API;
-6. verify persistence in the production database when the change affects data;
-   and
-7. preserve timestamped before-and-after evidence in an acceptance report.
+1. implement the change on the local ResearchOS source;
+2. test and accept the change on this local computer before accessing or
+   changing the VPS;
+3. verify the corresponding local UI or API behavior through the actual local
+   runtime, not only unit tests or mocks;
+4. verify local database persistence after reload or restart when the change
+   affects data;
+5. preserve the local verification result and clearly label it as local
+   evidence;
+6. create an intentional Git commit containing only the approved scope;
+7. deploy that exact committed source to the ResearchOS services on Hostinger;
+8. verify the deployed revision on the real Hostinger VPS;
+9. verify the corresponding behavior through the public production UI or API;
+10. verify persistence in the production database when the change affects
+    data; and
+11. preserve timestamped before-and-after evidence in an acceptance report.
+
+### Mandatory local-first gate
+
+No ResearchOS implementation change may proceed to the VPS until the relevant
+local checks pass. The minimum local gate is:
+
+- the source diff and intended scope are reviewed;
+- applicable unit, integration, contract, and regression tests pass;
+- the local application or affected service starts successfully;
+- the changed behavior is verified through the local UI or API;
+- local persistence is verified after refresh, restart, or a new session when
+  data is affected; and
+- failures and limitations are recorded without being presented as production
+  evidence.
+
+If the local environment cannot reproduce a production-only condition, record
+the limitation explicitly and obtain the user's direction before accessing or
+changing the VPS. A production-only check is not permission to skip every
+local check that can be performed safely.
 
 The Hostinger deployment is production evidence, not a replacement Git remote.
 The commit remains in the ResearchOS Git repository, while the exact committed
