@@ -51,5 +51,5 @@ def test_hostinger_stack_schedules_verified_backups_and_internal_monitoring() ->
     assert "operations_state:/state" in compose
     assert "hostinger_healthcheck.py" in compose
     assert "EXPECTED_SCHEMA_VERSION: \"41\"" in compose
-    assert 'cursor.execute("SELECT COUNT(*) FROM knowledge_objects")' in monitor
+    assert 'cursor.execute("SELECT COUNT(*) FROM canonical_objects")' in monitor
     assert "maximum_age" in monitor

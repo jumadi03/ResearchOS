@@ -49,3 +49,23 @@ Authenticated UI-to-backend connectivity, graph interaction, and refresh
 persistence are accepted. A scientific review mutation was not performed solely
 for deployment testing. No GitHub Release publication is authorized by this
 deployment acceptance.
+
+## Operational hardening
+
+Automated operational controls were activated on 2026-07-20:
+
+- `researchos-backup-1` runs a verified portable backup every 86,400 seconds
+  with a default 14-day retention period.
+- The first scheduled set, stamped `20260720T024359Z`, completed successfully.
+- The backup-set manifest and all six components (PostgreSQL, MinIO, knowledge,
+  architecture, configuration, and migration) passed SHA-256 verification.
+- `researchos-monitor-1` checks API, MinIO, PostgreSQL, schema version, canonical
+  object count, and health-state freshness every 60 seconds.
+- The accepted monitor result reported API passed, MinIO passed, PostgreSQL
+  passed, schema version 41, canonical object count 325, and no failures.
+- The public HTTPS health endpoint remained healthy.
+- Existing n8n, WAHA, and Traefik containers remained running and were not
+  restarted.
+
+The operating and recovery procedure is documented in
+`Documents/HOSTINGER_OPERATIONS_RUNBOOK.md`.

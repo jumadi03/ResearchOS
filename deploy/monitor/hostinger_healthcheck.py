@@ -30,7 +30,7 @@ def check_database(database_url: str, expected_schema: int) -> dict[str, object]
         with connection.cursor() as cursor:
             cursor.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
             schema_version = int(cursor.fetchone()[0])
-            cursor.execute("SELECT COUNT(*) FROM knowledge_objects")
+            cursor.execute("SELECT COUNT(*) FROM canonical_objects")
             object_count = int(cursor.fetchone()[0])
     if schema_version != expected_schema:
         raise RuntimeError(
