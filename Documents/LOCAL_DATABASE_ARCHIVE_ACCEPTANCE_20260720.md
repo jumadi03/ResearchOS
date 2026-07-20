@@ -92,3 +92,34 @@ Future cleanup uses `Scripts/archive_inactive_data.ps1` before removing an
 approved stale file. Recovery uses `Scripts/restore_inactive_data.ps1` with an
 explicit unused destination. Neither script decides that a file is stale or
 authorizes cleanup by itself.
+
+## VPS completion receipt
+
+Reported to the canonical Hostinger VPS on 2026-07-20 at approximately 22:22
+WITA. This reporting operation did not deploy the local archive database,
+change the production application source, recreate a container, or mutate the
+production PostgreSQL or MinIO data.
+
+The following completion evidence was installed under the existing root-only
+directory `/opt/researchos/deploy-backups`:
+
+- `researchos-ledger-a1ba4d2.bundle`
+  - commit: `a1ba4d2255d7e9c4119d13a3add7f797be687544`;
+  - size: 1,386,566 bytes;
+  - SHA-256:
+    `7a04c1515e275348a49d9645c7b6615c0c2a8f174933871a7cfad334313b0e10`;
+  - bundle verification on the VPS: complete history, passed.
+- `LOCAL_DATABASE_ARCHIVE_ACCEPTANCE_20260720.md`
+  - size at initial report: 4,082 bytes;
+  - SHA-256 at initial report:
+    `fb49f61ffde9b1c2fa7189639ddea6a2d85d6622b30f6a5e7c86a504f253d1b8`.
+
+Both files were observed as owner `root`, group `root`, mode `0600`; their
+parent directory was owner `root`, group `root`, mode `0700`.
+
+The first two remote bundle-verification commands were preserved as failed
+observations. The first could not enter `/opt/researchos` as the unprivileged
+administrative user. The second ran as root there but found no `.git`
+repository because production is deployed from a source archive. Verification
+then passed from a temporary isolated bare repository on the VPS, and that
+temporary directory was removed.
