@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$HostName = "76.13.20.211",
+    [string]$RemoteUser = "ubuntu",
     [string]$KeyPath = "$HOME\.ssh\researchos_hostinger_ed25519",
     [string]$DestinationRoot = "D:\ResearchOS\Backups\Hostinger",
     [int]$RetentionDays = 30,
@@ -21,7 +22,7 @@ function Assert-SafeChildPath {
 
 function Invoke-Ssh {
     param([string[]]$RemoteArguments)
-    & ssh -i $KeyPath "root@$HostName" @RemoteArguments
+    & ssh -i $KeyPath "$RemoteUser@$HostName" @RemoteArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Remote backup command failed"
     }
@@ -32,10 +33,19 @@ function Copy-RemoteFile {
     if ($Stamp -notmatch '^\d{8}T\d{6}Z$' -or $FileName -notmatch '^[A-Za-z0-9._-]+$') {
         throw "Unsafe backup component name"
     }
-    $exportRoot = "/opt/researchos/offsite-export/$Stamp"
+    $exportRoot = "/home/$RemoteUser/researchos-offsite-export/$Stamp"
     Invoke-Ssh @("mkdir", "-p", $exportRoot)
-    Invoke-Ssh @("docker", "cp", "${container}:/backups/$FileName", "$exportRoot/$FileName")
-    & scp -i $KeyPath "root@${HostName}:$exportRoot/$FileName" $Destination
+    Invoke-Ssh @(
+        "sudo", "docker", "cp",
+        "${container}:/backups/$FileName",
+        "$exportRoot/$FileName"
+    )
+    Invoke-Ssh @(
+        "sudo", "chown",
+        "${RemoteUser}:${RemoteUser}",
+        "$exportRoot/$FileName"
+    )
+    & scp -i $KeyPath "${RemoteUser}@${HostName}:$exportRoot/$FileName" $Destination
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to copy $FileName from Hostinger"
     }
@@ -49,8 +59,8 @@ $rootFull = [IO.Path]::GetFullPath($DestinationRoot)
 New-Item -ItemType Directory -Force -Path $rootFull | Out-Null
 
 $manifestNames = @(
-    & ssh -i $KeyPath "root@$HostName" docker exec $container find /backups `
-        -maxdepth 1 -type f -name 'backup-set-*.json' -print
+    & ssh -i $KeyPath "$RemoteUser@$HostName" sudo docker exec $container `
+        find /backups -maxdepth 1 -type f -name 'backup-set-*.json' -print
 )
 if ($LASTEXITCODE -ne 0 -or $manifestNames.Count -eq 0) {
     throw "No completed Hostinger backup manifest is available"
@@ -126,7 +136,10 @@ try {
     }
 
     Move-Item -LiteralPath $partialDirectory -Destination $finalDirectory
-    Invoke-Ssh @("rm", "-rf", "/opt/researchos/offsite-export/$stamp")
+    Invoke-Ssh @(
+        "rm", "-rf",
+        "/home/$RemoteUser/researchos-offsite-export/$stamp"
+    )
 } catch {
     if (Test-Path -LiteralPath $partialDirectory) {
         Assert-SafeChildPath $rootFull $partialDirectory

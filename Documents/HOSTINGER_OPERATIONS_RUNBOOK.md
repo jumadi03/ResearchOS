@@ -12,6 +12,41 @@ Date: 2026-07-20
 - Existing n8n, WAHA, and Traefik services are outside the ResearchOS Compose
   project and must not be removed by ResearchOS operations.
 
+## Administrative access and firewall
+
+Routine administration uses the dedicated `ubuntu` account and the ResearchOS
+SSH key:
+
+```powershell
+ssh -i $HOME\.ssh\researchos_hostinger_ed25519 ubuntu@76.13.20.211
+```
+
+Use `sudo` for Docker and operating-system administration. Direct root SSH,
+password SSH, and keyboard-interactive SSH are disabled. The Hostinger console
+and its root password are retained only as an out-of-band recovery path; do not
+store that password in this repository or send it through support messages.
+
+UFW denies unsolicited inbound and routed traffic. Only these public ports are
+allowed:
+
+- `22/tcp` for key-only SSH;
+- `80/tcp` for HTTP redirection and certificate handling; and
+- `443/tcp` for HTTPS.
+
+n8n on port 5678 and WAHA on port 3000 remain bound to loopback. PostgreSQL and
+MinIO remain private Docker services. Before changing SSH or firewall rules,
+keep one verified `ubuntu` session open and prove a second key-only session can
+connect.
+
+Inspect the effective controls:
+
+```sh
+sudo sshd -T | grep -E \
+  'permitrootlogin|passwordauthentication|kbdinteractiveauthentication|maxauthtries|allowusers'
+sudo ufw status verbose
+sudo ss -lntup
+```
+
 ## Automated backup
 
 The `researchos-backup-1` container creates a portable, hash-bound backup set
@@ -23,8 +58,8 @@ Inspect the latest backup:
 
 ```sh
 cd /opt/researchos/deploy
-docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml logs --tail=100 backup
-docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml exec backup sh -lc \
+sudo docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml logs --tail=100 backup
+sudo docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml exec backup sh -lc \
   'ls -1t /backups/backup-set-*.json | head -1'
 ```
 
@@ -45,9 +80,9 @@ Inspect the current state:
 
 ```sh
 cd /opt/researchos/deploy
-docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml exec monitor \
+sudo docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml exec monitor \
   cat /state/health.json
-docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml ps
+sudo docker compose --env-file stack.hostinger.env -f compose.hostinger.yaml ps
 ```
 
 A healthy monitor has container state `healthy`, report status `passed`, and a
@@ -76,7 +111,8 @@ The local Windows task runs `Scripts/pull_hostinger_backup.ps1` and stores
 verified sets under `D:\ResearchOS\Backups\Hostinger\<backup-stamp>`. The
 directory is excluded from Git. The pull accepts a set only after the manifest,
 every component, and every sidecar checksum agree. Local copies are retained for
-30 days by default.
+30 days by default. Both the pull and monitor use `ubuntu` over key-only SSH,
+then invoke the narrowly required Docker operations through `sudo`.
 
 Run an additional copy manually:
 

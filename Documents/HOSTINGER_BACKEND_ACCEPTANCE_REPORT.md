@@ -164,3 +164,28 @@ controlled failure test used a zero-minute freshness threshold and correctly:
 For normal failures the wrapper also attempts a visible Windows message. The
 durable alert file and failed task result remain authoritative if no interactive
 desktop session is available.
+
+## Host security hardening acceptance
+
+Routine VPS administration and backup automation now use key-only SSH through
+the `ubuntu` account. Direct root SSH, password authentication, and
+keyboard-interactive authentication are disabled; authentication attempts are
+limited to three and SSH is restricted to `ubuntu`.
+
+UFW is active with default-deny inbound and routed policies. Only ports 22, 80,
+and 443 are publicly allowed. n8n and WAHA remain loopback-bound, while
+PostgreSQL and MinIO remain private Docker services.
+
+Post-hardening acceptance confirmed:
+
+- fresh `ubuntu` SSH and non-interactive `sudo`;
+- intentional root SSH rejection;
+- ResearchOS API health `ok`;
+- n8n HTTP 200 and protected WAHA HTTP 401;
+- production monitor `passed`, schema 41, and 325 canonical objects;
+- manual offsite backup monitor `passed`; and
+- scheduled backup task result `0`, state `Ready`, with its next daily run
+  preserved.
+
+The detailed evidence and recovery boundary are recorded in
+`Documents/HOSTINGER_SECURITY_HARDENING_REPORT.md`.

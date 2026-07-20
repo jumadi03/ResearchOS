@@ -72,6 +72,9 @@ def test_offsite_backup_pull_is_manifest_bound_and_secret_excluding() -> None:
     assert "stack.hostinger.env" not in script
     assert "offsite-backup=passed" in script
     assert "MaximumBackupAgeHours" in script
+    assert '[string]$RemoteUser = "ubuntu"' in script
+    assert '"sudo", "docker", "cp"' in script
+    assert "root@" not in script
 
     override = (
         ROOT / "deploy" / "restore" / "compose.offsite-restore-drill.yaml"
@@ -92,3 +95,6 @@ def test_local_monitor_produces_durable_alerts_without_secrets() -> None:
     assert "msg.exe" in script
     assert "hostinger-backup-monitor=passed" in script
     assert "stack.hostinger.env" not in script
+    assert '[string]$RemoteUser = "ubuntu"' in script
+    assert "sudo docker exec" in script
+    assert "root@" not in script

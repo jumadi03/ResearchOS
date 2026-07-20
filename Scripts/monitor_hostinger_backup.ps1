@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$HostName = "76.13.20.211",
+    [string]$RemoteUser = "ubuntu",
     [string]$KeyPath = "$HOME\.ssh\researchos_hostinger_ed25519",
     [string]$RepositoryRoot = "D:\ResearchOS",
     [string]$OperationalStateRoot = "",
@@ -31,7 +32,7 @@ try {
     if (-not (Test-Path -LiteralPath $pullScript -PathType Leaf)) {
         throw "Offsite backup pull script is missing"
     }
-    $rawState = & ssh -i $KeyPath "root@$HostName" docker exec `
+    $rawState = & ssh -i $KeyPath "$RemoteUser@$HostName" sudo docker exec `
         researchos-monitor-1 cat /state/health.json
     if ($LASTEXITCODE -ne 0) {
         throw "Hostinger health monitor is unreachable"
@@ -55,7 +56,8 @@ try {
     }
 
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $pullScript `
-        -HostName $HostName -KeyPath $KeyPath -DestinationRoot $backupRoot
+        -HostName $HostName -RemoteUser $RemoteUser -KeyPath $KeyPath `
+        -DestinationRoot $backupRoot
     if ($LASTEXITCODE -ne 0) {
         throw "Offsite backup pull or checksum verification failed"
     }
