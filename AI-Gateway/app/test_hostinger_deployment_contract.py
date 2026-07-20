@@ -34,3 +34,22 @@ def test_hostinger_compose_uses_existing_tls_proxy_without_public_data_ports() -
     assert "Host(`${RESEARCHOS_API_HOSTNAME}`)" in compose
     assert 'ports: ["127.0.0.1:5432:5432"]' not in compose
     assert 'ports: ["127.0.0.1:9000:9000"' not in compose
+
+
+def test_hostinger_stack_schedules_verified_backups_and_internal_monitoring() -> None:
+    compose = (ROOT / "deploy" / "compose.hostinger.yaml").read_text(
+        encoding="utf-8"
+    )
+    monitor = (
+        ROOT / "deploy" / "monitor" / "hostinger_healthcheck.py"
+    ).read_text(encoding="utf-8")
+
+    assert "BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}" in compose
+    assert "BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}" in compose
+    assert "backup_data:/backups" in compose
+    assert "stack.hostinger.env:/source" not in compose
+    assert "operations_state:/state" in compose
+    assert "hostinger_healthcheck.py" in compose
+    assert "EXPECTED_SCHEMA_VERSION: \"41\"" in compose
+    assert 'cursor.execute("SELECT COUNT(*) FROM knowledge_objects")' in monitor
+    assert "maximum_age" in monitor

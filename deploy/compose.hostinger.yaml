@@ -138,11 +138,70 @@ services:
       migrate: {condition: service_completed_successfully}
       minio-init: {condition: service_completed_successfully}
 
+  backup:
+    build: {context: ./backup}
+    restart: unless-stopped
+    env_file: ["stack.hostinger.env"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-researchos}
+      PGUSER: ${POSTGRES_USER:-researchos}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-researchos}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOCUMENT_BUCKET: researchos-documents
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - backup_data:/backups
+      - knowledge_data:/source/knowledge:ro
+      - architecture_data:/source/architecture:ro
+      - ./compose.hostinger.yaml:/source/configuration/compose.hostinger.yaml:ro
+      - ./stack.hostinger.env.example:/source/configuration/stack.hostinger.env.example:ro
+      - ./backup/recovery-coverage-v1.json:/source/configuration/recovery-coverage-v1.json:ro
+      - ./migrate/migrate.sh:/source/migration/migrate.sh:ro
+      - ./postgres/init:/source/migration/sql:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      minio-init: {condition: service_completed_successfully}
+
+  monitor:
+    build: {context: ../AI-Gateway}
+    command: ["python", "/opt/researchos-monitor/hostinger_healthcheck.py"]
+    restart: unless-stopped
+    env_file: ["stack.hostinger.env"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
+      RESEARCHOS_INTERNAL_HEALTH_URL: http://api:8000/health
+      MINIO_INTERNAL_HEALTH_URL: http://minio:9000/minio/health/live
+      EXPECTED_SCHEMA_VERSION: "41"
+      HEALTHCHECK_INTERVAL_SECONDS: ${HEALTHCHECK_INTERVAL_SECONDS:-60}
+      HEALTHCHECK_STATE_PATH: /state/health.json
+    volumes:
+      - ./monitor/hostinger_healthcheck.py:/opt/researchos-monitor/hostinger_healthcheck.py:ro
+      - operations_state:/state
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - /opt/researchos-monitor/hostinger_healthcheck.py
+        - --verify-state
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      api: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      minio: {condition: service_healthy}
+
 volumes:
   postgres_data:
   minio_data:
+  backup_data:
   knowledge_data:
   architecture_data:
+  operations_state:
 
 networks:
   traefik:
