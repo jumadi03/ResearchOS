@@ -143,6 +143,36 @@ services:
       - default
       - traefik
 
+  ui:
+    image: researchos-ui:${RESEARCHOS_UI_REVISION}
+    restart: unless-stopped
+    environment:
+      RESEARCHOS_API_ORIGIN: http://api:8000
+      RESEARCHOS_ALLOW_INTERNAL_HTTP: "true"
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.researchos-ui.entrypoints: web,websecure
+      traefik.http.routers.researchos-ui.rule: Host(`${RESEARCHOS_UI_HOSTNAME}`) || Host(`${RESEARCHOS_UI_HOSTNAME_ALIAS}`)
+      traefik.http.routers.researchos-ui.tls: "true"
+      traefik.http.routers.researchos-ui.tls.certresolver: mytlschallenge
+      traefik.http.routers.researchos-ui.middlewares: researchos-security@docker
+      traefik.http.services.researchos-ui.loadbalancer.server.port: "3000"
+    networks:
+      - default
+      - traefik
+
   worker:
     build: {context: ../AI-Gateway}
     command: ["python", "-m", "app.workers.main"]

@@ -39,6 +39,12 @@ def test_hostinger_compose_owns_tls_proxy_without_public_data_ports() -> None:
     assert "traefik.http.routers.researchos-api.tls.certresolver" in compose
     assert "Host(`${RESEARCHOS_API_HOSTNAME}`)" in compose
     assert "Host(`${RESEARCHOS_API_HOSTNAME_ALIAS}`)" in compose
+    assert "image: researchos-ui:${RESEARCHOS_UI_REVISION}" in compose
+    assert "RESEARCHOS_API_ORIGIN: http://api:8000" in compose
+    assert 'RESEARCHOS_ALLOW_INTERNAL_HTTP: "true"' in compose
+    assert "Host(`${RESEARCHOS_UI_HOSTNAME}`)" in compose
+    assert "Host(`${RESEARCHOS_UI_HOSTNAME_ALIAS}`)" in compose
+    assert 'traefik.http.services.researchos-ui.loadbalancer.server.port: "3000"' in compose
     assert 'ports: ["127.0.0.1:5432:5432"]' not in compose
     assert 'ports: ["127.0.0.1:9000:9000"' not in compose
 
