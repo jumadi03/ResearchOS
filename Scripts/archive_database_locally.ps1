@@ -77,6 +77,43 @@ DROP TRIGGER IF EXISTS local_archive_generations_immutable
 CREATE TRIGGER local_archive_generations_immutable
     BEFORE UPDATE OR DELETE ON local_archive_generations
     FOR EACH ROW EXECUTE FUNCTION reject_local_archive_mutation();
+
+CREATE TABLE IF NOT EXISTS local_inactive_archive_items (
+    item_id uuid PRIMARY KEY,
+    item_kind text NOT NULL CHECK (
+        item_kind IN ('legacy_github_bundle','stale_file')
+    ),
+    source_locator text NOT NULL,
+    original_filename text NOT NULL CHECK (
+        original_filename !~ '[\\/]' AND original_filename <> ''
+    ),
+    content_sha256 text NOT NULL CHECK (content_sha256 ~ '^[0-9a-f]{64}$'),
+    content_size bigint NOT NULL CHECK (content_size >= 0),
+    content bytea NOT NULL,
+    archived_reason text NOT NULL CHECK (archived_reason <> ''),
+    archived_at timestamptz NOT NULL DEFAULT now(),
+    metadata jsonb NOT NULL CHECK (jsonb_typeof(metadata) = 'object'),
+    UNIQUE (item_kind, source_locator, content_sha256),
+    CHECK (octet_length(content) = content_size)
+);
+CREATE TABLE IF NOT EXISTS local_inactive_archive_restores (
+    restore_id uuid PRIMARY KEY,
+    item_id uuid NOT NULL REFERENCES local_inactive_archive_items(item_id),
+    restored_at timestamptz NOT NULL DEFAULT now(),
+    destination text NOT NULL,
+    restored_sha256 text NOT NULL CHECK (restored_sha256 ~ '^[0-9a-f]{64}$'),
+    verification jsonb NOT NULL CHECK (jsonb_typeof(verification) = 'object')
+);
+DROP TRIGGER IF EXISTS local_inactive_archive_items_immutable
+    ON local_inactive_archive_items;
+CREATE TRIGGER local_inactive_archive_items_immutable
+    BEFORE UPDATE OR DELETE ON local_inactive_archive_items
+    FOR EACH ROW EXECUTE FUNCTION reject_local_archive_mutation();
+DROP TRIGGER IF EXISTS local_inactive_archive_restores_immutable
+    ON local_inactive_archive_restores;
+CREATE TRIGGER local_inactive_archive_restores_immutable
+    BEFORE UPDATE OR DELETE ON local_inactive_archive_restores
+    FOR EACH ROW EXECUTE FUNCTION reject_local_archive_mutation();
 '@
 $catalogSql | & docker exec -i $container psql -v ON_ERROR_STOP=1 `
     -U $PostgresUser -d postgres

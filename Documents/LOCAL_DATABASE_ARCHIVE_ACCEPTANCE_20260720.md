@@ -50,3 +50,45 @@ the failed attempt.
 This archive is a safety copy for local cleanup work. Creating an archive does
 not itself authorize deletion. Cleanup must still identify its exact scope and
 confirm the accepted archive generation before any destructive operation.
+
+## Inactive-data vault extension
+
+The local archive was subsequently extended to retain cleanup candidates as
+immutable inactive data. Each item stores its original locator, filename,
+reason, metadata, byte length, complete binary content, and SHA-256 checksum.
+Restoration creates a separate file, refuses to overwrite an existing
+destination, verifies the recovered checksum, and appends an immutable restore
+event. The archived payload itself remains inactive and unchanged.
+
+Accepted historical GitHub snapshot:
+
+- item ID: `ad1d078c-c00f-4cae-a57c-66e869dbe65d`;
+- kind: `legacy_github_bundle`;
+- source: `legacy-github://remote-tracking-refs`;
+- captured references: 13;
+- size: 1,251,106 bytes;
+- SHA-256:
+  `cb0cc0ad616d4cb5dd9f945abe25decaa836e27d214f3b4cdd5ab95e97413cb7`;
+- Git bundle verification: complete history, passed; and
+- restored-copy verification: passed.
+
+The snapshot is historical evidence, not an active source and not an
+instruction to merge the old GitHub branches. At capture time,
+`legacy-github/main` was an ancestor of the local ledger and was 76 commits
+behind it.
+
+A disposable stale-file fixture was also admitted as item
+`8409994d-20e5-4f98-81d3-44112ac1c871`, removed from its source location,
+restored into the separate recovery area, and verified against its archived
+checksum. Both inactive items and both restore events remained present after
+the archive database restarted.
+
+The first stale-file attempt failed before admission because the installed
+Windows PowerShell runtime did not provide `System.IO.Path.GetRelativePath`.
+Workspace-relative path handling was replaced with a case-insensitive,
+root-bounded implementation and the complete round trip then passed.
+
+Future cleanup uses `Scripts/archive_inactive_data.ps1` before removing an
+approved stale file. Recovery uses `Scripts/restore_inactive_data.ps1` with an
+explicit unused destination. Neither script decides that a file is stale or
+authorizes cleanup by itself.

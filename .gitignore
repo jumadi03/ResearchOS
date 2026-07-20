@@ -45,6 +45,7 @@ dist/
 *.temp
 AI-Gateway/tmp/
 /Backups/Hostinger/
+/Backups/Inactive-Recovered/
 /.deployment/
 /NUL;
 
