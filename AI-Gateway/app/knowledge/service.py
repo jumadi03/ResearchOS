@@ -421,3 +421,152 @@ class KnowledgeDiscoveryService:
             project_id, limit=limit, relationship_types=relationship_types,
             review_status=review_status, min_confidence=min_confidence,
         )
+
+    def list_workflow_cases(self, project_id: str):
+        runs = tuple(
+            run for run in self.ingestion_pipeline.runs.values()
+            if run.discovery_contract.project_id == project_id
+        )
+        return tuple(
+            self._workflow_case(run)
+            for run in sorted(
+                runs, key=lambda item: (item.started_at, item.run_id), reverse=True
+            )
+        )
+
+    def get_workflow_case(self, project_id: str, run_id: str):
+        run = self.ingestion_pipeline.runs.get(run_id)
+        if run is None or run.discovery_contract.project_id != project_id:
+            raise KeyError(f"Unknown project workflow case: {run_id}")
+        return self._workflow_case(run)
+
+    def _workflow_case(self, run: DiscoveryRun):
+        records = self.repository_service.get_discovery_workflow_state(
+            run.discovery_contract.project_id,
+            tuple(item.record_id for item in run.records),
+        )
+        graph_ids = {
+            item["graph_id"] for item in records if item["graph_id"]
+        }
+        bundles = tuple(
+            item for item in self.theory_pipeline.list_theory_bundles()
+            if graph_ids.intersection(
+                self.theory_pipeline.bundles[item["bundle_id"]].graph_ids
+            )
+        )
+        publications = tuple(
+            {
+                "publication_id": package.manifest.publication_id,
+                "bundle_id": bundle["bundle_id"],
+                "kind": package.manifest.kind.value,
+                "generated_at": package.manifest.generated_at,
+                "integrity_verified": package.verify(),
+            }
+            for bundle in bundles
+            for package in self.theory_pipeline.publication_history(
+                bundle["bundle_id"]
+            )
+        )
+        record_count = len(run.records)
+        acquired = sum(bool(item["representation_id"]) for item in records)
+        inspected = sum(bool(item["inspection_id"]) for item in records)
+        eligible = sum(
+            item["screening_status"] == "eligible" for item in records
+        )
+        extracted = sum(bool(item["extraction_id"]) for item in records)
+        evidence_count = sum(item["evidence_count"] for item in records)
+        pending = sum(item["pending_evidence_count"] for item in records)
+        accepted = sum(item["accepted_evidence_count"] for item in records)
+        graph_count = len(graph_ids)
+        theory_count = sum(item["theory_count"] for item in bundles)
+        validated = sum(bool(item["latest_validation"]) for item in bundles)
+
+        def stage(key, label, state, detail, required_role=None):
+            return {
+                "key": key, "label": label, "state": state, "detail": detail,
+                "required_role": required_role,
+            }
+
+        stages = (
+            stage(
+                "discovery", "Discovery", "complete",
+                f"{record_count} record unik; {len(run.failures)} kegagalan provider",
+                "discoverer",
+            ),
+            stage(
+                "acquisition", "Akuisisi",
+                "complete" if acquired else "pending",
+                f"{acquired} dari {record_count} record memiliki representasi",
+                "discoverer",
+            ),
+            stage(
+                "screening", "Inspeksi dan screening",
+                "complete" if eligible else "pending",
+                f"{inspected} diperiksa; {eligible} eligible",
+                "discoverer",
+            ),
+            stage(
+                "extraction", "Ekstraksi evidence",
+                "complete" if extracted else "blocked" if not eligible else "pending",
+                f"{extracted} extraction; {evidence_count} objek provisional",
+                "discoverer",
+            ),
+            stage(
+                "evidence_review", "Human evidence review",
+                (
+                    "complete" if evidence_count and not pending
+                    else "pending" if evidence_count else "blocked"
+                ),
+                f"{accepted} accepted; {pending} pending",
+                "reviewer",
+            ),
+            stage(
+                "knowledge", "Knowledge intake dan graph",
+                "complete" if graph_count else "blocked" if not accepted else "pending",
+                f"{graph_count} graph dari evidence yang diterima",
+                "indexer",
+            ),
+            stage(
+                "theory", "Proposition dan theory",
+                "complete" if theory_count else "blocked" if not graph_count else "pending",
+                f"{theory_count} theory dalam {len(bundles)} bundle",
+                "reviewer",
+            ),
+            stage(
+                "validation", "Validation",
+                "complete" if validated else "blocked" if not theory_count else "pending",
+                f"{validated} bundle memiliki validation aktif",
+                "reviewer",
+            ),
+            stage(
+                "publication", "Publication",
+                "complete" if publications else "blocked" if not validated else "pending",
+                f"{len(publications)} paket publikasi immutable",
+                "publisher",
+            ),
+        )
+        next_stage = next(
+            (item for item in stages if item["state"] != "complete"), None
+        )
+        return {
+            "case_id": run.run_id,
+            "project_id": run.discovery_contract.project_id,
+            "question": {
+                "question_id": run.question.question_id,
+                "text": run.question.text,
+            },
+            "contract": {
+                "contract_id": run.discovery_contract.contract_id,
+                "scope": run.discovery_contract.scope,
+            },
+            "started_at": run.started_at,
+            "record_count": record_count,
+            "provider_failure_count": len(run.failures),
+            "stages": stages,
+            "next_action": next_stage,
+            "records": records,
+            "theory_bundles": bundles,
+            "publications": publications,
+            "authority": "derived_read_model_only",
+            "decision_automation": False,
+        }

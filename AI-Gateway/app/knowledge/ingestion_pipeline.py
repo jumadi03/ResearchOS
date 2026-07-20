@@ -87,7 +87,9 @@ class KnowledgeIngestionPipeline:
         self.relation_store = SemanticRelationStore(
             output_root / "semantic-relations"
         )
-        self.runs: dict[str, DiscoveryRun] = {}
+        self.runs = {
+            item.run_id: item for item in self.snapshots.load_all()
+        }
         self.extractions = {}
         self.inspections = {}
         self.screening_decisions = {}

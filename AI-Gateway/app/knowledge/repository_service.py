@@ -192,3 +192,8 @@ class KnowledgeRepositoryService:
 
     def get_project_graph(self, project_id: str, **options):
         return self._required("graph reads").get_project_graph(project_id, **options)
+
+    def get_discovery_workflow_state(self, project_id: str, record_ids):
+        return self._required("workflow reads").get_discovery_workflow_state(
+            project_id, tuple(record_ids)
+        )

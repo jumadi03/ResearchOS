@@ -143,6 +143,10 @@ class ScientificDataRepository(Protocol):
 
     def get_work_queue(self, project_id: str) -> dict: ...
 
+    def get_discovery_workflow_state(
+        self, project_id: str, record_ids: tuple[str, ...],
+    ) -> tuple[dict, ...]: ...
+
     def get_project_graph(
         self, project_id: str, *, limit: int, relationship_types: tuple[str, ...],
         review_status: str | None, min_confidence: float,

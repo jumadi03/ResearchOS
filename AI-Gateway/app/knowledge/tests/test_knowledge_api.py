@@ -1623,6 +1623,35 @@ def test_product_read_api_supports_any_authenticated_role_and_cursor(tmp_path: P
     assert objects.json()["next_cursor"] == "evidence:object-1"
 
 
+def test_workflow_case_read_model_is_authenticated_and_non_decisional(
+    tmp_path: Path,
+) -> None:
+    api = client(tmp_path, "audit", repository=RecordingRepository())
+    api.app.state.knowledge_service.list_workflow_cases = lambda project_id: ({
+        "case_id": "discovery-1", "project_id": project_id,
+        "question": {"question_id": "question-1", "text": "What changed?"},
+        "stages": ({
+            "key": "discovery", "state": "complete",
+            "required_role": "discoverer",
+        },),
+        "authority": "derived_read_model_only",
+        "decision_automation": False,
+    },)
+
+    response = api.get(
+        "/knowledge/projects/researchos-default/workflow-cases"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["case_id"] == "discovery-1"
+    assert response.json()["authority"] == "derived_read_model_only"
+    assert client(
+        tmp_path, None, repository=RecordingRepository()
+    ).get(
+        "/knowledge/projects/researchos-default/workflow-cases"
+    ).status_code == 401
+
+
 def test_product_object_actions_are_permission_aware(tmp_path: Path) -> None:
     reviewer = client(tmp_path, "review", repository=RecordingRepository()).get(
         "/knowledge/projects/researchos-default/objects/object-1"

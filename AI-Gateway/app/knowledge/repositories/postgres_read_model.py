@@ -410,6 +410,92 @@ class PostgresReadModelRepositoryMixin:
             },
         }
 
+    def get_discovery_workflow_state(
+        self, project_id: str, record_ids: tuple[str, ...],
+    ) -> tuple[dict, ...]:
+        """Project the governed downstream state of discovery records."""
+        if not record_ids:
+            return ()
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT DISTINCT ON (identity.record_id)
+                           identity.record_id,document.document_id::text,
+                           document.title,document.canonical_doi,
+                           representation.representation_id::text,
+                           inspection.inspection_key,
+                           screening.decision_key,screening.status,
+                           extraction.extraction_key,extraction.object_count,
+                           COALESCE(review.accepted_count,0),
+                           COALESCE(review.rejected_count,0),
+                           COALESCE(review.pending_count,0),
+                           intake.intake_key,intake.graph_key
+                    FROM identity_resolution_events identity
+                    JOIN scientific_documents document
+                      ON document.document_id=identity.document_id
+                    JOIN project_objects membership
+                      ON membership.object_id=document.document_id
+                     AND membership.project_id=%s
+                    LEFT JOIN LATERAL (
+                        SELECT r.representation_id
+                        FROM scientific_representations r
+                        WHERE r.object_id=document.document_id
+                        ORDER BY r.document_version DESC,r.created_at DESC LIMIT 1
+                    ) representation ON true
+                    LEFT JOIN LATERAL (
+                        SELECT i.inspection_key,i.inspection_id
+                        FROM source_inspections i
+                        WHERE i.representation_id=representation.representation_id
+                        ORDER BY i.inspected_at DESC LIMIT 1
+                    ) inspection ON true
+                    LEFT JOIN LATERAL (
+                        SELECT s.screening_decision_id,s.decision_key,s.status
+                        FROM screening_decisions s
+                        WHERE s.canonical_document_id=document.document_id
+                        ORDER BY s.decided_at DESC LIMIT 1
+                    ) screening ON true
+                    LEFT JOIN LATERAL (
+                        SELECT x.extraction_key,x.extraction_manifest_id,x.object_count
+                        FROM extraction_manifests x
+                        WHERE x.document_id=document.document_id
+                        ORDER BY x.created_at DESC LIMIT 1
+                    ) extraction ON true
+                    LEFT JOIN LATERAL (
+                        SELECT
+                          count(*) FILTER (WHERE p.projected_status='accepted')
+                            AS accepted_count,
+                          count(*) FILTER (WHERE p.projected_status='rejected')
+                            AS rejected_count,
+                          count(*) FILTER (WHERE p.projected_status='pending')
+                            AS pending_count
+                        FROM evidence_objects e
+                        JOIN evidence_current_review_projection p
+                          ON p.evidence_id=e.evidence_id
+                        WHERE e.extraction_manifest_id=
+                              extraction.extraction_manifest_id
+                    ) review ON true
+                    LEFT JOIN LATERAL (
+                        SELECT k.intake_key,k.graph_key
+                        FROM knowledge_intake_manifests k
+                        WHERE k.extraction_key=extraction.extraction_key
+                        ORDER BY k.occurred_at DESC LIMIT 1
+                    ) intake ON true
+                    WHERE identity.record_id=ANY(%s)
+                    ORDER BY identity.record_id,identity.resolved_at DESC
+                """, (project_id, list(record_ids)))
+                rows = cursor.fetchall()
+        return tuple({
+            "record_id": row[0], "document_id": row[1], "title": row[2],
+            "doi": row[3], "representation_id": row[4],
+            "inspection_id": row[5], "screening_id": row[6],
+            "screening_status": row[7], "extraction_id": row[8],
+            "evidence_count": row[9] or 0,
+            "accepted_evidence_count": row[10],
+            "rejected_evidence_count": row[11],
+            "pending_evidence_count": row[12],
+            "intake_id": row[13], "graph_id": row[14],
+        } for row in rows)
+
     def get_project_graph(
         self, project_id: str, *, limit: int, relationship_types: tuple[str, ...],
         review_status: str | None, min_confidence: float,

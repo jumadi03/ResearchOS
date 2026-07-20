@@ -160,6 +160,36 @@ def list_project_objects(
     return {"items": [asdict(item) for item in page.items], "next_cursor": page.next_cursor}
 
 
+@router.get("/projects/{project_id}/workflow-cases")
+def list_project_workflow_cases(
+    project_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, None)
+    try:
+        items = request.app.state.knowledge_service.list_workflow_cases(project_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {
+        "project_id": project_id, "items": items, "count": len(items),
+        "authority": "derived_read_model_only",
+    }
+
+
+@router.get("/projects/{project_id}/workflow-cases/{run_id}")
+def get_project_workflow_case(
+    project_id: str, run_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, None)
+    try:
+        return request.app.state.knowledge_service.get_workflow_case(
+            project_id, run_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/projects/{project_id}/objects/{object_ref}")
 def get_project_object(
     project_id: str, object_ref: str, request: Request,
