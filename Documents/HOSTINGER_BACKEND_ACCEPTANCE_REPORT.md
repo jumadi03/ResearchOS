@@ -189,3 +189,29 @@ Post-hardening acceptance confirmed:
 
 The detailed evidence and recovery boundary are recorded in
 `Documents/HOSTINGER_SECURITY_HARDENING_REPORT.md`.
+
+## Corrective live revalidation
+
+At `2026-07-20T03:49:17Z`, a fresh browser inspection disproved the earlier
+assumption that the active Sites deployment still had its backend binding. The
+public UI displayed `Backend belum tersedia` and explicitly reported that
+`RESEARCHOS_API_ORIGIN` was not configured.
+
+The Sites environment value existed, but the active deployment had not applied
+environment revision 1. Version 9 was republished without changing its source.
+The new production deployment succeeded with `env_set_revision=1`. After a
+fresh reload the public UI displayed the ResearchOS login boundary instead of
+the unavailable-backend state.
+
+The same revalidation connected directly to Hostinger and confirmed:
+
+- host `srv1534304`, public IP `76.13.20.211`;
+- public API health `{"status":"ok"}`;
+- database `researchos`, schema 41, 325 canonical objects, and 6 workspace
+  users;
+- production monitor `passed` with no failures; and
+- completed backup `20260720T031629Z`.
+
+This correction is retained as an acceptance finding. Full evidence is recorded
+in `Documents/HOSTINGER_LIVE_EVIDENCE_20260720T034917Z.md`. Authenticated
+mutation acceptance remains separate and is not claimed by this revalidation.
