@@ -113,9 +113,21 @@ Source reconciliation, service health, public reachability, schema
 persistence, canonical-object persistence, and rollback preservation:
 **TECHNICAL ACCEPTANCE PASSED**.
 
-Authenticated visual confirmation after sign-in and refresh remains
-**PENDING USER CONFIRMATION**. No new scientific or database mutation is
-required for this source-only reconciliation.
+At the time of technical acceptance, authenticated visual confirmation after
+sign-in and refresh was pending. It was subsequently completed as recorded
+below. No new scientific or database mutation was required for this
+source-only reconciliation.
+
+## Final authenticated visual confirmation
+
+The user signed in to `https://researchos.click`, refreshed the production
+workspace, and confirmed that it remained operational after refresh.
+
+Final acceptance state: **ACCEPTED**.
+
+This confirmation closes the visual persistence gate for the source
+reconciliation. It does not record or authorize a new scientific or database
+mutation.
 
 ## Source-ledger backup and remote boundary
 

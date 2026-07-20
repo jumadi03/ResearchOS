@@ -27,7 +27,7 @@
     "Documents/LOCAL_PRODUCTION_SYNC_ACCEPTANCE_20260720.md",
     "Documents/PRODUCTION_SOURCE_RECONCILIATION_20260720.md"
   ],
-  "acceptance_state": "technical_acceptance_passed",
-  "authenticated_visual_confirmation": "pending_user_confirmation",
+  "acceptance_state": "accepted",
+  "authenticated_visual_confirmation": "passed_after_refresh",
   "production_mutation_verified": true
 }
