@@ -22,6 +22,7 @@ RC.2 remains **NOT ACCEPTED**. Its tag was not moved or modified.
 - Release-contract regression: **4 passed, 0 failed**.
 - Canonical UI regression: **8 passed, 0 failed**.
 - Canonical UI production build: **passed** with Vinext.
+- Interactive local-browser acceptance: **passed**.
 - Installed backend package version: `0.5.0rc5`.
 - Database schema version: `41`.
 - Source archive inventory: 620 tracked files and **0 temporary test entries**.
@@ -47,6 +48,21 @@ The accepted graph-explorer behavior and visual layout are recorded in
 `Documents/LOCAL_CANONICAL_GRAPH_EXPLORER_ACCEPTANCE_REPORT.md`. RC.5 binds that
 exact accepted source to a reconstructible saved Sites version while explicitly
 keeping it separate from the older production deployment.
+
+## Interactive local-browser acceptance
+
+The canonical local UI at `http://localhost:3000/` was exercised against the
+local backend after the automated regression:
+
+- The UI reached the `Terhubung` state and restored the verified reviewer
+  session.
+- The canonical ResearchOS project loaded with 325 scientific objects.
+- The graph loaded 84 nodes and the bounded 160-edge view.
+- Searching for `demographic control` reduced the view to 2 nodes and 1 edge.
+- Keyboard activation opened the evidence inspector with its stable key,
+  object ID, relationship summary, and audited Object Inspector link.
+- After a full page refresh, the backend connection, graph search, selected
+  evidence node, and stable-key inspector state were all preserved.
 
 ## Release artifact checksums
 
