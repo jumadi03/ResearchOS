@@ -85,3 +85,14 @@ def test_migration_checksums_are_line_ending_stable():
     runner = (ROOT / "deploy/migrate/migrate.sh").read_text(encoding="utf-8")
 
     assert runner.count("tr -d '\\r' < \"$file\" | sha256sum") == 2
+
+
+def test_historical_checksum_drift_is_narrowly_allowlisted():
+    runner = (ROOT / "deploy/migrate/migrate.sh").read_text(encoding="utf-8")
+
+    assert "checksum_compatibility_admitted" in runner
+    assert "29:08fb62ef" in runner
+    assert "30:ab136fe9" in runner
+    assert "31:42260436" in runner
+    assert "32:6f5d8c46" in runner
+    assert '*) return 1 ;;' in runner
