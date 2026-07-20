@@ -79,3 +79,9 @@ def test_schema_version_42_is_consistent():
     assert "max(version),0) FROM schema_migrations) <> 42" in healthcheck
     assert "evidence_current_review_projection" in healthcheck
     assert "projection coverage is incomplete" in healthcheck
+
+
+def test_migration_checksums_are_line_ending_stable():
+    runner = (ROOT / "deploy/migrate/migrate.sh").read_text(encoding="utf-8")
+
+    assert runner.count("tr -d '\\r' < \"$file\" | sha256sum") == 2

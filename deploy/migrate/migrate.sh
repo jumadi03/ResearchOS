@@ -35,7 +35,7 @@ if [[ "$applied_count" == "0" ]]; then
     for file in /migrations/*.sql; do
       version="$(basename "$file" | cut -d_ -f1 | sed 's/^0*//')"
       if (( version <= baseline )); then
-        checksum="$(sha256sum "$file" | cut -d' ' -f1)"
+        checksum="$(tr -d '\r' < "$file" | sha256sum | cut -d' ' -f1)"
         filename="$(basename "$file")"
         printf "INSERT INTO schema_migrations(version,filename,checksum_sha256,applied_by) VALUES (%s,'%s','%s','detected-baseline');\n" \
           "$version" "$filename" "$checksum" | "${psql_base[@]}"
@@ -47,7 +47,7 @@ fi
 for file in /migrations/*.sql; do
   filename="$(basename "$file")"
   version="$(printf '%s' "$filename" | cut -d_ -f1 | sed 's/^0*//')"
-  checksum="$(sha256sum "$file" | cut -d' ' -f1)"
+  checksum="$(tr -d '\r' < "$file" | sha256sum | cut -d' ' -f1)"
   recorded="$("${psql_base[@]}" -Atc \
     "SELECT checksum_sha256 FROM schema_migrations WHERE version=$version")"
   if [[ -n "$recorded" ]]; then
