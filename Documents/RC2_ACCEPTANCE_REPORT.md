@@ -142,6 +142,30 @@ Final recovery state:
 PostgreSQL and MinIO remained healthy, the API returned HTTP 200, and the
 worker remained running.
 
+## Post-RC.2 infrastructure evidence — 2026-07-20
+
+This evidence is recorded for audit continuity only and is not retroactive
+acceptance of the immutable RC.2 tag.
+
+- The canonical UI was self-hosted on the Hostinger VPS at
+  `https://researchos.click`.
+- Public DNS for the root and `www` resolved to VPS `76.13.20.211`.
+- Trusted HTTPS, UI HTTP 200, and the UI-to-backend proxy were verified.
+- The first real login exposed a UI runtime HTTP 500 when Node required
+  `duplex: "half"` for a streamed request body.
+- UI commit `def1c7831a05e7f4d1bdd676630f12192c16b4ac` corrected the proxy and
+  added a POST-body regression test; all 13 UI tests passed.
+- The exact corrective image was deployed and reported `running/healthy`.
+- A real reviewer login succeeded, F5 preserved the session, and PostgreSQL
+  `last_seen_at` advanced from `2026-07-20 07:14:55.640642+00` to
+  `2026-07-20 07:17:03.982460+00`.
+- Detailed evidence is preserved in
+  `Documents/HOSTINGER_SELF_HOSTED_UI_ACCEPTANCE_20260720.md`.
+
+These later infrastructure results do not contain the typed-null SGF-020C fix
+inside tagged commit `38913be`; therefore RC.2 remains rejected and must not be
+moved or relabeled.
+
 ## Acceptance decision
 
 `v0.5.0-rc.2` is rejected as the release candidate because its tagged code has
