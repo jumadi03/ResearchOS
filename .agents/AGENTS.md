@@ -29,12 +29,13 @@ All future ResearchOS work must distinguish clearly between simulation, local,
 staging, and production. Never present a local test, mock, fixture, restore
 drill, or simulated result as proof of production behavior.
 
-The canonical real targets are:
+The canonical real targets are recorded in
+`deploy/production-registry.json`. The current targets are:
 
 - Public production UI:
-  `https://researchos-ilmiah.jumadi03.chatgpt.site/`
+  `https://researchos.click/`
 - Production backend:
-  `https://researchos-api.srv1534304.hstgr.cloud`
+  `https://api.researchos.click`
 - Production VPS:
   Hostinger host `srv1534304`, public IP `76.13.20.211`
 - Production database:
@@ -43,6 +44,10 @@ The canonical real targets are:
   MinIO on the Hostinger VPS
 - Local computer:
   source code, off-VPS backups, development, and preliminary tests only
+
+Historical Sites and Hostinger service URLs may remain available as aliases or
+fallbacks, but they are not the canonical acceptance targets unless the
+production registry is changed by an attributable operational decision.
 
 Production acceptance requires evidence collected from the real target:
 

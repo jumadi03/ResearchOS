@@ -11,14 +11,19 @@ mistaken for evidence that ResearchOS works in production.
 
 | Level | Canonical target | Accepted purpose |
 |---|---|---|
-| Production UI | `https://researchos-ilmiah.jumadi03.chatgpt.site/` | User-visible production acceptance |
-| Production API | `https://researchos-api.srv1534304.hstgr.cloud` | Live backend acceptance |
+| Production UI | `https://researchos.click/` | User-visible production acceptance |
+| Production API | `https://api.researchos.click` | Live backend acceptance |
 | Production VPS | Hostinger `srv1534304`, `76.13.20.211` | Infrastructure and service evidence |
 | Production database | PostgreSQL `researchos` on Hostinger | Persistence and canonical-data evidence |
 | Production storage | MinIO on Hostinger | Object-storage evidence |
 | Local computer | `D:\ResearchOS` and local services | Source, backup, development, and preliminary testing |
 
 Local results do not prove production behavior.
+
+The machine-readable authority for the current targets is
+`deploy/production-registry.json`. Historical Sites and Hostinger service URLs
+remain evidence of earlier deployments or fallback routes; they are not the
+current canonical acceptance targets.
 
 ## Evidence required
 

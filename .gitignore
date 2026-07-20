@@ -22,6 +22,7 @@ ENV/
 
 # Test, coverage, and type-checking caches
 .pytest_cache/
+/.pytest-tmp-*/
 .coverage
 .coverage.*
 htmlcov/
@@ -44,6 +45,8 @@ dist/
 *.temp
 AI-Gateway/tmp/
 /Backups/Hostinger/
+/.deployment/
+/NUL;
 
 # IDE and editor settings
 .idea/

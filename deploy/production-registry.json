@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "environment": "production",
+  "authority": "ResearchOS project owner",
+  "updated_at": "2026-07-20T17:21:00+08:00",
+  "public_ui": {
+    "canonical_url": "https://researchos.click/",
+    "aliases": ["https://www.researchos.click/"],
+    "historical_fallbacks": [
+      "https://researchos-ilmiah.jumadi03.chatgpt.site/"
+    ]
+  },
+  "public_api": {
+    "canonical_url": "https://api.researchos.click",
+    "health_url": "https://api.researchos.click/health",
+    "historical_aliases": [
+      "https://researchos-api.srv1534304.hstgr.cloud"
+    ]
+  },
+  "infrastructure": {
+    "provider": "Hostinger",
+    "host": "srv1534304",
+    "public_ip": "76.13.20.211",
+    "application_directory": "/opt/researchos",
+    "database": "researchos",
+    "object_storage": "MinIO"
+  },
+  "release_manifest": "deploy/production-release.json",
+  "acceptance_policy": "Documents/REAL_ENVIRONMENT_ACCEPTANCE_POLICY.md"
+}

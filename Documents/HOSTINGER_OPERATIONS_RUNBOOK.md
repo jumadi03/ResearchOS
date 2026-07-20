@@ -6,7 +6,11 @@ Date: 2026-07-20
 
 - Application directory: `/opt/researchos`
 - Compose file: `/opt/researchos/deploy/compose.hostinger.yaml`
-- Public API health: `https://researchos-api.srv1534304.hstgr.cloud/health`
+- Public UI: `https://researchos.click/`
+- Public API health: `https://api.researchos.click/health`
+- Machine-readable production target registry:
+  `deploy/production-registry.json`
+- Accepted release manifest: `deploy/production-release.json`
 - PostgreSQL, MinIO, backup storage, and health state remain private Docker
   volumes.
 - Traefik is owned by the ResearchOS Compose project and uses the external
@@ -74,7 +78,7 @@ The `researchos-monitor-1` container checks every 60 seconds:
 - the internal API health endpoint;
 - the internal MinIO health endpoint;
 - PostgreSQL connectivity;
-- schema version 41; and
+- schema version 42; and
 - the canonical object count.
 
 Inspect the current state:
@@ -161,6 +165,12 @@ container. The restored database contained schema version 41, 325 canonical
 objects, the accepted artifact status `review`, and lifecycle event
 `af60c4f8-ee72-4270-bd83-5330e27de073`. This is the current preferred local
 recovery set.
+
+That backup predates schema 42 and remains valid historical recovery evidence.
+The current accepted production schema and release revisions are recorded in
+`deploy/production-release.json`; restoration must apply the verified
+migration archive forward to the manifest's schema before production
+acceptance.
 
 ## Incident priorities
 
