@@ -25,6 +25,7 @@ RC.2 remains **NOT ACCEPTED**. Its tag was not moved or modified.
   production binding revision.
 - Canonical UI production build: **passed** with Vinext.
 - Interactive local-browser acceptance: **passed**.
+- Interactive owner-only production-browser acceptance: **passed**.
 - Installed backend package version: `0.5.0rc5`.
 - Database schema version: `41`.
 - Source archive inventory: 620 tracked files and **0 temporary test entries**.
@@ -55,9 +56,23 @@ URL. `RESEARCHOS_API_ORIGIN` is now configured to the dedicated Hostinger HTTPS
 backend. A post-candidate UI correction made Cloudflare Access service
 credentials optional for directly reachable HTTPS origins while preserving
 their use when configured. Browser inspection of a fresh versioned navigation
-confirmed the production UI reaches the backend and displays the ResearchOS
-login form (`Belum masuk`) instead of the former backend-unavailable state. No
-sample data or false authenticated state is displayed.
+confirmed the production UI reaches the backend. The reviewer subsequently
+authenticated successfully, and the session remained connected after a full
+page refresh. No sample data or false authenticated state is displayed.
+
+## Interactive production-browser acceptance
+
+The owner-only canonical UI was exercised against the Hostinger backend:
+
+- The UI reached `Terhubung` with a verified `reviewer` session.
+- The authenticated session remained connected after a full page refresh.
+- The knowledge graph loaded the accepted baseline of 84 nodes and the bounded
+  160-edge view.
+- Searching for `demographic control` reduced the graph to 2 nodes and 1 edge.
+- Selecting the evidence node opened its stable key, object ID, relationship
+  summary, and audited Object Inspector link.
+- After another full page refresh, the search, 2-node/1-edge graph state,
+  selected evidence, and evidence inspector all remained present.
 
 ## Interactive local-browser acceptance
 
@@ -97,9 +112,9 @@ ecd7bc8286014d9d487489194f573b0e98a56360c95236ad2670804988359c0e  researchos_ai_
 
 ## Remaining gate
 
-The HTTPS backend and Sites origin binding gates are complete. The remaining
-interactive production gate is an authenticated reviewer login followed by
-verification that canonical project data, review decisions, graph state, and
-refresh persistence behave as they did in local acceptance. Repository tag push
-and GitHub Release publication remain separate decisions and are not authorized
-by this acceptance.
+The HTTPS backend, Sites origin binding, authenticated reviewer session, graph
+data, and refresh-persistence gates are complete. A new production review
+decision was intentionally not submitted during this read-oriented acceptance,
+so no scientific decision was changed merely to test deployment. Repository tag
+push and GitHub Release publication remain separate decisions and are not
+authorized by this acceptance.

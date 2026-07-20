@@ -37,12 +37,15 @@ Sites environment revision 1 sets `RESEARCHOS_API_ORIGIN` to the Hostinger HTTPS
 origin. Owner-only Sites version 9 is deployed at
 `https://researchos-ilmiah.jumadi03.chatgpt.site/`.
 
-Fresh browser inspection reached the ResearchOS authentication boundary and
-displayed `Belum masuk` with the login form. This confirms the UI-to-backend
-route is active without claiming an authenticated user session.
+Fresh browser inspection reached the ResearchOS authentication boundary. The
+reviewer then authenticated successfully, remained connected after refresh, and
+loaded the accepted graph baseline of 84 nodes and 160 edges. Searching for
+`demographic control` produced 2 nodes and 1 edge; the selected evidence,
+stable-key inspector, and search state all persisted after another refresh.
 
 ## Remaining acceptance
 
-Sign in with an existing ResearchOS reviewer account, then verify project data,
-review persistence, graph interaction, and refresh persistence in the production
-UI. No GitHub Release publication is authorized by this deployment acceptance.
+Authenticated UI-to-backend connectivity, graph interaction, and refresh
+persistence are accepted. A scientific review mutation was not performed solely
+for deployment testing. No GitHub Release publication is authorized by this
+deployment acceptance.
