@@ -1,26 +1,27 @@
 # ResearchOS Working Agreement
 
-## Hostinger VPS management scope
+## Commit, deploy, and production-proof workflow
 
-The authorized operational scope covers the entire Hostinger VPS
-`srv1534304` (`76.13.20.211`), not only the ResearchOS containers. Work may
-inspect, diagnose, maintain, configure, and improve:
+ResearchOS implementation work must not stop at a local commit. For each
+approved production change:
 
-- ResearchOS services and data infrastructure;
-- the Ubuntu operating system;
-- Docker, networks, storage, firewall, and reverse proxy;
-- n8n, WAHA, and other services hosted on the VPS; and
-- technical domain, DNS, TLS, monitoring, backup, and recovery configuration
-  associated with the VPS.
+1. implement and test the change on the local ResearchOS source;
+2. create an intentional Git commit containing only the approved scope;
+3. deploy that exact committed source to the ResearchOS services on Hostinger;
+4. verify the deployed revision on the real Hostinger VPS;
+5. verify the corresponding behavior through the public production UI or API;
+6. verify persistence in the production database when the change affects data;
+   and
+7. preserve timestamped before-and-after evidence in an acceptance report.
 
-This expanded scope does not waive action-time safeguards. Obtain explicit
-approval immediately before deleting production data or volumes, restoring over
-production, rebooting or rebuilding the VPS, changing credentials or access
-permissions, making purchases or renewals, changing ownership, or applying a
-DNS/domain change that can interrupt an existing public service.
+The Hostinger deployment is production evidence, not a replacement Git remote.
+The commit remains in the ResearchOS Git repository, while the exact committed
+revision is deployed to Hostinger and its running revision is recorded.
 
-Preserve unrelated services and user data while working. Record live evidence
-before and after material production changes.
+This workflow authorizes deployment and verification of ResearchOS. It does not
+authorize changes to n8n, WAHA, unrelated VPS services, billing, ownership,
+domain registration, or unrelated DNS configuration unless the user requests
+those changes explicitly.
 
 ## Real-environment acceptance rule
 
