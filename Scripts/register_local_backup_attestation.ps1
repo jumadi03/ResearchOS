@@ -56,8 +56,8 @@ try {
         researchos-postgres-1:/tmp/storage-tier.sql
     if ($LASTEXITCODE -ne 0) { throw "Could not stage storage attestation" }
     & ssh -i $KeyPath "$RemoteUser@$HostName" sudo docker exec `
-        researchos-postgres-1 sh -lc `
-        'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /tmp/storage-tier.sql'
+        researchos-postgres-1 psql -v ON_ERROR_STOP=1 `
+        -U researchos -d researchos -f /tmp/storage-tier.sql
     if ($LASTEXITCODE -ne 0) { throw "Storage attestation was rejected" }
     & ssh -i $KeyPath "$RemoteUser@$HostName" rm -f $remote
     Write-Output "storage-tier-attestation=passed stamp=$stamp components=$($manifest.components.Count)"
