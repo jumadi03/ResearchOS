@@ -21,7 +21,8 @@ RC.2 remains **NOT ACCEPTED**. Its tag was not moved or modified.
 
 - Backend regression: **505 passed, 0 failed** in 32.15 seconds.
 - Release-contract regression: **4 passed, 0 failed**.
-- Canonical UI regression: **8 passed, 0 failed**.
+- Canonical UI regression: **10 passed, 0 failed** for the post-candidate
+  production binding revision.
 - Canonical UI production build: **passed** with Vinext.
 - Interactive local-browser acceptance: **passed**.
 - Installed backend package version: `0.5.0rc5`.
@@ -37,23 +38,26 @@ creating an isolated local parent directory, the unchanged suite passed
 
 ## Canonical UI binding
 
-- UI source commit: `8b06689b36f8a7c6df024c8e188d51e595fac216`.
-- Saved Sites version: `8`.
+- UI source commit: `112924bc8e8c6710dadf9f50c0a7ebe30512ee0f`.
+- Saved Sites version: `9`.
 - Current version state: `deployed`.
-- Currently deployed Sites version: `8`.
+- Currently deployed Sites version: `9`.
 - Production target:
   `https://researchos-ilmiah.jumadi03.chatgpt.site/`.
-- Operational state: `canonical_target_not_cutover`.
+- Operational state: `backend_connected_authentication_required`.
 
 The accepted graph-explorer behavior and visual layout are recorded in
 `Documents/LOCAL_CANONICAL_GRAPH_EXPLORER_ACCEPTANCE_REPORT.md`. RC.5 binds that
 exact accepted source to a reconstructible saved Sites version.
 
 The subsequent owner-only production deployment succeeded at the same canonical
-URL. Browser inspection confirmed the new UI shell is active and correctly
-fails closed with `Backend belum tersedia` because `RESEARCHOS_API_ORIGIN` is
-not yet configured in the Sites runtime. No sample data or false connected
-state is displayed.
+URL. `RESEARCHOS_API_ORIGIN` is now configured to the dedicated Hostinger HTTPS
+backend. A post-candidate UI correction made Cloudflare Access service
+credentials optional for directly reachable HTTPS origins while preserving
+their use when configured. Browser inspection of a fresh versioned navigation
+confirmed the production UI reaches the backend and displays the ResearchOS
+login form (`Belum masuk`) instead of the former backend-unavailable state. No
+sample data or false authenticated state is displayed.
 
 ## Interactive local-browser acceptance
 
@@ -88,12 +92,14 @@ ecd7bc8286014d9d487489194f573b0e98a56360c95236ad2670804988359c0e  researchos_ai_
   stated above.
 - No ResearchOS repository push was performed.
 - No GitHub Release was created.
-- Sites version 8 was deployed after the immutable RC.5 candidate tag was
+- Sites versions 8 and 9 were deployed after the immutable RC.5 candidate tag was
   created; the tag was not moved.
 
 ## Remaining gate
 
-The remaining implementation gate is a publicly reachable HTTPS backend origin
-and explicit configuration of `RESEARCHOS_API_ORIGIN` in Sites. Repository tag
-push and GitHub Release publication remain separate decisions and are not
-authorized by this acceptance.
+The HTTPS backend and Sites origin binding gates are complete. The remaining
+interactive production gate is an authenticated reviewer login followed by
+verification that canonical project data, review decisions, graph state, and
+refresh persistence behave as they did in local acceptance. Repository tag push
+and GitHub Release publication remain separate decisions and are not authorized
+by this acceptance.

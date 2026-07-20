@@ -2,13 +2,13 @@
   "schema_version": "1.1",
   "component": "researchos-canonical-target-ui",
   "repository": "sites-managed:researchos-ilmiah",
-  "commit_sha": "8b06689b36f8a7c6df024c8e188d51e595fac216",
+  "commit_sha": "112924bc8e8c6710dadf9f50c0a7ebe30512ee0f",
   "sites_project_id": "appgprj_6a5bf1bdc058819191746bfe731a3d50",
-  "sites_version_number": 8,
+  "sites_version_number": 9,
   "deployment_status": "deployed",
-  "deployed_sites_version_number": 8,
+  "deployed_sites_version_number": 9,
   "deployment_url": "https://researchos-ilmiah.jumadi03.chatgpt.site",
-  "operational_status": "canonical_target_not_cutover",
+  "operational_status": "backend_connected_authentication_required",
   "build_contract": "vinext",
-  "tests_passed": 8
+  "tests_passed": 10
 }
