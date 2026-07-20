@@ -1,5 +1,27 @@
 # ResearchOS Working Agreement
 
+## Hostinger VPS management scope
+
+The authorized operational scope covers the entire Hostinger VPS
+`srv1534304` (`76.13.20.211`), not only the ResearchOS containers. Work may
+inspect, diagnose, maintain, configure, and improve:
+
+- ResearchOS services and data infrastructure;
+- the Ubuntu operating system;
+- Docker, networks, storage, firewall, and reverse proxy;
+- n8n, WAHA, and other services hosted on the VPS; and
+- technical domain, DNS, TLS, monitoring, backup, and recovery configuration
+  associated with the VPS.
+
+This expanded scope does not waive action-time safeguards. Obtain explicit
+approval immediately before deleting production data or volumes, restoring over
+production, rebooting or rebuilding the VPS, changing credentials or access
+permissions, making purchases or renewals, changing ownership, or applying a
+DNS/domain change that can interrupt an existing public service.
+
+Preserve unrelated services and user data while working. Record live evidence
+before and after material production changes.
+
 ## Real-environment acceptance rule
 
 All future ResearchOS work must distinguish clearly between simulation, local,
