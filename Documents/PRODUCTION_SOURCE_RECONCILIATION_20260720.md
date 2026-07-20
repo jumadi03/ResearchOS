@@ -116,3 +116,25 @@ persistence, canonical-object persistence, and rollback preservation:
 Authenticated visual confirmation after sign-in and refresh remains
 **PENDING USER CONFIRMATION**. No new scientific or database mutation is
 required for this source-only reconciliation.
+
+## Source-ledger backup and remote boundary
+
+After the deployment evidence was committed as `1171187`, a complete Git
+bundle was created and verified:
+
+- bundle: `researchos-ledger-1171187.bundle`;
+- SHA-256:
+  `13be9b49dcd618e06c54aa45514c86c1e42aca29dc71239517b077eb659591c0`;
+- size: 1,389,362 bytes;
+- off-machine location:
+  `/opt/researchos/deploy-backups/researchos-ledger-1171187.bundle`;
+- VPS permissions: `0600`, owner `root:root`; and
+- bundle verification: complete history, passed.
+
+Ignored environment files, runtime credentials, and private restore keys were
+not tracked and therefore were not included. The tracked Ed25519 PEM is the
+public restore-trust key.
+
+The former GitHub remote was retained only as historical configuration and
+renamed from `origin` to `legacy-github`. The active local branch no longer has
+an upstream. No commit was pushed to GitHub during this reconciliation.
