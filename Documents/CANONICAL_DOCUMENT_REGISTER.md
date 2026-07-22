@@ -27,6 +27,23 @@
   `Documents/PMC-000_CANONICAL_ADMISSION_RECORD.md`
 - Current verification: `passed`
 
+### PMC-010
+
+- Title: `ResearchOS Engineering Onboarding Guide`
+- Version: `0.2`
+- Status: `Published Canonical Edition`
+- Classification: `Informative Engineering Onboarding Guide`
+- Canonical effect: `stable informative reference; no independent normative authority`
+- Human authority: `Jumadi`
+- Decision date: `2026-07-22`
+- Representation:
+  `Documents/PMC-010_ResearchOS_Engineering_Onboarding_Guide_v0.2_Published_Canonical_Edition.docx`
+- SHA-256:
+  `7bf589c0bd5830a9de7116a4af3034d33bb519c32d5e5d3431c90a8ea13fa7c1`
+- Admission record:
+  `Documents/PMC-010_CANONICAL_ADMISSION_RECORD.md`
+- Current verification: `passed`
+
 ### DOC-000
 
 - Title: `Standar Publikasi Dokumen Kanonik`

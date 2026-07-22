@@ -94,6 +94,7 @@ schema and persistence, and dependency-security gates.
 ## Documentation
 
 - [ResearchOS Project Master Context (PMC-000)](Documents/PMC-000_ResearchOS_Project_Master_Context_v1.0_Published_Canonical_Edition.docx)
+- [ResearchOS Engineering Onboarding Guide (PMC-010)](Documents/PMC-010_ResearchOS_Engineering_Onboarding_Guide_v0.2_Published_Canonical_Edition.docx)
 - [ResearchOS vision](Documents/RESEARCHOS_VISION.md)
 - [Scientific Governance Framework (SGF-000)](Documents/SCIENTIFIC_GOVERNANCE_FRAMEWORK.md)
 - [SGF-020 Human Authority and Decision Matrix](Documents/SGF_020_HUMAN_AUTHORITY_DECISION_MATRIX.md)
