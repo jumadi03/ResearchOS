@@ -35,6 +35,9 @@ class KnowledgeDiscoveryService:
         self.theory_pipeline = KnowledgeTheoryPipeline(
             output_root, self._graphs, data_repository=data_repository,
             object_store=object_store,
+            semantic_relation_resolver=(
+                self.ingestion_pipeline.relation_dependencies_for_graph
+            ),
         )
         self.object_translation_store = ObjectTranslationStore(
             output_root / "object-translations"
@@ -158,6 +161,14 @@ class KnowledgeDiscoveryService:
             change_id, **options
         )
 
+    def resolve_impact_review(self, change_id: str, **options):
+        return self.repository_service.resolve_impact_review(change_id, **options)
+
+    def select_follow_up_target(self, resolution_id: str, **options):
+        return self.repository_service.select_follow_up_target(
+            resolution_id, **options
+        )
+
     def acquire_document(self, run_id: str, candidate: DocumentCandidate):
         return self.ingestion_pipeline.acquire_document(run_id, candidate)
 
@@ -173,13 +184,43 @@ class KnowledgeDiscoveryService:
     def build_knowledge_graph(self, extraction_id: str):
         return self.ingestion_pipeline.build_knowledge_graph(extraction_id)
 
+    def graph_lifecycle(self, graph_id: str):
+        return self.theory_pipeline.graph_lifecycle(graph_id)
+
     def intake_accepted_evidence(
         self, extraction_id: str, *, evidence_object_ids: tuple[str, ...],
-        actor_id: str, occurred_at: str,
+        actor_id: str, occurred_at: str, semantic_relation_ids=(),
     ):
         return self.ingestion_pipeline.intake_accepted_evidence(
             extraction_id, evidence_object_ids=evidence_object_ids,
             actor_id=actor_id, occurred_at=occurred_at,
+            semantic_relation_ids=tuple(semantic_relation_ids),
+        )
+
+    def propose_semantic_relation(self, extraction_id: str, **values):
+        return self.ingestion_pipeline.propose_semantic_relation(
+            extraction_id, **values,
+        )
+
+    def review_semantic_relation(self, relation_id: str, **values):
+        return self.ingestion_pipeline.review_semantic_relation(
+            relation_id, **values,
+        )
+
+    def list_semantic_relations(self, *, extraction_id=None):
+        return self.ingestion_pipeline.list_semantic_relations(
+            extraction_id=extraction_id,
+        )
+
+    def semantic_relation_review_queue(self, extraction_id):
+        return self.ingestion_pipeline.semantic_relation_review_queue(
+            extraction_id,
+        )
+
+    def semantic_reextract(self, extraction_id, *, evidence_object_ids=()):
+        return self.ingestion_pipeline.semantic_reextract(
+            extraction_id,
+            evidence_object_ids=tuple(evidence_object_ids),
         )
 
     def review_evidence(
@@ -195,6 +236,24 @@ class KnowledgeDiscoveryService:
         return self.theory_pipeline.build_theories(
             graph_ids, generated_by=generated_by
         )
+
+    def propose_cross_study_proposition(self, **options):
+        return self.theory_pipeline.propose_cross_study_proposition(**options)
+
+    def review_cross_study_proposition(self, proposition_id, **options):
+        return self.theory_pipeline.review_cross_study_proposition(
+            proposition_id, **options,
+        )
+
+    def build_cross_study_proposition_theory(
+        self, proposition_id, **options,
+    ):
+        return self.theory_pipeline.build_cross_study_proposition_theory(
+            proposition_id, **options,
+        )
+
+    def list_cross_study_propositions(self):
+        return self.theory_pipeline.list_cross_study_propositions()
 
     def review_theory(self, bundle_id, **options):
         return self.theory_pipeline.review_theory(bundle_id, **options)
@@ -282,6 +341,9 @@ class KnowledgeDiscoveryService:
     def validation_history(self, bundle_id):
         return self.theory_pipeline.validation_history(bundle_id)
 
+    def dependency_impact(self, bundle_id):
+        return self.theory_pipeline.dependency_impact(bundle_id)
+
     def publish(self, bundle_id, **options):
         return self.theory_pipeline.publish(bundle_id, **options)
 
@@ -296,6 +358,12 @@ class KnowledgeDiscoveryService:
 
     def publication_package(self, bundle_id, publication_id):
         return self.theory_pipeline.publication_package(bundle_id, publication_id)
+
+    def relate_publication(self, publication_id, **options):
+        return self.theory_pipeline.relate_publication(publication_id, **options)
+
+    def publication_lifecycle(self, publication_id):
+        return self.theory_pipeline.publication_lifecycle(publication_id)
 
     def transition_artifact(
         self, artifact_id: str, *, to_status: str, actor_id: str,
@@ -353,3 +421,152 @@ class KnowledgeDiscoveryService:
             project_id, limit=limit, relationship_types=relationship_types,
             review_status=review_status, min_confidence=min_confidence,
         )
+
+    def list_workflow_cases(self, project_id: str):
+        runs = tuple(
+            run for run in self.ingestion_pipeline.runs.values()
+            if run.discovery_contract.project_id == project_id
+        )
+        return tuple(
+            self._workflow_case(run)
+            for run in sorted(
+                runs, key=lambda item: (item.started_at, item.run_id), reverse=True
+            )
+        )
+
+    def get_workflow_case(self, project_id: str, run_id: str):
+        run = self.ingestion_pipeline.runs.get(run_id)
+        if run is None or run.discovery_contract.project_id != project_id:
+            raise KeyError(f"Unknown project workflow case: {run_id}")
+        return self._workflow_case(run)
+
+    def _workflow_case(self, run: DiscoveryRun):
+        records = self.repository_service.get_discovery_workflow_state(
+            run.discovery_contract.project_id,
+            tuple(item.record_id for item in run.records),
+        )
+        graph_ids = {
+            item["graph_id"] for item in records if item["graph_id"]
+        }
+        bundles = tuple(
+            item for item in self.theory_pipeline.list_theory_bundles()
+            if graph_ids.intersection(
+                self.theory_pipeline.bundles[item["bundle_id"]].graph_ids
+            )
+        )
+        publications = tuple(
+            {
+                "publication_id": package.manifest.publication_id,
+                "bundle_id": bundle["bundle_id"],
+                "kind": package.manifest.kind.value,
+                "generated_at": package.manifest.generated_at,
+                "integrity_verified": package.verify(),
+            }
+            for bundle in bundles
+            for package in self.theory_pipeline.publication_history(
+                bundle["bundle_id"]
+            )
+        )
+        record_count = len(run.records)
+        acquired = sum(bool(item["representation_id"]) for item in records)
+        inspected = sum(bool(item["inspection_id"]) for item in records)
+        eligible = sum(
+            item["screening_status"] == "eligible" for item in records
+        )
+        extracted = sum(bool(item["extraction_id"]) for item in records)
+        evidence_count = sum(item["evidence_count"] for item in records)
+        pending = sum(item["pending_evidence_count"] for item in records)
+        accepted = sum(item["accepted_evidence_count"] for item in records)
+        graph_count = len(graph_ids)
+        theory_count = sum(item["theory_count"] for item in bundles)
+        validated = sum(bool(item["latest_validation"]) for item in bundles)
+
+        def stage(key, label, state, detail, required_role=None):
+            return {
+                "key": key, "label": label, "state": state, "detail": detail,
+                "required_role": required_role,
+            }
+
+        stages = (
+            stage(
+                "discovery", "Discovery", "complete",
+                f"{record_count} record unik; {len(run.failures)} kegagalan provider",
+                "discoverer",
+            ),
+            stage(
+                "acquisition", "Akuisisi",
+                "complete" if acquired else "pending",
+                f"{acquired} dari {record_count} record memiliki representasi",
+                "discoverer",
+            ),
+            stage(
+                "screening", "Inspeksi dan screening",
+                "complete" if eligible else "pending",
+                f"{inspected} diperiksa; {eligible} eligible",
+                "discoverer",
+            ),
+            stage(
+                "extraction", "Ekstraksi evidence",
+                "complete" if extracted else "blocked" if not eligible else "pending",
+                f"{extracted} extraction; {evidence_count} objek provisional",
+                "discoverer",
+            ),
+            stage(
+                "evidence_review", "Human evidence review",
+                (
+                    "complete" if evidence_count and not pending
+                    else "pending" if evidence_count else "blocked"
+                ),
+                f"{accepted} accepted; {pending} pending",
+                "reviewer",
+            ),
+            stage(
+                "knowledge", "Knowledge intake dan graph",
+                "complete" if graph_count else "blocked" if not accepted else "pending",
+                f"{graph_count} graph dari evidence yang diterima",
+                "indexer",
+            ),
+            stage(
+                "theory", "Proposition dan theory",
+                "complete" if theory_count else "blocked" if not graph_count else "pending",
+                f"{theory_count} theory dalam {len(bundles)} bundle",
+                "reviewer",
+            ),
+            stage(
+                "validation", "Validation",
+                "complete" if validated else "blocked" if not theory_count else "pending",
+                f"{validated} bundle memiliki validation aktif",
+                "reviewer",
+            ),
+            stage(
+                "publication", "Publication",
+                "complete" if publications else "blocked" if not validated else "pending",
+                f"{len(publications)} paket publikasi immutable",
+                "publisher",
+            ),
+        )
+        next_stage = next(
+            (item for item in stages if item["state"] != "complete"), None
+        )
+        return {
+            "case_id": run.run_id,
+            "project_id": run.discovery_contract.project_id,
+            "question": {
+                "question_id": run.question.question_id,
+                "text": run.question.text,
+            },
+            "contract": {
+                "contract_id": run.discovery_contract.contract_id,
+                "scope": run.discovery_contract.scope,
+            },
+            "started_at": run.started_at,
+            "record_count": record_count,
+            "provider_failure_count": len(run.failures),
+            "stages": stages,
+            "next_action": next_stage,
+            "records": records,
+            "theory_bundles": bundles,
+            "publications": publications,
+            "authority": "derived_read_model_only",
+            "decision_automation": False,
+        }

@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from app.settings import APP_NAME
@@ -14,6 +13,7 @@ from app.router.knowledge import router as knowledge_router
 from app.router.workspace import router as workspace_router
 from app.router.session import router as session_router
 from app.router.administration import router as administration_router
+from app.router.consequential import router as consequential_router
 from app.architecture.pipeline_service import ArchitecturePipelineService
 from app.architecture.repository import (
     RepositoryDashboardArtifactStore,
@@ -45,6 +45,8 @@ from app.knowledge.repositories.postgres import PostgresScientificDataRepository
 from app.knowledge.repositories.minio import MinioScientificObjectStore
 from app.infrastructure.database import require_schema_version
 from app.infrastructure.readiness import RuntimeReadinessChecker
+from app.product.static_cache import LocalWorkspaceStaticFiles
+from app.knowledge.consequential_controls import ConsequentialResearchControls
 from app.observability import (
     AuditTrail,
     CorrelationMiddleware,
@@ -76,7 +78,9 @@ def create_app() -> FastAPI:
     )
     app.mount(
         "/workspace-assets",
-        StaticFiles(directory=Path(__file__).resolve().parent / "product" / "static"),
+        LocalWorkspaceStaticFiles(
+            directory=Path(__file__).resolve().parent / "product" / "static"
+        ),
         name="workspace-assets",
     )
     app.state.knowledge_authenticator = KnowledgeAuthenticator(KNOWLEDGE_API_PRINCIPALS)
@@ -92,9 +96,11 @@ def create_app() -> FastAPI:
             restore_evidence_clock_skew_seconds=RESTORE_EVIDENCE_CLOCK_SKEW_SECONDS,
         )
         app.state.intelligence_ledger = IntelligenceLedger(DATABASE_URL)
+        app.state.consequential_controls = ConsequentialResearchControls(DATABASE_URL)
     else:
         app.state.workspace_sessions = None
         app.state.intelligence_ledger = None
+        app.state.consequential_controls = None
     app.state.ai_router = ai_router
     provider_options = {
         "timeout": KNOWLEDGE_PROVIDER_TIMEOUT,
@@ -152,6 +158,7 @@ def create_app() -> FastAPI:
     app.include_router(workspace_router)
     app.include_router(session_router)
     app.include_router(administration_router)
+    app.include_router(consequential_router)
     app.include_router(operations_router)
     return app
 

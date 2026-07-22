@@ -59,7 +59,7 @@ py -3.13 Scripts\bootstrap_local.py
 ```
 
 The bootstrap command generates unique credentials, starts the canonical stack,
-creates five role-separated accounts, verifies login and MinIO access, and
+creates six role-separated accounts, verifies login and MinIO access, and
 stores the credentials only in ignored local files. It can be run again safely:
 existing complete credentials are reused rather than silently rotated.
 
@@ -93,8 +93,13 @@ schema and persistence, and dependency-security gates.
 
 ## Documentation
 
+- [ResearchOS Project Master Context (PMC-000)](Documents/PMC-000_ResearchOS_Project_Master_Context_v1.0_Published_Canonical_Edition.docx)
+- [ResearchOS Engineering Onboarding Guide (PMC-010)](Documents/PMC-010_ResearchOS_Engineering_Onboarding_Guide_v0.2_Published_Canonical_Edition.docx)
 - [ResearchOS vision](Documents/RESEARCHOS_VISION.md)
 - [Scientific Governance Framework (SGF-000)](Documents/SCIENTIFIC_GOVERNANCE_FRAMEWORK.md)
+- [SGF-020 Human Authority and Decision Matrix](Documents/SGF_020_HUMAN_AUTHORITY_DECISION_MATRIX.md)
+- [SGF-030 Canonical Scientific Ontology](Documents/SGF_030_CANONICAL_SCIENTIFIC_ONTOLOGY.md)
+- [SGF-040 Research Object Lifecycle Standard](Documents/SGF_040_RESEARCH_OBJECT_LIFECYCLE_STANDARD.md)
 - [Autonomous intelligence roadmap](Documents/AUTONOMOUS_INTELLIGENCE_ROADMAP.md)
 - [Scientific interface vision](Documents/SCIENTIFIC_INTERFACE_VISION.md)
 - [Responsible evolution vision](Documents/RESPONSIBLE_EVOLUTION_VISION.md)
@@ -106,6 +111,9 @@ schema and persistence, and dependency-security gates.
 - [Multi-source scientific workflow pilot](Documents/MULTI_SOURCE_PILOT.md)
 - [Theory validation and risk-of-bias guide](Documents/VALIDATION_GUIDE.md)
 - [Catatan Awal Teori Ruang Orientasi — Model 6S](Documents/CATATAN_AWAL_TEORI_RUANG_ORIENTASI_MODEL_6S.md)
+- [Paket kueri discovery Abstraksi–Detail](Documents/ABSTRACTION_DETAIL_DISCOVERY_QUERY_PACK.md)
+- [Laporan run discovery Abstraksi–Detail](Documents/ABSTRACTION_DETAIL_DISCOVERY_RUN_REPORT.md)
+- [Screening sumber Abstraksi–Detail 01](Documents/ABSTRACTION_DETAIL_SOURCE_SCREENING_01.md)
 - [ResearchOS v0.4.0 launch announcement](Documents/LAUNCH_ANNOUNCEMENT.md)
 - [Local deployment and operations](Documents/LOCAL_STACK.md)
 - [Scientific data storage architecture](Documents/SCIENTIFIC_DATA_STORAGE.md)

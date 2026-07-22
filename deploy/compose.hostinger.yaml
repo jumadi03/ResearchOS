@@ -1,0 +1,270 @@
+name: researchos
+
+services:
+  traefik:
+    image: traefik@sha256:279606d45ac2a96f6b3f2e2f978b5534afeb9b5aeda478a728dede7e8d55ac37
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.mytlschallenge.acme.tlschallenge=true
+      - --certificatesresolvers.mytlschallenge.acme.email=user@srv1534304.hstgr.cloud
+      - --certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik
+
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-researchos}
+      POSTGRES_USER: ${POSTGRES_USER:-researchos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-researchos} -d ${POSTGRES_DB:-researchos}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: postgres:17-bookworm
+    restart: "no"
+    env_file: ["stack.hostinger.env"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-researchos}
+      PGUSER: ${POSTGRES_USER:-researchos}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./migrate/migrate.sh:/usr/local/bin/migrate.sh:ro
+      - ./postgres/init:/migrations:ro
+    command: ["bash", "/usr/local/bin/migrate.sh"]
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  minio:
+    image: minio/minio:RELEASE.2025-06-13T11-33-47Z
+    command: server /data --console-address :9001
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-researchos}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-05-21T01-59-54Z
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set researchos http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" --api S3v4 &&
+        mc mb --ignore-existing researchos/researchos-documents &&
+        mc mb --ignore-existing researchos/researchos-backups
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-researchos}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    depends_on:
+      minio: {condition: service_healthy}
+
+  api:
+    build: {context: ../AI-Gateway}
+    restart: unless-stopped
+    env_file: ["stack.hostinger.env"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-researchos}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOCUMENT_BUCKET: researchos-documents
+      KNOWLEDGE_OUTPUT_ROOT: /data/knowledge
+      REPOSITORY_DASHBOARD_ROOT: /data/architecture/repository-dashboard
+      REPOSITORY_DASHBOARD_EXPECTED_REVISION: ${REPOSITORY_DASHBOARD_EXPECTED_REVISION:-}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
+      MODEL_NAME: ${MODEL_NAME:-qwen3:8b}
+      RESTORE_TRUST_ROOT: /restore-trust
+      OPERATIONS_STATE_PATH: /operations-state/health.json
+      BACKUP_STATUS_ROOT: /backups
+      DEPLOYED_COMMIT_PATH: /runtime/DEPLOYED_COMMIT
+    volumes:
+      - knowledge_data:/data/knowledge
+      - architecture_data:/data/architecture
+      - ./restore/trust:/restore-trust:ro
+      - operations_state:/operations-state:ro
+      - backup_data:/backups:ro
+      - /opt/researchos/DEPLOYED_COMMIT:/runtime/DEPLOYED_COMMIT:ro
+    expose: ["8000"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      minio-init: {condition: service_completed_successfully}
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.researchos-api.entrypoints: web,websecure
+      traefik.http.routers.researchos-api.rule: Host(`${RESEARCHOS_API_HOSTNAME}`) || Host(`${RESEARCHOS_API_HOSTNAME_ALIAS}`)
+      traefik.http.routers.researchos-api.tls: "true"
+      traefik.http.routers.researchos-api.tls.certresolver: mytlschallenge
+      traefik.http.routers.researchos-api.middlewares: researchos-security@docker
+      traefik.http.middlewares.researchos-security.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.researchos-security.headers.forceSTSHeader: "true"
+      traefik.http.middlewares.researchos-security.headers.stsIncludeSubdomains: "true"
+      traefik.http.middlewares.researchos-security.headers.stsPreload: "true"
+      traefik.http.middlewares.researchos-security.headers.stsSeconds: "31536000"
+      traefik.http.services.researchos-api.loadbalancer.server.port: "8000"
+    networks:
+      - default
+      - traefik
+
+  ui:
+    image: researchos-ui:${RESEARCHOS_UI_REVISION}
+    restart: unless-stopped
+    environment:
+      RESEARCHOS_API_ORIGIN: http://api:8000
+      RESEARCHOS_ALLOW_INTERNAL_HTTP: "true"
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.researchos-ui.entrypoints: web,websecure
+      traefik.http.routers.researchos-ui.rule: Host(`${RESEARCHOS_UI_HOSTNAME}`) || Host(`${RESEARCHOS_UI_HOSTNAME_ALIAS}`)
+      traefik.http.routers.researchos-ui.tls: "true"
+      traefik.http.routers.researchos-ui.tls.certresolver: mytlschallenge
+      traefik.http.routers.researchos-ui.middlewares: researchos-security@docker
+      traefik.http.services.researchos-ui.loadbalancer.server.port: "3000"
+    networks:
+      - default
+      - traefik
+
+  worker:
+    build: {context: ../AI-Gateway}
+    command: ["python", "-m", "app.workers.main"]
+    restart: unless-stopped
+    env_file: ["stack.hostinger.env"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-researchos}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOCUMENT_BUCKET: researchos-documents
+      KNOWLEDGE_OUTPUT_ROOT: /data/knowledge
+      JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-3}
+      JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-660}
+      JOB_RETRY_BASE_SECONDS: ${JOB_RETRY_BASE_SECONDS:-5}
+      JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-600}
+      WORKER_METRICS_PORT: 9102
+    volumes:
+      - knowledge_data:/data/knowledge
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      minio-init: {condition: service_completed_successfully}
+
+  backup:
+    build: {context: ./backup}
+    restart: unless-stopped
+    env_file: ["stack.hostinger.env"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-researchos}
+      PGUSER: ${POSTGRES_USER:-researchos}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-researchos}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOCUMENT_BUCKET: researchos-documents
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - backup_data:/backups
+      - knowledge_data:/source/knowledge:ro
+      - architecture_data:/source/architecture:ro
+      - ./compose.hostinger.yaml:/source/configuration/compose.yaml:ro
+      - ./stack.hostinger.env.example:/source/configuration/stack.env.example:ro
+      - ./backup/recovery-coverage-v1.json:/source/configuration/recovery-coverage-v1.json:ro
+      - ./migrate/migrate.sh:/source/migration/migrate.sh:ro
+      - ./postgres/init:/source/migration/sql:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      minio-init: {condition: service_completed_successfully}
+
+  monitor:
+    build: {context: ../AI-Gateway}
+    command: ["python", "/opt/researchos-monitor/hostinger_healthcheck.py"]
+    restart: unless-stopped
+    env_file: ["stack.hostinger.env"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-researchos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-researchos}
+      RESEARCHOS_INTERNAL_HEALTH_URL: http://api:8000/health
+      MINIO_INTERNAL_HEALTH_URL: http://minio:9000/minio/health/live
+      EXPECTED_SCHEMA_VERSION: "42"
+      HEALTHCHECK_INTERVAL_SECONDS: ${HEALTHCHECK_INTERVAL_SECONDS:-60}
+      HEALTHCHECK_STATE_PATH: /state/health.json
+    volumes:
+      - ./monitor/hostinger_healthcheck.py:/opt/researchos-monitor/hostinger_healthcheck.py:ro
+      - operations_state:/state
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - /opt/researchos-monitor/hostinger_healthcheck.py
+        - --verify-state
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      api: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      minio: {condition: service_healthy}
+
+volumes:
+  traefik_data:
+    external: true
+    name: traefik_data
+  postgres_data:
+  minio_data:
+  backup_data:
+  knowledge_data:
+  architecture_data:
+  operations_state:
+
+networks:
+  traefik:
+    external: true
+    name: n8n_default

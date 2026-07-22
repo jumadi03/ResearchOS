@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 deploy/stack.env
+deploy/stack.hostinger.env
 deploy/local-access.env
 deploy/monitoring/prometheus.token
 deploy/restore/private/
@@ -21,6 +22,7 @@ ENV/
 
 # Test, coverage, and type-checking caches
 .pytest_cache/
+/.pytest-tmp-*/
 .coverage
 .coverage.*
 htmlcov/
@@ -32,6 +34,7 @@ htmlcov/
 # Packaging and build artifacts
 build/
 dist/
+.pnpm-store/
 *.egg-info/
 .eggs/
 
@@ -41,12 +44,19 @@ dist/
 *.tmp
 *.temp
 AI-Gateway/tmp/
+/Backups/Hostinger/
+/Backups/Inactive-Recovered/
+/.deployment/
+/NUL;
 
 # IDE and editor settings
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# Canonical UI is maintained in its own connected Sites repository
+/site/
 
 # Operating system metadata
 .DS_Store

@@ -178,6 +178,38 @@ def test_snapshot_is_byte_stable_and_content_addressed(tmp_path: Path) -> None:
     assert tuple(item.name for item in first.source_definitions) == ("openalex",)
 
 
+def test_discovery_snapshot_reopens_after_runtime_restart(tmp_path: Path) -> None:
+    provider = StubProvider("openalex", ({"id": "W1", "title": "Persistent"},))
+    run = LiteratureDiscoveryEngine(
+        (provider,), clock=lambda: "2026-01-01T00:00:00Z",
+        run_id_factory=lambda: "run-restart",
+    ).discover(question(), contract(), planned("openalex"))
+    store = DiscoverySnapshotStore(tmp_path)
+    store.save(run)
+
+    reopened = store.load_all()
+
+    assert reopened == (run,)
+    assert serialize_run(reopened[0]) == serialize_run(run)
+
+
+def test_pre_contract_snapshot_is_preserved_but_not_reopened(
+    tmp_path: Path,
+) -> None:
+    legacy_root = tmp_path / "legacy-run"
+    legacy_root.mkdir()
+    payload = b'{"run_id":"legacy-run","schema_version":"0.1"}'
+    path = legacy_root / (
+        "discovery-" + __import__("hashlib").sha256(payload).hexdigest() + ".json"
+    )
+    path.write_bytes(payload)
+    store = DiscoverySnapshotStore(tmp_path)
+
+    assert store.load_all() == ()
+    assert store.unsupported_snapshot_count == 1
+    assert path.read_bytes() == payload
+
+
 class FakeResponse:
     def __init__(self, payload, url="https://example.test", status_code=200, headers=None):
         self.payload = payload
@@ -214,6 +246,35 @@ def test_openalex_follows_cursor_and_respects_total_limit() -> None:
 
     assert [page.records[0]["id"] for page in pages] == ["1", "2"]
     assert calls[1]["cursor"] == "next"
+
+
+def test_openalex_resolves_exact_doi_without_ranked_search() -> None:
+    calls = []
+
+    def transport(url, **kwargs):
+        calls.append((url, kwargs["params"]))
+        return FakeResponse(
+            {
+                "id": "https://openalex.org/W4316363711",
+                "doi": "https://doi.org/10.3389/fdata.2022.971974",
+                "title": "Exact",
+            },
+            url=url,
+        )
+
+    pages = OpenAlexProvider(transport=transport).search(
+        SearchPlan(
+            "p", "https://doi.org/10.3389/fdata.2022.971974", ("openalex",),
+            limit_per_provider=10, year_from=2022, year_to=2023,
+        )
+    )
+
+    assert pages[0].records[0]["id"] == "https://openalex.org/W4316363711"
+    assert calls == [(
+        "https://api.openalex.org/works/https://doi.org/"
+        "10.3389/fdata.2022.971974",
+        {},
+    )]
 
 
 def test_crossref_resolves_exact_doi_without_ranked_search() -> None:

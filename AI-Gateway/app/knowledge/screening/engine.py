@@ -39,10 +39,14 @@ class ScientificScreeningEngine:
                 if all(item.code.startswith("REVIEW_") for item in failed)
                 else ScreeningStatus.INELIGIBLE
             )
+        reason_identity = "|".join(
+            f"{item.dimension.value}:{item.code}:{item.passed}:{item.explanation}"
+            for item in reasons
+        )
         identity = (
             f"{document.document_id}:{document.content_hash}:"
             f"{inspection.manifest_hash}:{contract.contract_id}:"
-            f"{self.screener_version}"
+            f"{self.screener_version}:{reason_identity}"
         )
         return ScreeningDecision(
             f"screening-{sha256(identity.encode()).hexdigest()[:24]}",
@@ -69,6 +73,14 @@ class ScientificScreeningEngine:
 
     @staticmethod
     def _scope(record, contract):
+        def canonical_type(value: str) -> str:
+            normalized = value.casefold().replace("-", "_").replace(" ", "_")
+            return (
+                "journal_article"
+                if normalized in {"article", "journalarticle", "journal_article"}
+                else normalized
+            )
+
         year_ok = (
             record.year is None
             or (contract.year_from is None or record.year >= contract.year_from)
@@ -76,8 +88,8 @@ class ScientificScreeningEngine:
         )
         type_ok = (
             record.work_type is None
-            or record.work_type.casefold()
-            in {item.casefold() for item in contract.document_types}
+            or canonical_type(record.work_type)
+            in {canonical_type(item) for item in contract.document_types}
         )
         passed = year_ok and type_ok
         return ScreeningReason(
@@ -109,4 +121,3 @@ class ScientificScreeningEngine:
             "Minimum traceable metadata and inspection quality are present" if passed
             else "Metadata quality requires explicit human assessment",
         )
-

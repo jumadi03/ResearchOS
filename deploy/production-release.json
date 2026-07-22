@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "environment": "production",
+  "deployed_at": "2026-07-20T21:36:20+08:00",
+  "backend": {
+    "repository": "ResearchOS",
+    "commit": "7879ec2259eb3f92f323008337050bd788ceede8",
+    "api_image_digest": "sha256:88b34c01b5a1a53b122bc7676302c0b1d4662640a33892fae4e8497c9431df63",
+    "worker_image_digest": "sha256:1967894c777b4ce5ab159aef71fde5ca7a7d671facefda9346a912593eee767c",
+    "monitor_image_digest": "sha256:d51a040e7a79a9b0466a53bd17359e1f3a2313aeb480c73cff1437cc9c0aafa4"
+  },
+  "ui": {
+    "repository": "ResearchOS canonical UI",
+    "commit": "1d747220ddf5b30bc4cb3506adcb7f71aacdbf19",
+    "image": "researchos-ui:1d747220ddf5b30bc4cb3506adcb7f71aacdbf19",
+    "image_digest": "sha256:6e1320426f02a21b8df428884217cbd7ec1255f2978e73cb9f1240f5bdb842a3"
+  },
+  "database": {
+    "engine": "PostgreSQL",
+    "name": "researchos",
+    "schema_version": 42
+  },
+  "acceptance_evidence": [
+    "Documents/HOSTINGER_SELF_HOSTED_UI_ACCEPTANCE_20260720.md",
+    "Documents/TIERED_STORAGE_ACCEPTANCE_20260720.md",
+    "Documents/OPERATIONAL_STATUS_ACCEPTANCE_20260720.md",
+    "Documents/LOCAL_PRODUCTION_SYNC_ACCEPTANCE_20260720.md",
+    "Documents/PRODUCTION_SOURCE_RECONCILIATION_20260720.md"
+  ],
+  "acceptance_state": "accepted",
+  "authenticated_visual_confirmation": "passed_after_refresh",
+  "production_mutation_verified": true
+}

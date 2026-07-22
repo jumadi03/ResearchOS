@@ -100,6 +100,23 @@ def test_tree_manifest_detects_tampered_restored_content(tmp_path):
         restore._verify_tree(root)
 
 
+def test_migration_checksum_is_stable_across_windows_and_linux_line_endings(
+    tmp_path,
+):
+    windows = tmp_path / "001_windows.sql"
+    linux = tmp_path / "001_linux.sql"
+    windows.write_bytes(b"SELECT 1;\r\nSELECT 2;\r\n")
+    linux.write_bytes(b"SELECT 1;\nSELECT 2;\n")
+
+    windows_hashes = restore._migration_checksum_candidates(windows)
+    linux_hashes = restore._migration_checksum_candidates(linux)
+
+    assert restore._sha256_file(windows) != restore._sha256_file(linux)
+    assert restore._sha256_file(windows) in windows_hashes
+    assert restore._sha256_file(linux) in windows_hashes
+    assert linux_hashes == {restore._sha256_file(linux)}
+
+
 def test_cleanup_uses_only_fixed_executor_owned_targets():
     commands: list[list[str]] = []
 

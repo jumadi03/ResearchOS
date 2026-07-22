@@ -18,7 +18,9 @@ from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
 from app.knowledge.repositories.semantic import SemanticIndexJob, SemanticSearchHit
 from app.knowledge.repositories.read_models import ObjectPage, ObjectSummary, ProjectSummary
 from app.knowledge.monitoring.models import (
-    ScientificSourceWatch, SourceWatchStatus, SourceWatchTransition,
+    FollowUpCaseTarget, ImpactReviewDecision, ImpactReviewResolution,
+    ScientificSourceWatch,
+    SourceWatchStatus, SourceWatchTransition,
 )
 from app.router.knowledge import router
 from app.router.workspace import router as workspace_router
@@ -66,12 +68,15 @@ class RecordingRepository:
         self.artifacts = []
         self.artifact_transitions = []
         self.publication_representations = []
+        self.publication_relationships = []
         self.semantic_jobs = []
         self.object_title = "Governance matters"
         self.admission_states = {}
         self.source_watches = []
         self.watch_transitions = []
         self.change_acknowledgements = []
+        self.impact_resolutions = []
+        self.follow_up_targets = []
 
     def persist_discovery(self, run): self.discovery_runs.append(run)
     def persist_metadata(self, run): self.metadata_runs.append(run)
@@ -123,6 +128,26 @@ class RecordingRepository:
             raise KeyError(f"Unknown scientific change: {change_id}")
         self.change_acknowledgements.append((change_id, values))
         return "ack-1"
+    def resolve_impact_review(self, change_id, **values):
+        if change_id != "change-retracted":
+            raise KeyError(f"Unknown scientific change: {change_id}")
+        item = ImpactReviewResolution(
+            "impact-resolution-1", change_id,
+            ImpactReviewDecision(values["decision"]), values["reviewer_id"],
+            values["rationale"], values["occurred_at"], "provenance-1",
+        )
+        self.impact_resolutions.append(item)
+        return item
+    def select_follow_up_target(self, resolution_id, **values):
+        if resolution_id != "impact-resolution-1":
+            raise KeyError(f"Unknown impact resolution: {resolution_id}")
+        item = FollowUpCaseTarget(
+            "selection-1", resolution_id, values["target_kind"],
+            values["target_object_id"], values["selector_id"],
+            values["rationale"], values["occurred_at"], "provenance-2",
+        )
+        self.follow_up_targets.append(item)
+        return item
     def persist_representation(self, record, result, storage_uri):
         self.representations.append((record, result, storage_uri))
         return "representation-1", 1
@@ -145,15 +170,18 @@ class RecordingRepository:
         return "screening-row-1"
     def validate_screening_decision(self, decision):
         assert any(item[1] == decision for item in self.screening_decisions)
-    def persist_evidence(self, record, manifest):
+    def persist_evidence(self, record, manifest, **values):
         assert manifest.verify()
         self.evidence_manifests.append((record, manifest))
         return tuple(f"evidence-{index}" for index, _ in enumerate(manifest.objects, 1))
     def load_extraction_manifest(self, extraction_id):
-        return next(
-            manifest for _, manifest in self.evidence_manifests
-            if manifest.extraction_id == extraction_id
-        )
+        try:
+            return next(
+                manifest for _, manifest in self.evidence_manifests
+                if manifest.extraction_id == extraction_id
+            )
+        except StopIteration as exc:
+            raise KeyError(extraction_id) from exc
     def review_evidence(self, evidence_object_id, **values):
         self.evidence_reviews.append((evidence_object_id, values))
         assessment = values["assessment"]
@@ -220,6 +248,10 @@ class RecordingRepository:
         )
     def persist_publication_representation(self, publication_id, **values):
         self.publication_representations.append((publication_id, values))
+
+    def record_publication_relationship(self, relationship):
+        self.publication_relationships.append(relationship)
+        return relationship
         return StoredRepresentation(
             "publication-representation", "publication-object", values["representation_type"],
             values["storage_uri"], values["media_type"], values["checksum_sha256"],
@@ -259,7 +291,71 @@ class RecordingRepository:
             "project_id": project_id,
             "pending_reviews": [{"object_id": "object-1", "title": "Governance matters"}],
             "pending_transitions": [], "index_jobs": [],
-            "counts": {"pending_reviews": 1, "pending_transitions": 0, "index_jobs": 0, "failed_jobs": 0},
+            "impact_reviews": [{
+                "task_id": "impact-review:change-retracted",
+                "change_id": "change-retracted", "signal": "retracted",
+                "status": "pending_human_review",
+            }],
+            "follow_up_cases": [{
+                "case_id": "follow-up:impact-resolution-1",
+                "source_resolution_id": "impact-resolution-1",
+                "change_id": "change-retracted",
+                "case_type": "evidence_review",
+                "required_role": "reviewer", "status": "target_selected",
+                "decision_automation": False,
+                "blocked_reason": "Canonical impacted object selection required.",
+                "target_selection": {
+                    "selection_id": "selection-1", "target_kind": "evidence",
+                    "target_object_id": "canonical-evidence-1",
+                    "target_stable_key": "evidence:object-1",
+                    "selector_id": "reviewer@example",
+                    "reviewed_statement_hash": "a" * 64,
+                    "extraction_manifest_hash": "b" * 64,
+                },
+            }, {
+                "case_id": "follow-up:impact-resolution-2",
+                "source_resolution_id": "impact-resolution-2",
+                "change_id": "change-retracted-2",
+                "case_type": "publication_review",
+                "required_role": "publisher", "status": "target_selected",
+                "decision_automation": False,
+                "blocked_reason": "Canonical impacted object selection required.",
+                "target_selection": {
+                    "selection_id": "selection-2", "target_kind": "publication",
+                    "target_object_id": "canonical-publication-1",
+                    "target_stable_key": "artifact:publication-1",
+                    "selector_id": "publisher@example",
+                },
+            }],
+            "completed_follow_up_cases": [{
+                "case_id": "follow-up:impact-resolution-closed",
+                "source_resolution_id": "impact-resolution-closed",
+                "change_id": "change-retracted-closed",
+                "case_type": "publication_review",
+                "required_role": "publisher", "status": "closed",
+                "target_selection": {
+                    "selection_id": "selection-closed",
+                    "target_kind": "publication",
+                    "target_object_id": "canonical-publication-closed",
+                    "target_stable_key": "artifact:publication-closed",
+                },
+                "action_completion": {
+                    "action_id": "relationship-closed",
+                    "audit_workflow": "publication_relationship",
+                    "outcome": "retracts",
+                    "completed_at": "2026-07-18T00:00:00Z",
+                },
+                "workflow_timeline": [
+                    {"stage": "impact_resolved"},
+                    {"stage": "target_selected"},
+                    {"stage": "action_completed"},
+                    {"stage": "case_closed"},
+                ],
+            }],
+            "counts": {"pending_reviews": 1, "pending_transitions": 0,
+                       "index_jobs": 0, "failed_jobs": 0, "impact_reviews": 1,
+                       "follow_up_cases": 2,
+                       "completed_follow_up_cases": 1},
         }
     def get_project_graph(self, project_id, **values):
         return {
@@ -330,6 +426,9 @@ def client(
     pdf = canvas.Canvas(output)
     pdf.drawString(40, 800, "Results")
     pdf.drawString(40, 780, "We find that governance matters.")
+    pdf.drawString(
+        40, 765, "The final sample comprised 425 researchers (n = 425)."
+    )
     pdf.drawString(40, 750, "Conclusion")
     pdf.drawString(40, 730, "Governance improves village performance.")
     pdf.save()
@@ -349,6 +448,7 @@ def client(
         "audit": {"actor_id": "auditor@example", "roles": ["auditor"]},
         "review": {"actor_id": "reviewer@example", "roles": ["reviewer"]},
         "index": {"actor_id": "indexer@example", "roles": ["indexer"]},
+        "publish": {"actor_id": "publisher@example", "roles": ["publisher"]},
     })
     app.state.workspace_sessions = FakeSessionManager()
     app.include_router(router)
@@ -356,6 +456,32 @@ def client(
     app.include_router(session_router)
     headers = {"Authorization": f"Bearer {token}"} if token else None
     return TestClient(app, headers=headers)
+
+
+def test_operational_status_returns_status_payload(tmp_path, monkeypatch):
+    expected = {
+        "status": "passed",
+        "checked_at": "2026-07-20T08:00:00Z",
+        "monitor": {"status": "passed", "checked_at": None, "checks": []},
+        "backup": {"status": "passed", "stamp": "20260720T075150Z"},
+        "disk": {
+            "used_percent": 8,
+            "available_bytes": 92_000_000_000,
+            "threshold_percent": 80,
+        },
+        "deployment": {"revision": "test-revision"},
+    }
+    monkeypatch.setattr(
+        "app.router.knowledge.build_operational_status",
+        lambda **_kwargs: expected,
+    )
+
+    response = client(tmp_path, token="audit").get(
+        "/knowledge/operations/status"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == expected
 
 
 def payload():
@@ -650,6 +776,46 @@ def test_continuous_monitoring_api_is_readable_and_lifecycle_governed(
     assert repository.change_acknowledgements[0][1]["actor_id"] == (
         "reviewer@example"
     )
+    impact = client(
+        tmp_path, "review", repository=repository,
+    ).post(
+        "/knowledge/impact-reviews/change-retracted/resolutions",
+        json={
+            "decision": "evidence_review_required",
+            "rationale": "Retraction may invalidate admitted evidence.",
+            "occurred_at": "2026-07-17T00:45:00Z",
+        },
+    )
+    assert impact.status_code == 201
+    assert impact.json()["decision"] == "evidence_review_required"
+    assert impact.json()["follow_up_case"]["case_id"] == (
+        "follow-up:impact-resolution-1"
+    )
+    assert impact.json()["follow_up_case"]["decision_automation"] is False
+    assert repository.impact_resolutions[0].reviewer_id == "reviewer@example"
+    target = client(
+        tmp_path, "review", repository=repository,
+    ).post(
+        "/knowledge/evidence-follow-up-cases/impact-resolution-1/targets",
+        json={
+            "target_object_id": "object-1",
+            "rationale": "Canonical evidence identity verified manually.",
+            "occurred_at": "2026-07-17T00:50:00Z",
+        },
+    )
+    assert target.status_code == 201
+    assert target.json()["target_kind"] == "evidence"
+    assert repository.follow_up_targets[0].selector_id == "reviewer@example"
+    assert client(
+        tmp_path, "review", repository=repository,
+    ).post(
+        "/knowledge/publication-follow-up-cases/impact-resolution-1/targets",
+        json={
+            "target_object_id": "publication-1",
+            "rationale": "Attempt with wrong role must fail.",
+            "occurred_at": "2026-07-17T00:51:00Z",
+        },
+    ).status_code == 403
 
 
 def test_monitoring_transition_and_acknowledgement_fail_closed(
@@ -776,6 +942,16 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
     assert graph.status_code == 201
     assert repository.graphs[0][0].graph_id == graph.json()["graph_id"]
     assert repository.graphs[0][1] == repository.evidence_manifests[0][1].created_at
+    lifecycle = api.get(
+        f"/knowledge/graphs/{graph.json()['graph_id']}/lifecycle",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert lifecycle.status_code == 200
+    assert lifecycle.json()["state"] == "current"
+    assert lifecycle.json()["current"] is True
+    assert lifecycle.json()[
+        "verification"
+    ] == "canonical_evidence_and_semantic_relation_ledgers"
     theories = api.post("/knowledge/theories", json={"graph_ids": [graph.json()["graph_id"]]})
     assert theories.status_code == 201
     gaps = api.post(f"/knowledge/theories/{theories.json()['bundle_id']}/gaps")
@@ -801,13 +977,21 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
         headers={"Authorization": "Bearer review"},
     )
     assert validation.status_code == 201
-    publication = api.post(
-        f"/knowledge/theories/{theories.json()['bundle_id']}/publications",
-        json={
-            "validation_report_id": validation.json()["report_id"],
-            "kind": "literature_review", "generated_at": "2026-07-16T00:05:00Z",
-        },
+    publication_path = (
+        f"/knowledge/theories/{theories.json()['bundle_id']}/publications"
+    )
+    publication_request = {
+        "validation_report_id": validation.json()["report_id"],
+        "kind": "literature_review", "generated_at": "2026-07-16T00:05:00Z",
+    }
+    assert api.post(
+        publication_path, json=publication_request,
         headers={"Authorization": "Bearer review"},
+    ).status_code == 403
+    publication = api.post(
+        publication_path,
+        json=publication_request,
+        headers={"Authorization": "Bearer publish"},
     )
     assert publication.status_code == 201
     assert [item["artifact_type"] for item in repository.artifacts] == [
@@ -817,13 +1001,30 @@ def test_extraction_reads_verified_object_representation(tmp_path: Path) -> None
         "draft", "draft", "validated", "published",
     ]
     assert [item["actor_id"] for item in repository.artifacts] == [
-        "researcher@example", "researcher@example", "reviewer@example", "reviewer@example",
+        "researcher@example", "researcher@example", "reviewer@example", "publisher@example",
     ]
     assert len(object_store.byte_objects) == 1
     publication_id, representation = repository.publication_representations[0]
     assert publication_id == publication.json()["publication_id"]
     assert representation["representation_type"] == "markdown"
     assert representation["edition_type"] == "canonical"
+    retraction = api.post(
+        f"/knowledge/publications/{publication.json()['publication_id']}/relationships",
+        json={
+            "relation_type": "retracts", "target_publication_id": None,
+            "rationale": "Material validity failure confirmed after release.",
+            "occurred_at": "2026-07-17T00:00:00Z",
+        }, headers={"Authorization": "Bearer publish"},
+    )
+    assert retraction.status_code == 201
+    lifecycle = api.get(
+        f"/knowledge/publications/{publication.json()['publication_id']}/lifecycle",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert lifecycle.status_code == 200
+    assert lifecycle.json()["state"] == "retracted"
+    assert lifecycle.json()["current"] is False
+    assert repository.publication_relationships[0].verify()
 
 
 def test_knowledge_intake_requires_indexer_and_registers_canonical_evidence(
@@ -851,8 +1052,71 @@ def test_knowledge_intake_requires_indexer_and_registers_canonical_evidence(
     extraction = api.post(
         f"/knowledge/documents/{acquired['document_id']}/extractions"
     ).json()
+    result_id = next(
+        item["object_id"] for item in extraction["objects"]
+        if item["object_type"] == "result"
+    )
+    conclusion_id = next(
+        item["object_id"] for item in extraction["objects"]
+        if item["object_type"] == "conclusion"
+    )
+    reextracted = api.post(
+        f"/knowledge/extractions/{extraction['extraction_id']}/"
+        "semantic-reextractions",
+        json={"evidence_object_ids": [result_id]},
+    )
+    assert reextracted.status_code == 201
+    assert reextracted.json()["integrity_verified"] is True
+    assert {
+        item["object_type"] for item in reextracted.json()["objects"]
+    } >= {"population", "measurement"}
+    assert all(
+        item["review_state"] == "provisional"
+        for item in reextracted.json()["objects"]
+    )
+    proposed = api.post(
+        f"/knowledge/extractions/{extraction['extraction_id']}/semantic-relations",
+        json={
+            "source_object_id": conclusion_id,
+            "target_object_id": result_id,
+            "edge_type": "infers_from",
+            "provenance_object_id": conclusion_id,
+            "rationale": "The conclusion is explicitly drawn from the result.",
+            "proposed_at": "2026-07-17T00:01:00Z",
+        },
+    )
+    assert proposed.status_code == 201
+    relation_id = proposed.json()["relation_id"]
+    assert proposed.json()["state"] == "proposed"
+    queue = api.get(
+        f"/knowledge/extractions/{extraction['extraction_id']}/"
+        "semantic-relation-review-queue",
+        headers={"Authorization": "Bearer review"},
+    )
+    assert queue.status_code == 200
+    assert queue.json()["counts"]["proposed"] == 1
+    assert queue.json()["proposals"][0]["relation"]["relation_id"] == relation_id
+    assert queue.json()["proposals"][0]["source"]["object_id"] == conclusion_id
+    assert queue.json()["proposals"][0]["target"]["object_id"] == result_id
+    assert queue.json()["review_context"][0]["review_event"]["provenance_id"]
+    assert queue.json()["review_context"][0]["review_event"]["assessment_hash"]
+    reviewed = api.post(
+        f"/knowledge/semantic-relations/{relation_id}/reviews",
+        json={
+            "decision": "accepted",
+            "rationale": "The source passage and relation direction were checked.",
+            "occurred_at": "2026-07-17T00:01:30Z",
+        },
+        headers={"Authorization": "Bearer review"},
+    )
+    assert reviewed.status_code == 200
+    assert reviewed.json()["state"] == "accepted"
     endpoint = f"/knowledge/extractions/{extraction['extraction_id']}/intake"
-    request = {"evidence_object_ids": [], "occurred_at": "2026-07-17T00:02:00Z"}
+    request = {
+        "evidence_object_ids": [],
+        "semantic_relation_ids": [relation_id],
+        "occurred_at": "2026-07-17T00:02:00Z",
+    }
     assert api.post(endpoint, json=request).status_code == 403
 
     response = api.post(
@@ -862,8 +1126,14 @@ def test_knowledge_intake_requires_indexer_and_registers_canonical_evidence(
     body = response.json()
     assert body["integrity_verified"] is True
     assert body["intake"]["actor_id"] == "indexer@example"
+    assert body["intake"]["semantic_relation_ids"] == [relation_id]
     assert body["intake"]["admitted_evidence_object_ids"]
     assert all(item["admitted"] for item in body["intake"]["decisions"])
+    assert any(
+        item["edge_type"] == "infers_from"
+        and item["provenance"]["object_id"] == conclusion_id
+        for item in body["graph"]["edges"]
+    )
     assert repository.graphs[-1][0].graph_id == body["graph"]["graph_id"]
 
 
@@ -925,6 +1195,25 @@ def test_artifact_transition_requires_reviewer_and_attributes_actor(tmp_path: Pa
     assert response.status_code == 201
     assert response.json()["actor_id"] == "reviewer@example"
     assert response.json()["from_status"] == "draft"
+
+
+def test_published_transition_requires_publisher_and_attributes_release_actor(
+    tmp_path: Path,
+) -> None:
+    repository = RecordingRepository()
+    request = {
+        "to_status": "published",
+        "rationale": "Release gates and immutable package verified.",
+        "occurred_at": "2026-07-16T00:20:00Z",
+    }
+    assert client(tmp_path, token="review", repository=repository).post(
+        "/knowledge/artifacts/bundle-1/transitions", json=request,
+    ).status_code == 403
+    response = client(tmp_path, token="publish", repository=repository).post(
+        "/knowledge/artifacts/bundle-1/transitions", json=request,
+    )
+    assert response.status_code == 201
+    assert response.json()["actor_id"] == "publisher@example"
 
 
 def test_semantic_index_job_requires_indexer_role_and_exact_dimensions(tmp_path: Path) -> None:
@@ -1248,11 +1537,11 @@ def test_document_api_requires_matching_provenance_and_registers_pdf(tmp_path: P
     publication = api.post(
         f"/knowledge/theories/{theories.json()['bundle_id']}/publications",
         json={"validation_report_id": validation.json()["report_id"], "kind": "literature_review", "generated_at": "2026-07-15T00:00:00Z"},
-        headers={"Authorization": "Bearer review"},
+        headers={"Authorization": "Bearer publish"},
     )
     assert publication.status_code == 201
     assert publication.json()["integrity_verified"] is True
-    assert publication.json()["generated_by"] == "reviewer@example"
+    assert publication.json()["generated_by"] == "publisher@example"
     history = api.get(
         f"/knowledge/theories/{theories.json()['bundle_id']}/publication-history",
         headers={"Authorization": "Bearer review"},
@@ -1334,6 +1623,35 @@ def test_product_read_api_supports_any_authenticated_role_and_cursor(tmp_path: P
     assert objects.json()["next_cursor"] == "evidence:object-1"
 
 
+def test_workflow_case_read_model_is_authenticated_and_non_decisional(
+    tmp_path: Path,
+) -> None:
+    api = client(tmp_path, "audit", repository=RecordingRepository())
+    api.app.state.knowledge_service.list_workflow_cases = lambda project_id: ({
+        "case_id": "discovery-1", "project_id": project_id,
+        "question": {"question_id": "question-1", "text": "What changed?"},
+        "stages": ({
+            "key": "discovery", "state": "complete",
+            "required_role": "discoverer",
+        },),
+        "authority": "derived_read_model_only",
+        "decision_automation": False,
+    },)
+
+    response = api.get(
+        "/knowledge/projects/researchos-default/workflow-cases"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["case_id"] == "discovery-1"
+    assert response.json()["authority"] == "derived_read_model_only"
+    assert client(
+        tmp_path, None, repository=RecordingRepository()
+    ).get(
+        "/knowledge/projects/researchos-default/workflow-cases"
+    ).status_code == 401
+
+
 def test_product_object_actions_are_permission_aware(tmp_path: Path) -> None:
     reviewer = client(tmp_path, "review", repository=RecordingRepository()).get(
         "/knowledge/projects/researchos-default/objects/object-1"
@@ -1366,6 +1684,10 @@ def test_object_workspace_is_available_without_embedding_credentials(tmp_path: P
     assert 'id="translateObject"' in response.text
     assert 'id="translateProjectObjects"' in response.text
     assert "/workspace-assets/object-translation-ui.js" in response.text
+    assert "/workspace-assets/discovery.js?v=" in response.text
+    assert "/workspace-assets/workspace.css?v=" in response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["clear-site-data"] == '"cache"'
     assert 'id="qualityThreshold"' in response.text
     assert 'id="qualityMetrics"' in response.text
     assert 'id="calibrationForm"' in response.text
@@ -1410,6 +1732,27 @@ def test_workspace_i18n_defaults_to_indonesian_and_covers_every_product_area() -
         assert f'"{source}":"{indonesian}"' in catalog
 
 
+def test_discovery_workspace_submits_the_required_governed_contract() -> None:
+    static = Path(__file__).resolve().parents[2] / "product" / "static"
+    discovery = (static / "discovery.js").read_text(encoding="utf-8")
+    workspace = (static / "workspace.js").read_text(encoding="utf-8")
+
+    assert "discovery_contract:" in discovery
+    assert "query_concepts:" in discovery
+    assert "research_question_id:questionId" in discovery
+    assert "search_plan_id:planId" in discovery
+    assert "project_id:state.project" in discovery
+    assert "/inspections" in discovery
+    assert "/screenings" in discovery
+    assert "screening.status!=='eligible'" in discovery
+    assert "Array.isArray(body.detail)" in workspace
+    assert "state.queue?.pending_reviews" in workspace
+    assert "item.reviewed_statement_hash" in workspace
+    assert "item.extraction_manifest_hash" in workspace
+    assert "citation_fidelity:" in workspace
+    assert "epistemic_classification:" in workspace
+
+
 def test_composed_knowledge_routers_do_not_duplicate_paths(tmp_path: Path) -> None:
     application = client(tmp_path, None).app
     paths = [
@@ -1427,6 +1770,36 @@ def test_work_queue_is_readable_and_exposes_role_capabilities(tmp_path: Path) ->
     )
     assert reviewer.status_code == 200
     assert reviewer.json()["counts"]["pending_reviews"] == 1
+    assert reviewer.json()["counts"]["impact_reviews"] == 1
+    assert reviewer.json()["impact_reviews"][0]["signal"] == "retracted"
+    assert reviewer.json()["counts"]["follow_up_cases"] == 2
+    assert reviewer.json()["follow_up_cases"][0]["action_authorized"] is True
+    assert reviewer.json()["follow_up_cases"][0]["available_action"] == {
+        "action": "evidence:review", "method": "POST",
+        "href": "/knowledge/evidence/object-1/reviews",
+        "requires_confirmation": True,
+        "audit_workflow": "evidence_review_event",
+        "reviewed_statement_hash": "a" * 64,
+        "extraction_manifest_hash": "b" * 64,
+    }
+    assert reviewer.json()["follow_up_cases"][1]["available_action"] is None
+    publisher = client(
+        tmp_path, "publish", repository=RecordingRepository()
+    ).get("/knowledge/projects/researchos-default/work-queue").json()
+    assert publisher["follow_up_cases"][0]["action_authorized"] is False
+    assert publisher["follow_up_cases"][1]["available_action"] == {
+        "action": "publication:retract", "method": "POST",
+        "href": "/knowledge/publications/publication-1/relationships",
+        "relation_type": "retracts", "requires_confirmation": True,
+        "audit_workflow": "publication_relationship",
+    }
+    assert publisher["counts"]["completed_follow_up_cases"] == 1
+    completed = publisher["completed_follow_up_cases"][0]
+    assert completed["status"] == "closed"
+    assert completed["action_completion"]["outcome"] == "retracts"
+    assert [item["stage"] for item in completed["workflow_timeline"]] == [
+        "impact_resolved", "target_selected", "action_completed", "case_closed",
+    ]
     assert reviewer.json()["permissions"]["can_review"] is True
     assert reviewer.json()["permissions"]["can_index"] is False
     indexer = client(tmp_path, "index", repository=RecordingRepository()).get(

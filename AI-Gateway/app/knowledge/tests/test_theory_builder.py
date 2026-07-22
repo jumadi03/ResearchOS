@@ -80,6 +80,98 @@ def test_theory_builder_aggregates_support_and_represents_competition(tmp_path: 
     assert TheoryBundleStore(tmp_path).save(bundle).exists()
 
 
+def test_theory_builder_deduplicates_support_from_the_same_evidence_quote() -> None:
+    source = graph("duplicate", "One reviewed conclusion")
+    original = source.edges[0]
+    duplicated = replace(original, edge_id="edge-duplicate-alias")
+    repeated = replace(
+        source, edges=(original, duplicated), content_hash="",
+    ).finalized()
+
+    bundle = TheoryBuilder().build((repeated,), created_at="time")
+
+    assert len(bundle.proposals) == 1
+    assert bundle.proposals[0].support_count == 1
+    assert len(bundle.proposals[0].evidence) == 1
+
+
+def test_cross_study_builder_rejects_single_source_and_distinct_claims() -> None:
+    bundle = TheoryBuilder().build_cross_study((
+        graph("one", "Institutions shape data sharing"),
+        graph("two", "Researchers need repository guidance"),
+    ), created_at="time")
+
+    assert bundle.verify()
+    assert bundle.proposals == ()
+
+
+def test_cross_study_builder_requires_two_independent_evidence_objects() -> None:
+    bundle = TheoryBuilder().build_cross_study((
+        graph("one", "Institutional support improves data sharing"),
+        graph("two", "Institutional support improves data sharing"),
+    ), created_at="time")
+
+    assert len(bundle.proposals) == 1
+    proposal = bundle.proposals[0]
+    assert proposal.support_count == 2
+    assert len({item.graph_id for item in proposal.evidence}) == 2
+    assert len({item.object_id for item in proposal.evidence}) == 2
+    assert proposal.statement.startswith(
+        "Independent evidence across studies supports the proposition that "
+    )
+
+
+def test_cross_study_builder_can_use_explicitly_supported_results() -> None:
+    first = graph("result-one", "A conclusion")
+    second = graph("result-two", "Another conclusion")
+    first = replace(
+        first,
+        nodes=(
+            replace(first.nodes[0], label="Repository guidance improves data sharing"),
+            first.nodes[1],
+        ),
+        content_hash="",
+    ).finalized()
+    second = replace(
+        second,
+        nodes=(
+            replace(second.nodes[0], label="Repository guidance improves data sharing"),
+            second.nodes[1],
+        ),
+        content_hash="",
+    ).finalized()
+
+    bundle = TheoryBuilder().build_cross_study(
+        (first, second), created_at="time",
+    )
+
+    assert len(bundle.proposals) == 1
+    proposal = bundle.proposals[0]
+    assert "repository guidance improves data sharing" in proposal.statement
+    assert {item.object_id for item in proposal.evidence} == {
+        "object-result-one", "object-result-two",
+    }
+
+
+def test_cross_study_builder_ignores_unrelated_limitation_without_support() -> None:
+    source = graph("limited", "A supported conclusion")
+    provenance = source.nodes[0].provenance
+    limitation = KnowledgeNode(
+        "limitation-limited", KnowledgeNodeType.LIMITATION,
+        "Small samples constrain generalization", provenance,
+    )
+    unsupported = replace(
+        source, nodes=source.nodes + (limitation,), content_hash="",
+    ).finalized()
+
+    bundle = TheoryBuilder().build_cross_study(
+        (unsupported, graph("other", "Another conclusion")),
+        created_at="time",
+    )
+
+    assert bundle.proposals == ()
+
+
 def test_theory_builder_rejects_provisional_rejected_and_mixed_graphs() -> None:
     import pytest
     builder = TheoryBuilder()
@@ -163,6 +255,189 @@ def test_theory_pipeline_cannot_bypass_canonical_admission_authority(
     with pytest.raises(ValueError, match="Canonical repository is required"):
         pipeline.build_theories(
             (safe_graph.graph_id,), generated_by="researcher@example",
+        )
+
+
+def test_stale_evidence_dependency_blocks_revalidation_and_publication_readiness(
+    tmp_path: Path,
+) -> None:
+    safe_graph = graph("dependency", "Reviewed evidence supports theory")
+    event = safe_graph.nodes[0].provenance.review_event
+    repository = AdmissionRepository((
+        EvidenceAdmission(
+            event.evidence_object_id, ExtractionReviewState.ACCEPTED, event,
+        ),
+    ))
+    pipeline = KnowledgeTheoryPipeline(
+        tmp_path, {safe_graph.graph_id: safe_graph},
+        data_repository=repository,
+    )
+    bundle, _ = pipeline.build_theories(
+        (safe_graph.graph_id,), generated_by="researcher@example",
+    )
+    proposal = bundle.proposals[0]
+    bundle, _ = pipeline.review_theory(
+        bundle.bundle_id, theory_id=proposal.theory_id, decision="accepted",
+        reviewer="reviewer@example", rationale="Evidence supports the claim",
+        occurred_at="2026-07-18T00:00:00Z",
+    )
+    report, _ = pipeline.validate_theories(
+        bundle.bundle_id, assessed_at="2026-07-18T00:00:00Z",
+        search_completed_at="2026-07-18T00:00:00Z", max_age_days=180,
+        risk_of_bias_by_theory={proposal.theory_id: "low"},
+        reviewer="reviewer@example", triggered_by_decision_id=None,
+    )
+    repository.admissions[event.evidence_object_id] = EvidenceAdmission(
+        event.evidence_object_id, ExtractionReviewState.REJECTED,
+        replace(event, decision=ExtractionReviewState.REJECTED),
+    )
+
+    impact = pipeline.dependency_impact(bundle.bundle_id)
+    assert impact.current is False
+    assert impact.impacted_evidence_ids == (event.evidence_object_id,)
+    assert impact.impacted_graph_ids == (safe_graph.graph_id,)
+    assert impact.graph_states == ((safe_graph.graph_id, "superseded"),)
+    assert impact.evidence_states == (
+        (event.evidence_object_id, "rejected"),
+    )
+    assert pipeline.validation_history(bundle.bundle_id)[0][
+        "active_for_current_bundle"
+    ] is False
+    readiness = pipeline.publication_readiness(
+        bundle.bundle_id, kind="literature_review",
+        validation_report_id=report.report_id,
+    )
+    assert readiness["ready"] is False
+    assert readiness["dependency_impact"]["current"] is False
+    assert next(
+        item for item in readiness["checks"]
+        if item["key"] == "current_dependencies"
+    )["passed"] is False
+    lifecycle = pipeline.graph_lifecycle(safe_graph.graph_id)
+    assert lifecycle.state == "superseded"
+    assert lifecycle.current is False
+    assert lifecycle.impacted_evidence_ids == (event.evidence_object_id,)
+    with pytest.raises(ValueError, match="stale or inadmissible"):
+        pipeline.validate_theories(
+            bundle.bundle_id, assessed_at="2026-07-19T00:00:00Z",
+            search_completed_at="2026-07-19T00:00:00Z", max_age_days=180,
+            risk_of_bias_by_theory={proposal.theory_id: "low"},
+            reviewer="reviewer@example", triggered_by_decision_id=None,
+        )
+
+
+def test_rejected_semantic_relation_supersedes_graph_and_theory_dependencies(
+    tmp_path: Path,
+) -> None:
+    safe_graph = graph(
+        "relation-dependency",
+        "Reviewed semantic relations support reproducible synthesis",
+    )
+    event = safe_graph.nodes[0].provenance.review_event
+    repository = AdmissionRepository((
+        EvidenceAdmission(
+            event.evidence_object_id, ExtractionReviewState.ACCEPTED, event,
+        ),
+    ))
+    relation_state = {
+        safe_graph.graph_id: (
+            ("semantic-relation-reviewed", "accepted"),
+        ),
+    }
+    pipeline = KnowledgeTheoryPipeline(
+        tmp_path, {safe_graph.graph_id: safe_graph},
+        data_repository=repository,
+        semantic_relation_resolver=lambda graph_id: relation_state.get(
+            graph_id, (),
+        ),
+    )
+    bundle, _ = pipeline.build_theories(
+        (safe_graph.graph_id,), generated_by="researcher@example",
+    )
+    proposal = bundle.proposals[0]
+    bundle, _ = pipeline.review_theory(
+        bundle.bundle_id, theory_id=proposal.theory_id, decision="accepted",
+        reviewer="reviewer@example", rationale="Theory relation reviewed",
+        occurred_at="2026-07-19T03:00:00Z",
+    )
+    report, _ = pipeline.validate_theories(
+        bundle.bundle_id, assessed_at="2026-07-19T03:01:00Z",
+        search_completed_at="2026-07-19T03:01:00Z", max_age_days=180,
+        risk_of_bias_by_theory={proposal.theory_id: "low"},
+        reviewer="reviewer@example", triggered_by_decision_id=None,
+    )
+    assert pipeline.graph_lifecycle(safe_graph.graph_id).current is True
+    relation_state[safe_graph.graph_id] = (
+        ("semantic-relation-reviewed", "rejected"),
+    )
+
+    lifecycle = pipeline.graph_lifecycle(safe_graph.graph_id)
+    assert lifecycle.state == "superseded"
+    assert lifecycle.impacted_semantic_relation_ids == (
+        "semantic-relation-reviewed",
+    )
+    impact = pipeline.dependency_impact(bundle.bundle_id)
+    assert impact.current is False
+    assert impact.impacted_graph_ids == (safe_graph.graph_id,)
+    assert impact.impacted_semantic_relation_ids == (
+        "semantic-relation-reviewed",
+    )
+    assert pipeline.validation_history(bundle.bundle_id)[0][
+        "active_for_current_bundle"
+    ] is False
+    readiness = pipeline.publication_readiness(
+        bundle.bundle_id, kind="literature_review",
+        validation_report_id=report.report_id,
+    )
+    assert readiness["ready"] is False
+    with pytest.raises(ValueError, match="current graph dependencies"):
+        pipeline.build_theories(
+            (safe_graph.graph_id,), generated_by="researcher@example",
+        )
+    with pytest.raises(ValueError, match="stale or inadmissible"):
+        pipeline.validate_theories(
+            bundle.bundle_id, assessed_at="2026-07-19T03:02:00Z",
+            search_completed_at="2026-07-19T03:02:00Z", max_age_days=180,
+            risk_of_bias_by_theory={proposal.theory_id: "low"},
+            reviewer="reviewer@example", triggered_by_decision_id=None,
+        )
+
+
+def test_publication_relationships_project_correction_and_retraction(
+    tmp_path: Path,
+) -> None:
+    pipeline = KnowledgeTheoryPipeline(tmp_path, {})
+    pipeline.publication_packages = {"old": object(), "new": object()}
+    correction, snapshot = pipeline.relate_publication(
+        "new", relation_type="corrects", target_publication_id="old",
+        actor_id="publisher@example", rationale="Corrected analysis and citations",
+        occurred_at="2026-07-19T00:00:00Z",
+    )
+    assert correction.verify() and snapshot.exists()
+    assert pipeline.publication_lifecycle("old")["state"] == "corrected"
+    assert pipeline.publication_lifecycle("old")[
+        "replacement_publication_id"
+    ] == "new"
+    assert pipeline.publication_lifecycle("new")["state"] == "current"
+
+    retraction, _ = pipeline.relate_publication(
+        "new", relation_type="retracts", target_publication_id=None,
+        actor_id="publisher@example", rationale="Material validity failure confirmed",
+        occurred_at="2026-07-20T00:00:00Z",
+    )
+    assert retraction.verify()
+    assert pipeline.publication_lifecycle("new")["state"] == "retracted"
+    with pytest.raises(ValueError, match="must not specify"):
+        pipeline.relate_publication(
+            "new", relation_type="retracts", target_publication_id="old",
+            actor_id="publisher@example", rationale="Invalid retraction target",
+            occurred_at="2026-07-21T00:00:00Z",
+        )
+    with pytest.raises(ValueError, match="cannot correct or supersede itself"):
+        pipeline.relate_publication(
+            "new", relation_type="supersedes", target_publication_id="new",
+            actor_id="publisher@example", rationale="Invalid self relationship",
+            occurred_at="2026-07-21T00:00:00Z",
         )
 
 

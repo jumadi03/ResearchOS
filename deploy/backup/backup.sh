@@ -45,8 +45,9 @@ write_tree_manifest() {
   fi
   (
     cd "$source" || exit 1
-    find . -mindepth 1 -printf 'entry %y %P\n' | LC_ALL=C sort
-    find . -type f -print0 |
+    find . -mindepth 1 ! -path './.researchos-tree-manifest.txt' \
+      -printf 'entry %y %P\n' | LC_ALL=C sort
+    find . -type f ! -path './.researchos-tree-manifest.txt' -print0 |
       LC_ALL=C sort -z |
       xargs -0 -r sha256sum
   ) >"$output"

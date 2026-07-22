@@ -26,6 +26,63 @@ class ScientificChangeKind(StrEnum):
     PROVIDER_FAILURE = "provider_failure"
 
 
+class ImpactReviewDecision(StrEnum):
+    INVESTIGATE = "investigate"
+    NO_ACTION = "no_action"
+    EVIDENCE_REVIEW_REQUIRED = "evidence_review_required"
+    PUBLICATION_REVIEW_REQUIRED = "publication_review_required"
+
+
+@dataclass(frozen=True, slots=True)
+class ImpactReviewResolution:
+    resolution_id: str
+    change_id: str
+    decision: ImpactReviewDecision
+    reviewer_id: str
+    rationale: str
+    occurred_at: str
+    provenance_id: str | None = None
+
+    def follow_up_case(self) -> dict | None:
+        routing = {
+            ImpactReviewDecision.EVIDENCE_REVIEW_REQUIRED: (
+                "evidence_review", "reviewer"
+            ),
+            ImpactReviewDecision.PUBLICATION_REVIEW_REQUIRED: (
+                "publication_review", "publisher"
+            ),
+        }
+        selected = routing.get(self.decision)
+        if selected is None:
+            return None
+        case_type, required_role = selected
+        return {
+            "case_id": f"follow-up:{self.resolution_id}",
+            "source_resolution_id": self.resolution_id,
+            "change_id": self.change_id,
+            "case_type": case_type,
+            "required_role": required_role,
+            "status": "open",
+            "decision_automation": False,
+            "blocked_reason": (
+                "A canonical impacted object must be selected by an authorized "
+                "human before a lifecycle decision can be recorded."
+            ),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class FollowUpCaseTarget:
+    selection_id: str
+    source_resolution_id: str
+    target_kind: str
+    target_object_id: str
+    selector_id: str
+    rationale: str
+    occurred_at: str
+    provenance_id: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class ScientificSourceWatch:
     watch_id: str

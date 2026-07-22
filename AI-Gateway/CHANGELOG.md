@@ -7,6 +7,103 @@ follows Semantic Versioning.
 
 ### Changed
 
+- Recorded the owner-only production deployment of canonical Sites UI version
+  8 without moving the immutable RC.5 tag or claiming backend cutover.
+
+## [0.5.0-rc.5] - 2026-07-20
+
+### Changed
+
+- Reconciled the canonical UI release binding with the accepted local graph
+  explorer source and its saved Sites version.
+- Distinguished a saved-but-not-deployed UI version from the currently
+  deployed production version in release baseline and provenance metadata.
+- Expanded canonical UI regression coverage from two to eight rendered
+  contract tests.
+
+- Strengthened the one-machine local controller with dependency-aware
+  readiness, rendered-workspace verification, read-only status inspection,
+  and a data-preserving stop operation.
+- Added restart continuity acceptance for PostgreSQL identity, schema and
+  workspace accounts, plus a temporary write-read-delete MinIO sentinel.
+- Fixed the browser discovery form to submit the required governed contract,
+  bind the canonical project ID, attribute query concepts, and render
+  structured validation errors readably.
+- Replaced manual workspace asset version bumps with an explicit local
+  no-store HTTP cache policy so rebuilt container revisions load immediately.
+- Added a cache-only Clear-Site-Data response on the local workspace entry
+  point to evict revisions cached before the no-store policy existed.
+- Added automatic content-hash query versions for every workspace stylesheet
+  and script, eliminating manual cache-busting when local assets change.
+- Resolve exact DOI queries through OpenAlex's canonical work endpoint instead
+  of ranked bibliographic search, preventing unrelated acquisition provenance.
+- Complete governed inspection and eligibility screening in the discovery UI
+  before evidence extraction, removing the browser workflow dead end.
+- Version immutable screening identities by their evaluated reasons so metadata
+  enrichment can produce a new decision without an integrity-key conflict.
+- Canonicalize provider aliases for journal articles during scope screening so
+  OpenAlex and Crossref records honor the same governed document type.
+- Route normal evidence review through the complete governed assessment form,
+  binding statement and extraction hashes from the canonical work queue.
+
+### Verification
+
+- Preserved every earlier release-candidate tag without modification.
+- Saved Sites version 8 from the exact validated UI source without deploying
+  it to production.
+
+## [0.5.0-rc.4] - 2026-07-19
+
+### Changed
+
+- Bound the canonical Sites UI to the release contract with its exact source
+  commit, Sites project and version, production URL, test count, and
+  operational cutover status.
+- Added the canonical UI binding to the release baseline and provenance,
+  closing the cross-repository evidence gap found during RC.3 acceptance.
+- Added the secure public API tunnel contract for connecting the Sites UI to
+  an explicitly configured HTTPS backend origin.
+
+### Verification
+
+- Preserved RC.3 as an immutable candidate and recorded its consolidated
+  acceptance decision separately.
+- Added regression coverage that rejects incomplete canonical UI provenance.
+
+## [0.5.0-rc.3] - 2026-07-19
+
+### Fixed
+
+- Fixed the consequential-research revalidation read when `project_id` is
+  omitted by explicitly typing the nullable PostgreSQL filter parameter.
+- Added regression coverage for the unfiltered SGF-020C revalidation query.
+
+### Verification
+
+- Completed interactive visual inspection of the canonical production UI,
+  including its fail-closed unavailable-backend state and retry control.
+- Passed 487 backend tests, the Vinext production build, and one canonical
+  rendered-HTML test.
+
+## [0.5.0-rc.2] - 2026-07-19
+
+### Changed
+
+- Added repeatable local credential rotation with automatic rollback for API
+  role tokens, PostgreSQL, MinIO, Grafana, and human workspace accounts.
+- Added atomic workspace password rotation with fresh PBKDF2 salts, lockout
+  reset, attributable audit evidence, and revocation of all existing sessions.
+- Verified isolated restore, PostgreSQL and MinIO outage recovery, application
+  fail-closed behavior, and post-rotation backup continuity.
+- Made restore-controller subprocess decoding deterministic on Windows by
+  using UTF-8 with replacement for non-decodable diagnostic bytes.
+- Added object-storage outage regression coverage proving that failed reads
+  and writes do not produce fallback payloads or false success URIs.
+
+## [0.5.0-rc.1] - 2026-07-19
+
+### Changed
+
 - Added Phase 1F-E Windows host-trigger contract with read-only planning and
   status, disabled-by-default installation, limited interactive privilege,
   single-instance execution, and explicit removal that preserves canonical

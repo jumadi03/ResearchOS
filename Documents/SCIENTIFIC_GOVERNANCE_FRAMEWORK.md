@@ -20,11 +20,12 @@ Dokumen SGF-000 menyimpan kerangka kanonik jangka panjang untuk tata kelola
 ilmiah ResearchOS. Ia menetapkan keluarga dokumen, urutan dependensi, dan
 posisinya terhadap metodologi, arsitektur, serta implementasi.
 
-SGF-000 belum meratifikasi isi rinci setiap standar turunannya. SGF-010 sampai
-SGF-100 berstatus **direncanakan** sampai masing-masing disusun, diperiksa
-terhadap kontrak kanonik yang berlaku, dan diterima secara eksplisit oleh
-otoritas proyek. Kode dan kontrak kanonik yang sudah ada tetap menjadi Single
-Source of Truth untuk perilaku sistem yang telah diimplementasikan.
+SGF-000 belum meratifikasi isi rinci setiap standar turunannya. SGF-010 dan
+SGF-050 sampai SGF-100 berstatus **direncanakan**. SGF-020, SGF-030, dan
+SGF-040 telah disusun sebagai project-owner-directed operational standards,
+tetapi formal ratification tetap belum didefinisikan oleh governance
+repository saat ini. Kode dan kontrak kanonik yang sudah ada tetap menjadi
+Single Source of Truth untuk perilaku sistem yang telah diimplementasikan.
 
 ## Tujuan
 
@@ -122,7 +123,10 @@ konstitusi ini.
 
 ## SGF-020 — Human Authority & Decision Matrix
 
-Status: direncanakan.
+Status: operational standard version 1.0; formal ratification not defined.
+
+Dokumen:
+`Documents/SGF_020_HUMAN_AUTHORITY_DECISION_MATRIX.md`.
 
 Standar ini akan menetapkan bukan hanya siapa yang berwenang, tetapi juga:
 
@@ -148,7 +152,10 @@ Theory Acceptance
 
 ## SGF-030 — Canonical Scientific Ontology
 
-Status: direncanakan.
+Status: operational standard version 1.0; formal ratification not defined.
+
+Dokumen:
+`Documents/SGF_030_CANONICAL_SCIENTIFIC_ONTOLOGY.md`.
 
 Ontology akan menyatukan makna objek ilmiah agar AI, backend, antarmuka,
 Knowledge Graph, dan subsystem lain tidak memakai definisi yang berbeda.
@@ -172,7 +179,10 @@ nama baru diperkenalkan.
 
 ## SGF-040 — Research Object Lifecycle Standard
 
-Status: direncanakan.
+Status: operational standard version 1.0; formal ratification not defined.
+
+Dokumen:
+`Documents/SGF_040_RESEARCH_OBJECT_LIFECYCLE_STANDARD.md`.
 
 Evidence, Theory, Publication, dan objek penelitian lain dapat memiliki
 lifecycle yang berbeda, tetapi harus memakai bahasa lifecycle, transition,

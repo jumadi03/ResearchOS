@@ -49,24 +49,31 @@ slow network. The command:
 
 - creates unique local credentials;
 - starts PostgreSQL, MinIO, the API, workers, and monitoring;
-- creates five role-separated browser accounts; and
+- creates six role-separated browser accounts; and
 - verifies account login, API health, and both required object-storage buckets.
 
 The installation is ready when the command ends with:
 
 ```text
-runtime-bootstrap=passed accounts=5 buckets=2
-researchos-bootstrap=passed credentials=deploy/local-access.env
+runtime-bootstrap=passed accounts=6 buckets=2
+researchos-bootstrap=passed checks=8 credentials=deploy/local-access.env workspace=http://127.0.0.1:8080/workspace
 ```
 
 Running the command again is safe. Complete existing credentials are reused
 instead of being silently replaced.
+
+The final readiness gate verifies the API, authentication configuration,
+PostgreSQL, the expected schema, worker heartbeat, object storage, persistence
+paths, and the rendered workspace. A process that is merely running but cannot
+serve a usable workspace does not pass bootstrap.
 
 ## 4. Open and verify the services
 
 Open these local addresses:
 
 - API health: <http://127.0.0.1:8080/health>
+- Operational readiness: <http://127.0.0.1:8080/ready>
+- Research workspace: <http://127.0.0.1:8080/workspace>
 - Interactive API documentation: <http://127.0.0.1:8080/docs>
 - MinIO console: <http://127.0.0.1:9101>
 - Prometheus: <http://127.0.0.1:9090>
@@ -80,24 +87,23 @@ into an issue, chat, screenshot, commit, or pull request.
 To see container health without exposing credentials:
 
 ```powershell
-Set-Location deploy
-docker compose --env-file stack.env -f compose.yaml ps
-Set-Location ..
+py -3.13 Scripts\bootstrap_local.py --status
 ```
+
+The status command is read-only: it validates the existing local
+configuration, running services, dependency readiness, and workspace
+rendering. It does not create or rotate credentials.
 
 ## 5. Stop safely
 
 Stop the services while preserving databases, objects, and credentials:
 
 ```powershell
-Set-Location deploy
-docker compose --env-file stack.env -f compose.yaml down
-Set-Location ..
+py -3.13 Scripts\bootstrap_local.py --stop
 ```
 
-Start them again by rerunning the bootstrap command. Do not add `--volumes` to
-the stop command: that option permanently deletes local databases, objects,
-monitoring history, and backups.
+This stop operation preserves local databases, objects, monitoring history,
+backups, and credentials. Start them again by rerunning the bootstrap command.
 
 ## Troubleshooting
 

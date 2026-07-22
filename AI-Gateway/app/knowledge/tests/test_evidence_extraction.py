@@ -175,3 +175,85 @@ def test_manifest_tampering_and_ambiguous_text_fail_safely(tmp_path: Path) -> No
     )
     assert empty.objects == ()
     assert empty.verify()
+
+
+def test_extraction_bounds_sections_before_page_furniture_and_back_matter(
+    tmp_path: Path,
+) -> None:
+    output = BytesIO()
+    pdf = canvas.Canvas(output)
+    text = pdf.beginText(40, 800)
+    for line in (
+        "Results",
+        "Forty percent of journals allowed repository reuse.",
+        "PLOS ONE",
+        "Citation: Example metadata that is not scientific evidence.",
+        "Conclusion",
+        "Open-data policies remain inconsistent across journals and require clearer repository standards.",
+        "Author Contributions",
+        "Writing – original draft: Example Author.",
+        "References",
+        "1. Example reference.",
+    ):
+        text.textLine(line)
+    pdf.drawText(text)
+    pdf.save()
+    content = output.getvalue()
+    candidate = DocumentCandidate(
+        "record", "https://example.test/bounded.pdf", AccessStatus.OPEN,
+        "CC-BY", "openalex", "source-hash", "source-openalex",
+        "query-family-1",
+    )
+    result = DocumentAcquirer(
+        transport=lambda *a, **k: Response(content)
+    ).acquire(candidate, acquired_at="time")
+    source = DocumentRegistry(tmp_path / "bounded").register(result)[0]
+    inspection, decision = screened(source, content)
+
+    manifest = EvidenceExtractionEngine().extract(
+        source, content, created_at="later", inspection=inspection,
+        screening_decision=decision,
+    )
+
+    assert [item.object_type for item in manifest.objects] == [
+        ScientificObjectType.RESULT,
+        ScientificObjectType.CONCLUSION,
+    ]
+    assert manifest.objects[0].content == (
+        "Forty percent of journals allowed repository reuse."
+    )
+    assert manifest.objects[1].content == (
+        "Open-data policies remain inconsistent across journals and require clearer repository standards."
+    )
+    assert all(
+        "Author Contributions" not in item.content
+        for item in manifest.objects
+    )
+
+
+def test_short_truncated_claim_fragments_fail_closed(tmp_path: Path) -> None:
+    output = BytesIO()
+    pdf = canvas.Canvas(output)
+    text = pdf.beginText(40, 800)
+    text.textLine("We find that 26.")
+    text.textLine("Looking at disciplinary impacts, we find that 55.")
+    pdf.drawText(text)
+    pdf.save()
+    content = output.getvalue()
+    candidate = DocumentCandidate(
+        "record", "https://example.test/fragments.pdf", AccessStatus.OPEN,
+        "CC-BY", "openalex", "source-hash", "source-openalex",
+        "query-family-1",
+    )
+    result = DocumentAcquirer(
+        transport=lambda *a, **k: Response(content)
+    ).acquire(candidate, acquired_at="time")
+    source = DocumentRegistry(tmp_path / "fragments").register(result)[0]
+    inspection, decision = screened(source, content)
+
+    manifest = EvidenceExtractionEngine().extract(
+        source, content, created_at="later", inspection=inspection,
+        screening_decision=decision,
+    )
+
+    assert manifest.objects == ()

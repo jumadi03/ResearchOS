@@ -4,8 +4,12 @@ from hashlib import sha256
 import json
 
 from app.knowledge.discovery.normalization import canonical_json
-from app.knowledge.repositories.artifacts import ArtifactLifecycleEvent
+from app.knowledge.repositories.artifacts import (
+    ArtifactLifecycleEvent,
+    require_artifact_transition,
+)
 from app.knowledge.repositories.models import StoredRepresentation
+from app.knowledge.publication.models import PublicationRelationType
 
 
 def artifact_integrity_matches(
@@ -161,11 +165,7 @@ class PostgresArtifactRepositoryMixin:
                 if row is None:
                     raise KeyError(f"Unknown canonical artifact: {artifact_id}")
                 canonical_id, from_status = row
-                expected = self._LIFECYCLE_TRANSITIONS.get(from_status)
-                if expected != to_status:
-                    raise ValueError(
-                        f"Invalid artifact transition: {from_status} -> {to_status}; expected {expected}"
-                    )
+                require_artifact_transition(from_status, to_status)
                 payload = {**identity, "from_status": from_status}
                 cursor.execute("""
                     INSERT INTO provenance_events(
@@ -283,3 +283,83 @@ class PostgresArtifactRepositoryMixin:
             storage_uri, media_type, checksum_sha256, file_size, version,
         )
 
+    def record_publication_relationship(self, relationship):
+        if not relationship.verify():
+            raise ValueError("Publication relationship integrity verification failed")
+        relation = PublicationRelationType(relationship.relation_type)
+        if relation is PublicationRelationType.RETRACTS:
+            if relationship.target_publication_id is not None:
+                raise ValueError("Retraction must not specify a target publication")
+        elif not relationship.target_publication_id:
+            raise ValueError(f"{relation.value} requires a target publication")
+        payload = {
+            "relationship_id": relationship.relationship_id,
+            "source_publication_id": relationship.source_publication_id,
+            "target_publication_id": relationship.target_publication_id,
+            "relation_type": relation.value, "actor_id": relationship.actor_id,
+            "rationale": relationship.rationale,
+            "occurred_at": relationship.occurred_at,
+            "content_hash": relationship.content_hash,
+        }
+        event_hash = sha256(canonical_json(payload).encode()).hexdigest()
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                ids = [relationship.source_publication_id]
+                if relationship.target_publication_id:
+                    ids.append(relationship.target_publication_id)
+                resolved = {}
+                for publication_id in ids:
+                    cursor.execute("""
+                        SELECT c.object_id,r.artifact_type,r.status
+                        FROM canonical_objects c
+                        JOIN research_artifacts r ON r.artifact_id=c.object_id
+                        WHERE c.stable_key=%s FOR UPDATE OF c,r
+                    """, (f"artifact:{publication_id}",))
+                    row = cursor.fetchone()
+                    if row is None:
+                        raise KeyError(f"Unknown publication artifact: {publication_id}")
+                    artifact_id, artifact_type, status = row
+                    if artifact_type != "publication_package" or status not in {
+                        "published", "deprecated",
+                    }:
+                        raise ValueError("Publication relationship requires released artifacts")
+                    resolved[publication_id] = artifact_id
+                source_id = resolved[relationship.source_publication_id]
+                target_id = (
+                    resolved[relationship.target_publication_id]
+                    if relationship.target_publication_id else None
+                )
+                cursor.execute("""
+                    INSERT INTO provenance_events(
+                        execution_id,source_object_id,output_object_id,human_reviewer,
+                        event_type,event_payload,occurred_at,event_hash
+                    ) VALUES (%s,%s,%s,%s,'publication_relationship',%s,%s,%s)
+                    ON CONFLICT(event_hash) DO NOTHING RETURNING provenance_id
+                """, (
+                    relationship.relationship_id, target_id or source_id, source_id,
+                    relationship.actor_id, json.dumps(payload),
+                    relationship.occurred_at, event_hash,
+                ))
+                inserted = cursor.fetchone()
+                if inserted is None:
+                    cursor.execute(
+                        "SELECT provenance_id FROM provenance_events WHERE event_hash=%s",
+                        (event_hash,),
+                    )
+                    provenance_id = cursor.fetchone()[0]
+                else:
+                    provenance_id = inserted[0]
+                cursor.execute("""
+                    INSERT INTO publication_relationships(
+                        relationship_key,source_artifact_id,target_artifact_id,
+                        relation_type,actor_id,rationale,occurred_at,
+                        provenance_id,content_hash
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(relationship_key) DO NOTHING
+                """, (
+                    relationship.relationship_id, source_id, target_id,
+                    relation.value, relationship.actor_id,
+                    relationship.rationale, relationship.occurred_at,
+                    provenance_id, relationship.content_hash,
+                ))
+        return relationship

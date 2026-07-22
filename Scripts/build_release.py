@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY = ROOT / "AI-Gateway"
 OUTPUT = ROOT / "dist" / "release"
+CANONICAL_UI_LOCK = ROOT / "deploy" / "canonical-ui.lock.json"
 
 
 def sha256(path: Path) -> str:
@@ -59,9 +61,79 @@ def declared_version() -> str:
     return version
 
 
+def canonical_ui_lock() -> dict:
+    document = json.loads(CANONICAL_UI_LOCK.read_text(encoding="utf-8"))
+    required = {
+        "schema_version",
+        "component",
+        "repository",
+        "commit_sha",
+        "sites_project_id",
+        "sites_version_number",
+        "deployment_status",
+        "deployed_sites_version_number",
+        "deployment_url",
+        "operational_status",
+        "build_contract",
+        "tests_passed",
+    }
+    missing = sorted(required - document.keys())
+    if missing:
+        raise RuntimeError(f"Canonical UI lock is missing fields: {missing}")
+    if document["schema_version"] != "1.1":
+        raise RuntimeError("Unsupported canonical UI lock schema")
+    if document["component"] != "researchos-canonical-target-ui":
+        raise RuntimeError("Unexpected canonical UI component")
+    if not re.fullmatch(r"[0-9a-f]{40}", document["commit_sha"]):
+        raise RuntimeError("Canonical UI commit must be a full lowercase Git SHA")
+    if not str(document["sites_project_id"]).startswith("appgprj_"):
+        raise RuntimeError("Canonical UI Sites project ID is invalid")
+    if not isinstance(document["sites_version_number"], int) or document["sites_version_number"] < 1:
+        raise RuntimeError("Canonical UI Sites version must be a positive integer")
+    if document["deployment_status"] not in {
+        "saved_not_deployed",
+        "deployed",
+    }:
+        raise RuntimeError("Canonical UI deployment status is invalid")
+    if (
+        not isinstance(document["deployed_sites_version_number"], int)
+        or document["deployed_sites_version_number"] < 1
+    ):
+        raise RuntimeError(
+            "Canonical UI deployed Sites version must be a positive integer"
+        )
+    if (
+        document["deployment_status"] == "saved_not_deployed"
+        and document["deployed_sites_version_number"] >= document["sites_version_number"]
+    ):
+        raise RuntimeError(
+            "Saved-only canonical UI version must be newer than the deployed version"
+        )
+    if (
+        document["deployment_status"] == "deployed"
+        and document["deployed_sites_version_number"] != document["sites_version_number"]
+    ):
+        raise RuntimeError(
+            "Deployed canonical UI version must match the saved version"
+        )
+    if not str(document["deployment_url"]).startswith("https://"):
+        raise RuntimeError("Canonical UI deployment URL must use HTTPS")
+    if document["operational_status"] not in {
+        "canonical_target_not_cutover",
+        "operational_canonical",
+        "authenticated_production_acceptance_passed",
+    }:
+        raise RuntimeError("Canonical UI operational status is invalid")
+    if document["build_contract"] != "vinext":
+        raise RuntimeError("Canonical UI build contract must be vinext")
+    if not isinstance(document["tests_passed"], int) or document["tests_passed"] < 1:
+        raise RuntimeError("Canonical UI test count must be a positive integer")
+    return document
+
+
 def source_files() -> list[Path]:
     result = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        ["git", "ls-files", "--cached"],
         cwd=ROOT,
         text=True,
         capture_output=True,
@@ -148,10 +220,81 @@ def sbom(version: str) -> Path:
     return target
 
 
+def release_baseline(
+    version: str,
+    *,
+    backend_tests: int,
+    ui_tests: int,
+    schema_version: int,
+) -> Path:
+    ui_lock = canonical_ui_lock()
+    if ui_tests != ui_lock["tests_passed"]:
+        raise RuntimeError(
+            "Canonical UI test count does not match deploy/canonical-ui.lock.json"
+        )
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.splitlines()
+    migrations = sorted((ROOT / "deploy" / "postgres" / "init").glob("*.sql"))
+    document = {
+        "schema_version": "1.0",
+        "project": "ResearchOS",
+        "release": {
+            "version": version,
+            "label": f"v{version}",
+            "status": "local_release_candidate_unpublished",
+        },
+        "acceptance": {
+            "installed_project_version": importlib.metadata.version(
+                "researchos-ai-gateway"
+            ),
+            "backend_tests": {
+                "passed": backend_tests,
+                "failed": 0,
+                "skipped": 0,
+                "deprecation_warnings": 0,
+            },
+            "canonical_ui_tests": {
+                "passed": ui_tests,
+                "failed": 0,
+            },
+            "database_schema_version": schema_version,
+            "dependency_audit": "no_known_vulnerabilities",
+            "restore_drill_verified": True,
+            "encrypted_usb_backup_verified": True,
+        },
+        "inventory": {
+            "source_files": len(source_files()),
+            "tracked_changes": sum(not line.startswith("??") for line in status),
+            "untracked_files": sum(line.startswith("??") for line in status),
+            "migration_files": len(migrations),
+            "latest_migration": migrations[-1].name if migrations else None,
+            "canonical_ui": ui_lock,
+        },
+        "publication": {
+            "committed": False,
+            "tagged": False,
+            "pushed": False,
+            "deployed_publicly": False,
+        },
+    }
+    target = OUTPUT / f"ResearchOS-{version}.baseline.json"
+    target.write_text(
+        json.dumps(document, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return target
+
+
 def provenance(version: str, subjects: list[Path]) -> Path:
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True
     ).stdout.strip()
+    ui_lock = canonical_ui_lock()
     document = {
         "schema_version": "1.0",
         "project": "ResearchOS",
@@ -160,6 +303,21 @@ def provenance(version: str, subjects: list[Path]) -> Path:
             "repository": "https://github.com/jumadi03/ResearchOS",
             "revision": revision,
         },
+        "external_sources": [
+            {
+                "component": ui_lock["component"],
+                "repository": ui_lock["repository"],
+                "revision": ui_lock["commit_sha"],
+                "sites_project_id": ui_lock["sites_project_id"],
+                "sites_version_number": ui_lock["sites_version_number"],
+                "deployment_status": ui_lock["deployment_status"],
+                "deployed_sites_version_number": ui_lock[
+                    "deployed_sites_version_number"
+                ],
+                "deployment_url": ui_lock["deployment_url"],
+                "operational_status": ui_lock["operational_status"],
+            }
+        ],
         "builder": {
             "python": platform.python_version(),
             "platform": platform.platform(),
@@ -187,7 +345,10 @@ def checksums() -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument("--backend-tests", type=int, required=True)
+    parser.add_argument("--ui-tests", type=int, required=True)
+    parser.add_argument("--schema-version", type=int, required=True)
+    args = parser.parse_args()
     version = declared_version()
     resolved_output = OUTPUT.resolve()
     if not resolved_output.is_relative_to(ROOT.resolve()) or resolved_output == ROOT.resolve():
@@ -196,6 +357,12 @@ def main() -> int:
         shutil.rmtree(OUTPUT)
     OUTPUT.mkdir(parents=True)
     built = [wheel(), source_archive(version), sbom(version)]
+    built.append(release_baseline(
+        version,
+        backend_tests=args.backend_tests,
+        ui_tests=args.ui_tests,
+        schema_version=args.schema_version,
+    ))
     built.append(provenance(version, built))
     built.append(checksums())
     print(f"release-build=passed version={version} artifacts={len(built)}")

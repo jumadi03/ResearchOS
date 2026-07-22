@@ -14,6 +14,35 @@ class PublicationKind(StrEnum):
     EVIDENCE_BRIEF = "evidence_brief"
 
 
+class PublicationRelationType(StrEnum):
+    CORRECTS = "corrects"
+    SUPERSEDES = "supersedes"
+    RETRACTS = "retracts"
+
+
+@dataclass(frozen=True, slots=True)
+class PublicationRelationship:
+    relationship_id: str
+    source_publication_id: str
+    relation_type: PublicationRelationType
+    target_publication_id: str | None
+    actor_id: str
+    rationale: str
+    occurred_at: str
+    content_hash: str = ""
+    schema_version: str = "1.0"
+
+    def finalized(self):
+        payload = asdict(replace(self, content_hash=""))
+        digest = sha256(json.dumps(
+            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()).hexdigest()
+        return replace(self, content_hash=digest)
+
+    def verify(self) -> bool:
+        return bool(self.content_hash) and self.finalized().content_hash == self.content_hash
+
+
 @dataclass(frozen=True, slots=True)
 class CitationVerification:
     cited_evidence_ids: tuple[str, ...]

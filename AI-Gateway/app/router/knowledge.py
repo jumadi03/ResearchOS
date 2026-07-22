@@ -1,6 +1,8 @@
 """Authenticated HTTP boundary for SK-001A."""
 
 from dataclasses import asdict
+import os
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials
@@ -16,15 +18,19 @@ from app.models.knowledge import (
     DocumentAcquisitionRequest, LiteratureDiscoveryRequest,
     CitationTraversalRequest,
     ArtifactTransitionRequest, EvidenceReviewRequest, PublicationPreviewRequest,
-    PublicationRequest,
+    PublicationRequest, PublicationRelationshipRequest,
     KnowledgeIntakeRequest, SemanticIndexRequest, SemanticSearchRequest,
+    SemanticRelationProposalRequest, SemanticRelationReviewRequest,
+    SemanticReextractionRequest,
+    CrossStudyPropositionRequest, CrossStudyPropositionReviewRequest,
     TheoryBuildRequest,
     TheoryAlignmentDecisionRequest, TheoryAlignmentRequest, TheoryReviewRequest,
     TheoryValidationRequest,
     TheoryTranslationGenerateRequest, TheoryTranslationReviewRequest,
     TheoryTranslationSubmissionRequest,
     SourceWatchRequest, ScientificChangeAcknowledgementRequest,
-    SourceWatchTransitionRequest,
+    SourceWatchTransitionRequest, ImpactReviewResolutionRequest,
+    FollowUpCaseTargetRequest,
 )
 from app.knowledge.ingestion.models import AccessStatus, DocumentCandidate
 from app.knowledge.retrieval.snowballing import CitationDirection
@@ -32,12 +38,45 @@ from app.knowledge.extraction.models import (
     EpistemicClassification, EvidenceReviewAssessment,
 )
 from app.runtime.models.runtime_request import RuntimeRequest
-from app.router.knowledge_dependencies import authorize, bearer
+from app.product.operational_status import build_operational_status
+from app.product.storage_tiers import read_storage_tier_status
+from app.settings import DATABASE_URL
+from app.router.knowledge_dependencies import authorize, authorize_any, bearer
 from app.router.knowledge_workspace import router as workspace_router
 
 
 router = APIRouter(prefix="/knowledge", tags=["scientific-knowledge"])
 router.include_router(workspace_router)
+
+@router.get("/operations/status")
+def operational_status(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials,
+        KnowledgeRole.ADMIN, KnowledgeRole.AUDITOR, KnowledgeRole.REVIEWER,
+    )
+    return build_operational_status(
+        monitor_path=Path(os.getenv(
+            "OPERATIONS_STATE_PATH", "/operations-state/health.json"
+        )),
+        backup_root=Path(os.getenv("BACKUP_STATUS_ROOT", "/backups")),
+        deployed_commit_path=Path(os.getenv(
+            "DEPLOYED_COMMIT_PATH", "/runtime/DEPLOYED_COMMIT"
+        )),
+    )
+
+@router.get("/operations/storage-tiers")
+def storage_tier_status(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials,
+        KnowledgeRole.ADMIN, KnowledgeRole.AUDITOR, KnowledgeRole.REVIEWER,
+    )
+    return read_storage_tier_status(DATABASE_URL)
 
 @router.get("/discovery/capabilities")
 def discovery_capabilities(
@@ -300,6 +339,71 @@ def acknowledge_scientific_change(
     }
 
 
+@router.post("/impact-reviews/{change_id}/resolutions", status_code=201)
+def resolve_impact_review(
+    change_id: str, req: ImpactReviewResolutionRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        resolution = request.app.state.knowledge_service.resolve_impact_review(
+            change_id, decision=req.decision, reviewer_id=principal.actor_id,
+            rationale=req.rationale, occurred_at=req.occurred_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        **asdict(resolution),
+        "follow_up_case": resolution.follow_up_case(),
+    }
+
+
+def _select_follow_up_target(
+    resolution_id, req, request, credentials, target_kind, required_role,
+):
+    principal = authorize(request, credentials, required_role)
+    try:
+        selection = request.app.state.knowledge_service.select_follow_up_target(
+            resolution_id, target_kind=target_kind,
+            target_object_id=req.target_object_id,
+            selector_id=principal.actor_id, rationale=req.rationale,
+            occurred_at=req.occurred_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return asdict(selection)
+
+
+@router.post(
+    "/evidence-follow-up-cases/{resolution_id}/targets", status_code=201
+)
+def select_evidence_follow_up_target(
+    resolution_id: str, req: FollowUpCaseTargetRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    return _select_follow_up_target(
+        resolution_id, req, request, credentials, "evidence",
+        KnowledgeRole.REVIEWER,
+    )
+
+
+@router.post(
+    "/publication-follow-up-cases/{resolution_id}/targets", status_code=201
+)
+def select_publication_follow_up_target(
+    resolution_id: str, req: FollowUpCaseTargetRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    return _select_follow_up_target(
+        resolution_id, req, request, credentials, "publication",
+        KnowledgeRole.PUBLISHER,
+    )
+
+
 @router.post("/discovery/runs/{run_id}/documents", status_code=201)
 def acquire_document(
     run_id: str,
@@ -407,6 +511,21 @@ def build_knowledge_graph(
     return result
 
 
+@router.get("/graphs/{graph_id}/lifecycle")
+def graph_lifecycle(
+    graph_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
+    try:
+        projection = request.app.state.knowledge_service.graph_lifecycle(graph_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return asdict(projection)
+
+
 @router.post("/extractions/{extraction_id}/intake", status_code=201)
 def intake_accepted_evidence(
     extraction_id: str,
@@ -420,6 +539,7 @@ def intake_accepted_evidence(
             request.app.state.knowledge_service.intake_accepted_evidence(
                 extraction_id,
                 evidence_object_ids=tuple(req.evidence_object_ids),
+                semantic_relation_ids=tuple(req.semantic_relation_ids),
                 actor_id=principal.actor_id,
                 occurred_at=req.occurred_at,
             )
@@ -434,6 +554,147 @@ def intake_accepted_evidence(
         "intake_snapshot": intake_snapshot.name,
         "graph_snapshot": graph_snapshot.name,
         "integrity_verified": intake.verify() and graph.verify(),
+    }
+
+
+@router.post(
+    "/extractions/{extraction_id}/semantic-relations", status_code=201,
+)
+def propose_semantic_relation(
+    extraction_id: str, req: SemanticRelationProposalRequest,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.DISCOVERER)
+    try:
+        relation, snapshot = (
+            request.app.state.knowledge_service.propose_semantic_relation(
+                extraction_id, source_object_id=req.source_object_id,
+                target_object_id=req.target_object_id,
+                edge_type=req.edge_type,
+                provenance_object_id=req.provenance_object_id,
+                proposed_by=principal.actor_id, rationale=req.rationale,
+                proposed_at=req.proposed_at,
+            )
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(relation)
+    result["snapshot"] = snapshot.name
+    return result
+
+
+@router.post(
+    "/extractions/{extraction_id}/semantic-reextractions", status_code=201,
+)
+def semantic_reextract(
+    extraction_id: str, req: SemanticReextractionRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize(request, credentials, KnowledgeRole.DISCOVERER)
+    try:
+        manifest, snapshot = (
+            request.app.state.knowledge_service.semantic_reextract(
+                extraction_id,
+                evidence_object_ids=tuple(req.evidence_object_ids),
+            )
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(manifest)
+    result["snapshot"] = snapshot.name
+    result["integrity_verified"] = manifest.verify()
+    return result
+
+
+@router.post("/semantic-relations/{relation_id}/reviews")
+def review_semantic_relation(
+    relation_id: str, req: SemanticRelationReviewRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        relation, snapshot = (
+            request.app.state.knowledge_service.review_semantic_relation(
+                relation_id, decision=req.decision,
+                reviewer=principal.actor_id, rationale=req.rationale,
+                occurred_at=req.occurred_at,
+            )
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(relation)
+    result["snapshot"] = snapshot.name
+    return result
+
+
+@router.get("/semantic-relations")
+def list_semantic_relations(
+    request: Request, extraction_id: str | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER,
+        KnowledgeRole.INDEXER, KnowledgeRole.AUDITOR,
+    )
+    return {
+        "items": [
+            asdict(item)
+            for item in request.app.state.knowledge_service.list_semantic_relations(
+                extraction_id=extraction_id,
+            )
+        ]
+    }
+
+
+@router.get(
+    "/extractions/{extraction_id}/semantic-relation-review-queue"
+)
+def semantic_relation_review_queue(
+    extraction_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials, KnowledgeRole.DISCOVERER,
+        KnowledgeRole.REVIEWER, KnowledgeRole.AUDITOR,
+    )
+    try:
+        queue = (
+            request.app.state.knowledge_service
+            .semantic_relation_review_queue(extraction_id)
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return asdict(queue) if not isinstance(queue, dict) else {
+        **queue,
+        "accepted_objects": [
+            asdict(item) for item in queue["accepted_objects"]
+        ],
+        "review_context": [{
+            **item,
+            "review_event": asdict(item["review_event"]),
+        } for item in queue["review_context"]],
+        "proposals": [{
+            "relation": asdict(item["relation"]),
+            "source": (
+                asdict(item["source"]) if item["source"] is not None else None
+            ),
+            "target": (
+                asdict(item["target"]) if item["target"] is not None else None
+            ),
+            "provenance": (
+                asdict(item["provenance"])
+                if item["provenance"] is not None else None
+            ),
+        } for item in queue["proposals"]],
     }
 
 
@@ -478,12 +739,112 @@ def build_theories(req: TheoryBuildRequest, request: Request, credentials: HTTPA
     return result
 
 
+@router.post("/cross-study-propositions", status_code=201)
+def propose_cross_study_proposition(
+    req: CrossStudyPropositionRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.DISCOVERER)
+    try:
+        item, snapshot = (
+            request.app.state.knowledge_service.propose_cross_study_proposition(
+                statement=req.statement,
+                evidence_references=tuple(
+                    (ref.graph_id, ref.object_id, ref.stance)
+                    for ref in req.evidence
+                ),
+                proposed_by=principal.actor_id, rationale=req.rationale,
+                proposed_at=req.proposed_at,
+            )
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(item)
+    result["snapshot"] = snapshot.name
+    result["integrity_verified"] = item.verify()
+    return result
+
+
+@router.get("/cross-study-propositions")
+def list_cross_study_propositions(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
+    return {
+        "items": [
+            asdict(item)
+            for item in (
+                request.app.state.knowledge_service
+                .list_cross_study_propositions()
+            )
+        ]
+    }
+
+
+@router.post(
+    "/cross-study-propositions/{proposition_id}/reviews", status_code=201,
+)
+def review_cross_study_proposition(
+    proposition_id: str, req: CrossStudyPropositionReviewRequest,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    try:
+        item, snapshot = (
+            request.app.state.knowledge_service.review_cross_study_proposition(
+                proposition_id, decision=req.decision,
+                reviewer=principal.actor_id, rationale=req.rationale,
+                occurred_at=req.occurred_at,
+            )
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(item)
+    result["snapshot"] = snapshot.name
+    result["integrity_verified"] = item.verify()
+    return result
+
+
+@router.post(
+    "/cross-study-propositions/{proposition_id}/theory-bundles",
+    status_code=201,
+)
+def build_cross_study_proposition_theory(
+    proposition_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.DISCOVERER)
+    try:
+        bundle, snapshot = (
+            request.app.state.knowledge_service
+            .build_cross_study_proposition_theory(
+                proposition_id, generated_by=principal.actor_id,
+            )
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = asdict(bundle)
+    result["snapshot"] = snapshot.name
+    result["integrity_verified"] = bundle.verify()
+    return result
+
+
 @router.get("/theories")
 def list_theory_bundles(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(bearer),
 ):
-    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
     return {"items": list(request.app.state.knowledge_service.list_theory_bundles())}
 
 
@@ -852,7 +1213,12 @@ def transition_artifact(
     artifact_id: str, req: ArtifactTransitionRequest, request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(bearer),
 ):
-    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    required_role = (
+        KnowledgeRole.PUBLISHER
+        if req.to_status == "published"
+        else KnowledgeRole.REVIEWER
+    )
+    principal = authorize(request, credentials, required_role)
     try:
         event = request.app.state.knowledge_service.transition_artifact(
             artifact_id, to_status=req.to_status, actor_id=principal.actor_id,
@@ -930,9 +1296,24 @@ def validation_history(
     return {"bundle_id": bundle_id, "items": items}
 
 
+@router.get("/theories/{bundle_id}/dependency-impact")
+def dependency_impact(
+    bundle_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
+    try:
+        impact = request.app.state.knowledge_service.dependency_impact(bundle_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return asdict(impact)
+
+
 @router.post("/theories/{bundle_id}/publications", status_code=201)
 def publish(bundle_id: str, req: PublicationRequest, request: Request, credentials: HTTPAuthorizationCredentials | None = Security(bearer)):
-    principal = authorize(request, credentials, KnowledgeRole.REVIEWER)
+    principal = authorize(request, credentials, KnowledgeRole.PUBLISHER)
     try:
         package, location = request.app.state.knowledge_service.publish(
             bundle_id, validation_report_id=req.validation_report_id,
@@ -954,7 +1335,9 @@ def publication_readiness(
     validation_report_id: str | None = None,
     credentials: HTTPAuthorizationCredentials | None = Security(bearer),
 ):
-    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
     try:
         return request.app.state.knowledge_service.publication_readiness(
             bundle_id, kind=kind, validation_report_id=validation_report_id,
@@ -991,7 +1374,9 @@ def publication_history(
     bundle_id: str, request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(bearer),
 ):
-    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
     try:
         packages = request.app.state.knowledge_service.publication_history(bundle_id)
     except KeyError as exc:
@@ -1007,7 +1392,9 @@ def publication_package(
     bundle_id: str, publication_id: str, request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(bearer),
 ):
-    authorize(request, credentials, KnowledgeRole.REVIEWER)
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
     try:
         package = request.app.state.knowledge_service.publication_package(
             bundle_id, publication_id,
@@ -1019,3 +1406,39 @@ def publication_package(
         "package_content_hash": package.content_hash,
         "integrity_verified": package.verify(),
     }
+
+
+@router.post("/publications/{publication_id}/relationships", status_code=201)
+def relate_publication(
+    publication_id: str, req: PublicationRelationshipRequest, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    principal = authorize(request, credentials, KnowledgeRole.PUBLISHER)
+    try:
+        relationship, snapshot = request.app.state.knowledge_service.relate_publication(
+            publication_id, relation_type=req.relation_type,
+            target_publication_id=req.target_publication_id,
+            actor_id=principal.actor_id, rationale=req.rationale,
+            occurred_at=req.occurred_at,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {**asdict(relationship), "snapshot": snapshot.name}
+
+
+@router.get("/publications/{publication_id}/lifecycle")
+def publication_lifecycle(
+    publication_id: str, request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer),
+):
+    authorize_any(
+        request, credentials, KnowledgeRole.REVIEWER, KnowledgeRole.PUBLISHER
+    )
+    try:
+        return request.app.state.knowledge_service.publication_lifecycle(
+            publication_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

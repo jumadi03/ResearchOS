@@ -60,6 +60,10 @@ class ScientificDataRepository(Protocol):
         self, change_id: str, **options,
     ) -> str: ...
 
+    def resolve_impact_review(self, change_id: str, **options): ...
+
+    def select_follow_up_target(self, resolution_id: str, **options): ...
+
     def persist_representation(
         self, record: LiteratureRecord, result: AcquisitionResult, storage_uri: str,
     ) -> tuple[str, int]: ...
@@ -79,7 +83,8 @@ class ScientificDataRepository(Protocol):
     def validate_screening_decision(self, decision: ScreeningDecision) -> None: ...
 
     def persist_evidence(
-        self, record: LiteratureRecord, manifest: ExtractionManifest,
+        self, record: LiteratureRecord | None, manifest: ExtractionManifest,
+        *, source_extraction_id: str | None = None,
     ) -> tuple[str, ...]: ...
 
     def load_extraction_manifest(self, extraction_id: str) -> ExtractionManifest: ...
@@ -115,6 +120,8 @@ class ScientificDataRepository(Protocol):
         edition_type: str, published_at: str,
     ) -> StoredRepresentation: ...
 
+    def record_publication_relationship(self, relationship): ...
+
     def enqueue_semantic_index(
         self, *, object_type: str, object_id: str, model: str,
         embedding: tuple[float, ...], metadata: dict,
@@ -135,6 +142,10 @@ class ScientificDataRepository(Protocol):
     def get_object_read_model(self, object_ref: str, project_id: str) -> dict: ...
 
     def get_work_queue(self, project_id: str) -> dict: ...
+
+    def get_discovery_workflow_state(
+        self, project_id: str, record_ids: tuple[str, ...],
+    ) -> tuple[dict, ...]: ...
 
     def get_project_graph(
         self, project_id: str, *, limit: int, relationship_types: tuple[str, ...],

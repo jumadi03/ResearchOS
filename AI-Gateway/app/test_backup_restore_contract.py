@@ -33,6 +33,7 @@ def test_backup_producer_publishes_a_hash_bound_portable_manifest():
     assert r'\"name\":\"migration\"' in script
     assert "snapshot_tree()" in script
     assert "write_tree_manifest()" in script
+    assert "! -path './.researchos-tree-manifest.txt'" in script
     assert 'write_tree_manifest "$destination" "$copied"' in script
     assert 'cmp --silent "$before" "$copied"' in script
     assert 'cmp --silent "$before" "$after"' in script
@@ -66,13 +67,32 @@ def test_administration_ui_uses_restore_verified_recovery_semantics():
     assert "${r.ready?" not in script
 
 
-def test_schema_version_32_is_consistent():
+def test_schema_version_42_is_consistent():
     settings = (ROOT / "AI-Gateway/app/settings.py").read_text(encoding="utf-8")
     environment = (ROOT / "deploy/stack.env.example").read_text(encoding="utf-8")
     healthcheck = (
         ROOT / "deploy/verify/canonical_storage_healthcheck.sql"
     ).read_text(encoding="utf-8")
 
-    assert 'DATABASE_SCHEMA_VERSION", "32"' in settings
-    assert "DATABASE_SCHEMA_VERSION=32" in environment
-    assert "max(version),0) FROM schema_migrations) <> 32" in healthcheck
+    assert 'DATABASE_SCHEMA_VERSION", "42"' in settings
+    assert "DATABASE_SCHEMA_VERSION=42" in environment
+    assert "max(version),0) FROM schema_migrations) <> 42" in healthcheck
+    assert "evidence_current_review_projection" in healthcheck
+    assert "projection coverage is incomplete" in healthcheck
+
+
+def test_migration_checksums_are_line_ending_stable():
+    runner = (ROOT / "deploy/migrate/migrate.sh").read_text(encoding="utf-8")
+
+    assert runner.count("tr -d '\\r' < \"$file\" | sha256sum") == 2
+
+
+def test_historical_checksum_drift_is_narrowly_allowlisted():
+    runner = (ROOT / "deploy/migrate/migrate.sh").read_text(encoding="utf-8")
+
+    assert "checksum_compatibility_admitted" in runner
+    assert "29:08fb62ef" in runner
+    assert "30:ab136fe9" in runner
+    assert "31:42260436" in runner
+    assert "32:6f5d8c46" in runner
+    assert '*) return 1 ;;' in runner

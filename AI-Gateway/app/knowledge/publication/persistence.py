@@ -7,6 +7,7 @@ from pathlib import Path
 from app.architecture.persistence import atomic_write
 from app.knowledge.publication.models import (
     CitationVerification, PublicationKind, PublicationManifest, PublicationPackage,
+    PublicationRelationship, PublicationRelationType,
 )
 
 
@@ -65,3 +66,36 @@ class PublicationStore:
                 )
             packages.append(package)
         return tuple(packages)
+
+
+class PublicationRelationshipStore:
+    def __init__(self, root: Path) -> None: self.root = root
+
+    def save(self, item: PublicationRelationship) -> Path:
+        if not item.verify():
+            raise ValueError("Publication relationship integrity verification failed")
+        path = self.root / f"{item.relationship_id}.json"
+        payload = json.dumps(asdict(item), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if path.exists():
+            if path.read_text(encoding="utf-8") != payload:
+                raise FileExistsError("Publication relationship is immutable")
+            return path
+        atomic_write(path, payload)
+        return path
+
+    def load_all(self) -> tuple[PublicationRelationship, ...]:
+        if not self.root.exists(): return ()
+        items = []
+        for path in sorted(self.root.glob("*.json")):
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            item = PublicationRelationship(
+                raw["relationship_id"], raw["source_publication_id"],
+                PublicationRelationType(raw["relation_type"]),
+                raw.get("target_publication_id"), raw["actor_id"],
+                raw["rationale"], raw["occurred_at"], raw["content_hash"],
+                raw.get("schema_version", "1.0"),
+            )
+            if not item.verify():
+                raise ValueError(f"Publication relationship integrity failed: {path.name}")
+            items.append(item)
+        return tuple(items)

@@ -74,6 +74,15 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _migration_checksum_candidates(path: Path) -> set[str]:
+    """Return raw and LF-normalized hashes accepted by historical ledgers."""
+    content = path.read_bytes()
+    return {
+        sha256(content).hexdigest(),
+        sha256(content.replace(b"\r\n", b"\n")).hexdigest(),
+    }
+
+
 def _safe_extract(archive: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=False)
     seen: set[str] = set()
@@ -225,7 +234,10 @@ def _restore_postgresql(
     if not sql_files:
         raise RestoreDrillError("Migration archive contains no SQL files")
     expected = {
-        int(path.name.split("_", 1)[0]): (path.name, _sha256_file(path))
+        int(path.name.split("_", 1)[0]): (
+            path.name,
+            _migration_checksum_candidates(path),
+        )
         for path in sql_files
     }
     ledger = _run(
@@ -245,7 +257,10 @@ def _restore_postgresql(
     for line in ledger.splitlines():
         version, filename, checksum = line.split("|", 2)
         actual[int(version)] = (filename, checksum)
-    if actual != expected:
+    if set(actual) != set(expected) or any(
+        actual[version][0] != filename or actual[version][1] not in checksums
+        for version, (filename, checksums) in expected.items()
+    ):
         raise RestoreDrillError("Restored schema_migrations ledger does not match migration files")
     canonical_count = _run(
         runner,
@@ -424,7 +439,8 @@ def execute_restore_drill(
             cleanup_verified = _cleanup(runner)
             if not cleanup_verified:
                 outcome = "failed"
-                error = "Isolated restore target cleanup failed"
+                cleanup_error = "Isolated restore target cleanup failed"
+                error = f"{error}; {cleanup_error}" if error else cleanup_error
     completed_at = _utcnow()
     report: dict[str, Any] = {
         "schema_version": "1.0",

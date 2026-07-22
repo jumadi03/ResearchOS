@@ -1,0 +1,14 @@
+{
+  "evidence": {
+    "object_sentinel_sha256": "0d96e010e4ec5fed0dbf0d96987796f3f8537537e0b1443ce88354fcaa324f01",
+    "postgres_system_identifier": "7662768702744834086",
+    "schema_version": 41,
+    "workspace_user_count": 6,
+    "workspace_user_hash": "c69a4ac7eac8514a4ac63f94c936cdaeb5a99378584c63aa85a14a18ac5fecbc"
+  },
+  "restart": "docker_compose_restart_data_preserved",
+  "result": "passed",
+  "schema_version": "1.0",
+  "sentinel_cleanup": "passed",
+  "verified_at": "2026-07-19T14:43:35.566984+00:00"
+}

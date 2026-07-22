@@ -90,6 +90,23 @@ class OpenAlexProvider(HttpProvider):
     citation_directions = ("backward", "forward")
 
     def search(self, plan: SearchPlan) -> tuple[ProviderPage, ...]:
+        doi = plan.query_for(self.name).strip()
+        doi = re.sub(
+            r"^https?://(?:dx\.)?doi\.org/", "", doi,
+            flags=re.IGNORECASE,
+        )
+        if re.fullmatch(r"10\.\d{4,9}/\S+", doi, flags=re.IGNORECASE):
+            response = self._get(
+                {},
+                url=f"{self.base_url}/https://doi.org/{quote(doi, safe='/')}",
+            )
+            record = response.json()
+            return (ProviderPage(
+                (record,) if record.get("id") else (),
+                response.url,
+                1 if record.get("id") else 0,
+            ),)
+
         filters = []
         if plan.year_from:
             filters.append(f"from_publication_date:{plan.year_from}-01-01")

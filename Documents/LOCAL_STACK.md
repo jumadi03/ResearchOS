@@ -25,12 +25,39 @@ py -3.13 Scripts\bootstrap_local.py
 ```
 
 The command generates the three ignored credential files, starts the stack,
-creates the `discoverer`, `auditor`, `reviewer`, `indexer`, and `admin` browser
-accounts, and verifies both account login and canonical MinIO buckets. Complete
+creates the `discoverer`, `auditor`, `reviewer`, `indexer`, `publisher`, and
+`admin` browser accounts, and verifies both account login and canonical MinIO buckets. Complete
 existing configuration is reused. A partial configuration fails closed instead
 of guessing or overwriting credentials. Existing ResearchOS volumes without
 their ignored credential files are also rejected; restore the credential files
 rather than generating incompatible passwords for persisted data.
+
+Bootstrap succeeds only after the live `/ready` contract confirms
+authentication, PostgreSQL, schema version, worker heartbeat, object storage,
+and local persistence paths, and after `/workspace` renders its login
+interface. Use the same controller for routine operation:
+
+```powershell
+py -3.13 Scripts\bootstrap_local.py --status
+py -3.13 Scripts\bootstrap_local.py --stop
+```
+
+`--status` is read-only and fails when credentials are incomplete, services
+are stopped, a runtime dependency is unavailable, or the workspace cannot be
+rendered. `--stop` performs a normal Compose shutdown and preserves volumes
+and ignored credential files.
+
+Verify continuity across a routine restart from the repository root:
+
+```powershell
+py -3.13 Scripts\verify_local_continuity.py
+```
+
+The verifier compares the PostgreSQL system identity, migration version, and
+hashed workspace-account inventory before and after restart. It also writes,
+retrieves, verifies, and removes a random MinIO sentinel. Its ignored JSON
+report contains hashes and counts only; credentials and sentinel content are
+not recorded.
 
 Run commands from `deploy` and always supply the untracked local environment:
 
@@ -261,6 +288,14 @@ Reports are retained below the ignored
 `deploy/restore/reports/<run-id>/` directory. The controller does not accept
 backup paths, target identifiers, report paths, database URLs, or key paths.
 It is not a scheduler and is not exposed through the API, UI, or worker.
+
+The latest local end-to-end execution and its live recovery projection are
+recorded in
+[`LOCAL_RECOVERY_ACCEPTANCE_REPORT.md`](LOCAL_RECOVERY_ACCEPTANCE_REPORT.md).
+
+The verified local login, discovery, logout, login-renewal, and persistence
+flow is recorded in
+[`LOCAL_BROWSER_ACCEPTANCE_REPORT.md`](LOCAL_BROWSER_ACCEPTANCE_REPORT.md).
 
 Phase 1F-D adds a canonical schedule that starts paused. Inspect it from
 `deploy`:

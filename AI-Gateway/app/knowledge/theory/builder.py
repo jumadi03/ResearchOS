@@ -36,18 +36,35 @@ class TheoryBuilder:
             for node in graph.nodes:
                 if node.node_type is not KnowledgeNodeType.CONCLUSION:
                     continue
-                evidence = []
+                evidence_by_source = {}
                 for edge in graph.edges:
                     if edge.target_id == node.node_id and edge.edge_type is KnowledgeEdgeType.SUPPORTS:
-                        evidence.append(TheoryEvidence(
+                        candidate = TheoryEvidence(
                             edge.edge_id, graph.graph_id, edge.provenance.object_id,
                             EvidenceStance.SUPPORTS, edge.provenance.confidence,
                             edge.provenance.quote_hash, edge.provenance.document_id,
                             edge.provenance.page,
-                        ))
+                        )
+                        source_key = (
+                            graph.graph_id, edge.provenance.object_id,
+                            edge.provenance.quote_hash,
+                        )
+                        existing = evidence_by_source.get(source_key)
+                        if (
+                            existing is None
+                            or (-candidate.confidence, candidate.edge_id)
+                            < (-existing.confidence, existing.edge_id)
+                        ):
+                            evidence_by_source[source_key] = candidate
                 key = self._claim_key(node.label)
                 if key:
-                    claims.setdefault(key, []).append((node.label.strip(), tuple(evidence)))
+                    claims.setdefault(key, []).append((
+                        node.label.strip(),
+                        tuple(sorted(
+                            evidence_by_source.values(),
+                            key=lambda item: (item.graph_id, item.edge_id),
+                        )),
+                    ))
         proposals = []
         for key, occurrences in sorted(claims.items()):
             statement = min((item[0] for item in occurrences), key=self._statement_rank)
@@ -71,6 +88,100 @@ class TheoryBuilder:
             f"theory-bundle-{sha256(identity.encode()).hexdigest()[:24]}", graph_ids,
             created_at, tuple(sorted(proposals, key=lambda item: item.theory_id)),
             tuple(competing),
+        ).finalized()
+
+    def build_cross_study(
+        self, graphs: tuple[ScientificKnowledgeGraph, ...], *,
+        created_at: str,
+    ) -> TheoryBundle:
+        """Build propositions from explicitly supported, independent evidence."""
+        bundle = self.build(graphs, created_at=created_at)
+        eligible_types = {
+            KnowledgeNodeType.RESULT,
+            KnowledgeNodeType.LIMITATION,
+            KnowledgeNodeType.CONCLUSION,
+        }
+        claims: dict[str, list[tuple[str, TheoryEvidence]]] = {}
+        for graph in graphs:
+            for node in graph.nodes:
+                if node.node_type not in eligible_types or node.provenance is None:
+                    continue
+                support_edges = (
+                    edge for edge in graph.edges
+                    if edge.edge_type is KnowledgeEdgeType.SUPPORTS
+                    and node.node_id in (edge.source_id, edge.target_id)
+                )
+                key = self._claim_key(node.label)
+                if len(self._candidate_tokens(node.label)) < 3:
+                    continue
+                for edge in support_edges:
+                    provenance = node.provenance
+                    claims.setdefault(key, []).append((
+                        node.label.strip(),
+                        TheoryEvidence(
+                            edge.edge_id, graph.graph_id, provenance.object_id,
+                            EvidenceStance.SUPPORTS, provenance.confidence,
+                            provenance.quote_hash, provenance.document_id,
+                            provenance.page,
+                        ),
+                    ))
+        proposals = []
+        for key, occurrences in sorted(claims.items()):
+            evidence_by_source = {}
+            for _, candidate in occurrences:
+                source_key = (
+                    candidate.graph_id, candidate.object_id,
+                    candidate.quote_hash,
+                )
+                existing = evidence_by_source.get(source_key)
+                if (
+                    existing is None
+                    or (-candidate.confidence, candidate.edge_id)
+                    < (-existing.confidence, existing.edge_id)
+                ):
+                    evidence_by_source[source_key] = candidate
+            evidence = tuple(sorted(
+                evidence_by_source.values(),
+                key=lambda item: (item.graph_id, item.edge_id),
+            ))
+            graph_ids = {item.graph_id for item in evidence}
+            object_ids = {item.object_id for item in evidence}
+            if len(graph_ids) < 2 or len(object_ids) < 2:
+                continue
+            source = min(
+                (statement for statement, _ in occurrences),
+                key=self._statement_rank,
+            )
+            source = " ".join(source.split())
+            if not source:
+                continue
+            proposition = (
+                "Independent evidence across studies supports the proposition "
+                f"that {source[0].lower() + source[1:]}"
+            )
+            identity = self._claim_key(proposition)
+            proposals.append(TheoryProposal(
+                theory_id=(
+                    f"theory-{sha256(('cross-study:' + identity).encode()).hexdigest()[:24]}"
+                ),
+                statement=proposition,
+                evidence=evidence,
+                support_count=len(evidence),
+                contradiction_count=0,
+            ))
+        competing = []
+        for index, left in enumerate(proposals):
+            for right in proposals[index + 1:]:
+                if self._compete(left.statement, right.statement):
+                    competing.append(CompetingTheory(
+                        left.theory_id, right.theory_id,
+                        "Shared subject with opposing polarity",
+                    ))
+        return replace(
+            bundle,
+            proposals=tuple(sorted(proposals, key=lambda item: item.theory_id)),
+            competing=tuple(competing),
+            content_hash="",
         ).finalized()
 
     def review(self, bundle: TheoryBundle, *, theory_id: str, decision: TheoryReviewState, reviewer: str, rationale: str, occurred_at: str) -> TheoryBundle:

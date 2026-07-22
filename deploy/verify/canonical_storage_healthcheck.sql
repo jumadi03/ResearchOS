@@ -3,6 +3,17 @@ DECLARE
     object_uuid uuid;
     event_uuid uuid;
 BEGIN
+    IF to_regclass('public.storage_tier_attestations') IS NULL OR
+       to_regclass('public.storage_tier_current') IS NULL THEN
+        RAISE EXCEPTION 'tiered storage catalog is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname='storage_tier_attestations_immutable'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'storage tier attestation immutability is missing';
+    END IF;
     INSERT INTO canonical_objects(object_type, stable_key, lifecycle_status)
     VALUES ('health_check', 'health:provenance-object', 'draft')
     ON CONFLICT(stable_key) DO UPDATE SET updated_at=now()
@@ -45,15 +56,30 @@ WHERE schemaname='public' AND tablename IN (
     'evidence_objects','provenance_events',
     'knowledge_nodes','knowledge_edges','research_artifacts',
     'artifact_lifecycle_events','publication_representations',
+    'publication_relationships','representation_capture_events',
     'backup_restore_verifications','restore_drill_runs',
     'restore_drill_run_events','restore_drill_schedule_state',
-    'restore_drill_schedule_events'
+    'restore_drill_schedule_events','scientific_impact_review_resolutions',
+    'scientific_follow_up_case_targets'
 );
 
 DO $$
 BEGIN
-IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 32 THEN
+IF (SELECT COALESCE(max(version),0) FROM schema_migrations) <> 42 THEN
         RAISE EXCEPTION 'database schema version does not match application';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM evidence_current_review_projection
+        WHERE NOT status_consistent
+    ) THEN
+        RAISE EXCEPTION 'evidence current-review projection is inconsistent';
+    END IF;
+    IF (
+        SELECT count(*) FROM evidence_current_review_projection
+    ) <> (
+        SELECT count(*) FROM evidence_objects
+    ) THEN
+        RAISE EXCEPTION 'evidence current-review projection coverage is incomplete';
     END IF;
     IF NOT EXISTS (
         SELECT 1 FROM storage_contract_registry

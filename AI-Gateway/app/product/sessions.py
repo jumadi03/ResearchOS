@@ -204,6 +204,61 @@ class WorkspaceSessionManager:
                            (row[0], Jsonb({"actor": actor})))
         return {"user_id": user_id, "revoked_sessions": count}
 
+    def rotate_password(self, username: str, password: str, actor: str):
+        username = username.strip().lower()
+        if len(password) < 20:
+            raise ValueError("Rotated password must contain at least 20 characters")
+        salt = os.urandom(16)
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT user_id FROM workspace_users
+                WHERE username=%s AND status='active' FOR UPDATE
+                """,
+                (username,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise LookupError("Active workspace user not found")
+            cursor.execute(
+                """
+                UPDATE workspace_users
+                SET password_hash=%s,password_salt=%s,password_iterations=%s,
+                    failed_attempts=0,locked_until=NULL,updated_at=now()
+                WHERE user_id=%s
+                """,
+                (
+                    _password_hash(password, salt, self.password_iterations),
+                    base64.b64encode(salt).decode(),
+                    self.password_iterations,
+                    row[0],
+                ),
+            )
+            cursor.execute(
+                """
+                UPDATE workspace_sessions SET revoked_at=now()
+                WHERE user_id=%s AND revoked_at IS NULL
+                """,
+                (row[0],),
+            )
+            revoked = cursor.rowcount
+            cursor.execute(
+                """
+                INSERT INTO authentication_events(
+                    username,event_type,details
+                ) VALUES (%s,'sessions_revoked',%s)
+                """,
+                (
+                    username,
+                    Jsonb({"actor": actor, "reason": "password_rotation"}),
+                ),
+            )
+        return {
+            "user_id": str(row[0]),
+            "username": username,
+            "revoked_sessions": revoked,
+        }
+
     def administration_audit(self, limit: int = 50):
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute("""

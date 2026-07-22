@@ -12,6 +12,7 @@ class KnowledgeRole(StrEnum):
     AUDITOR = "auditor"
     REVIEWER = "reviewer"
     INDEXER = "indexer"
+    PUBLISHER = "publisher"
 
 
 @dataclass(frozen=True, slots=True)

@@ -18,13 +18,16 @@ REQUIRED_RESOURCES = {
     "scientific_source_watches", "scientific_source_watch_state",
     "scientific_monitoring_runs", "scientific_changes",
     "scientific_change_acknowledgements",
+    "scientific_impact_review_resolutions",
+    "scientific_follow_up_case_targets",
     "scientific_source_watch_transitions",
     "extraction_manifests", "knowledge_intake_manifests",
     "scientific_identifiers", "identity_resolution_events",
     "evidence_objects", "evidence_review_events",
     "provenance_events", "knowledge_nodes", "knowledge_edges",
     "research_artifacts", "artifact_lifecycle_events",
-    "publication_representations", "embedding_index", "background_jobs",
+    "publication_representations", "publication_relationships",
+    "embedding_index", "background_jobs",
     "researchos-documents", "researchos-backups", "knowledge_data",
     "backup_runs", "backup_restore_verifications",
 }
@@ -54,6 +57,9 @@ def main() -> None:
                 "edges without provenance": "SELECT count(*) FROM knowledge_edges e LEFT JOIN provenance_events p ON p.provenance_id=e.provenance_id WHERE p.provenance_id IS NULL",
                 "artifact events without provenance": "SELECT count(*) FROM artifact_lifecycle_events e LEFT JOIN provenance_events p ON p.provenance_id=e.provenance_id WHERE p.provenance_id IS NULL",
                 "publication editions without representation": "SELECT count(*) FROM publication_representations p LEFT JOIN scientific_representations r ON r.representation_id=p.representation_id WHERE r.representation_id IS NULL",
+                "publication relationships without provenance": "SELECT count(*) FROM publication_relationships r LEFT JOIN provenance_events p ON p.provenance_id=r.provenance_id WHERE p.provenance_id IS NULL",
+                "impact resolutions without provenance": "SELECT count(*) FROM scientific_impact_review_resolutions r LEFT JOIN provenance_events p ON p.provenance_id=r.provenance_id WHERE p.provenance_id IS NULL",
+                "follow-up targets without provenance": "SELECT count(*) FROM scientific_follow_up_case_targets t LEFT JOIN provenance_events p ON p.provenance_id=t.provenance_id WHERE p.provenance_id IS NULL",
                 "invalid canonical hashes": "SELECT count(*) FROM scientific_representations WHERE length(checksum_sha256)<>64",
                 "invalid semantic dimensions": "SELECT count(*) FROM embedding_index WHERE dimensions<>1536",
             }
@@ -81,6 +87,9 @@ def main() -> None:
                 "backup_restore_verifications_immutable",
                 "identity_resolution_events_immutable",
                 "publication_representations_immutable",
+                "publication_relationships_immutable",
+                "scientific_impact_review_resolutions_immutable",
+                "scientific_follow_up_case_targets_immutable",
             }
             cursor.execute("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
             missing_triggers = required_triggers - {row[0] for row in cursor.fetchall()}
