@@ -44,6 +44,24 @@
   `Documents/PMC-010_CANONICAL_ADMISSION_RECORD.md`
 - Current verification: `passed`
 
+### REA-000
+
+- Title: `ResearchOS Engineering Architecture`
+- Version: `2.1`
+- Status: `Published Canonical Edition`
+- Classification: `Canonical Engineering Architecture Baseline`
+- Canonical effect: `engineering architecture interpretation, responsibility and contract boundaries, dependency direction, conformance aggregation, and bounded evolution`
+- Human authority: `Jumadi`
+- Decision date: `2026-07-22`
+- Repository-audit boundary: `8 PASS and 12 PARTIAL at revision 793c9870fa6d521a921c9fb97c5423970c00d6cf; not production acceptance`
+- Representation:
+  `Documents/REA-000_ResearchOS_Engineering_Architecture_v2.1_Published_Canonical_Edition.docx`
+- SHA-256:
+  `36b2c5681e922e1aae26d7f7a6e364b081bdcb465aaa0308c5749179986c9d35`
+- Admission record:
+  `Documents/REA-000_CANONICAL_ADMISSION_RECORD.md`
+- Current verification: `passed`
+
 ### DOC-000
 
 - Title: `Standar Publikasi Dokumen Kanonik`
