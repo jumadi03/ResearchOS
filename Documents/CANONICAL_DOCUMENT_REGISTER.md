@@ -2,7 +2,7 @@
 
 ## Status
 
-- Register date: `2026-07-19`
+- Register date: `2026-07-22`
 - Governing publication standard: `DOC-000 v0.2`
 - Scope: canonical project-governance DOCX representations in
   `Documents/`
@@ -10,6 +10,22 @@
   canonical status
 
 ## Current canonical documents
+
+### PMC-000
+
+- Title: `ResearchOS Project Master Context`
+- Version: `1.0`
+- Status: `Published Canonical Edition`
+- Classification: `Master Project Context and Documentation Index`
+- Human authority: `Jumadi`
+- Decision date: `2026-07-22`
+- Representation:
+  `Documents/PMC-000_ResearchOS_Project_Master_Context_v1.0_Published_Canonical_Edition.docx`
+- SHA-256:
+  `cb2443c8164ae6eb96342cd44577d50c425119de365af5ae414f73ebe57f9903`
+- Admission record:
+  `Documents/PMC-000_CANONICAL_ADMISSION_RECORD.md`
+- Current verification: `passed`
 
 ### DOC-000
 
